@@ -52,10 +52,13 @@ Preferred order:
 Guardrails:
 
 - Do not spam.
+- Keep proactive chat disabled unless the owner approves schedule, reason, and daily limit.
 - Do not bypass login or access restrictions.
 - Do not scrape private content without permission.
 - Do not send sensitive commands through weakly authenticated channels.
 - Keep personal-account bridges optional and disabled by default.
+- Do not pretend to be a real person when identity matters; the assistant may be warm and natural, but must remain honest about being automated.
+- Route company, money, legal, HR, account, and trading actions out of WeChat to Feishu or a protected approval flow.
 
 ### 2.3 Feishu
 
@@ -68,6 +71,7 @@ Guardrails:
 - Use minimal permissions.
 - Log command sender and command type.
 - Require approval for sensitive actions.
+- Treat Feishu CLI and MCP tools as controlled execution tools behind the app/event entry layer, not as unrestricted chat surfaces.
 
 ### 2.4 Shell and Server Automation
 

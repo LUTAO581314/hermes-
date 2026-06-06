@@ -16,7 +16,7 @@
 ```text
 Interaction Layer
   Feishu company-management bot
-  WeChat personal-companion bridge
+  WeChat personal-companion official channel
   BaiLongma UI
   CLI
 
@@ -30,7 +30,7 @@ Orchestration Layer
   Hermes
   job scheduler
   tool router
-  MCP adapters
+  MCP and CLI adapters
 
 Company Operations Layer
   Feishu tasks
@@ -108,15 +108,29 @@ Feishu is the system of action for company workflows. Obsidian is the durable me
 
 ```text
 Owner personal message or scheduled check-in
-  -> WeChat or BaiLongma
+  -> WeChat official channel or BaiLongma
   -> personal context retrieval
+  -> companion response policy
   -> lightweight reply or reminder
-  -> important facts written to Obsidian
+  -> important facts routed through Obsidian memory intake
 ```
 
-WeChat should be personal and lightweight. Company decisions, money, approvals, and employee management should stay in Feishu or owner-confirmed admin flows.
+WeChat should be personal and lightweight. Official channels, such as a WeChat Official Account or WeCom customer-service flow, are preferred. Personal-account bridges remain disabled until a separate risk review and owner acceptance. Company decisions, money, approvals, and employee management should stay in Feishu or owner-confirmed admin flows.
 
-### 3.5 API-First Multimodal Flow
+### 3.5 Feishu Tool Flow
+
+```text
+Feishu app callback or Channel SDK event
+  -> channel policy router
+  -> Hermes company workflow
+  -> Feishu CLI or MCP tool layer when an approved action needs execution
+  -> audit log
+  -> Feishu or Obsidian summary
+```
+
+Feishu CLI and MCP tools are execution tools, not the first message-entry layer. They should be invoked only behind the channel policy router, minimal permissions, and approval gates.
+
+### 3.6 API-First Multimodal Flow
 
 ```text
 Image / PDF / video / web URL
@@ -130,7 +144,7 @@ Image / PDF / video / web URL
 
 The VPS should not run heavy local image or video models by default. It should coordinate API calls, validate outputs, keep logs, and write final artifacts.
 
-### 3.6 Simulation Flow
+### 3.7 Simulation Flow
 
 ```text
 Obsidian notes

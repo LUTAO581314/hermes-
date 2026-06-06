@@ -15,6 +15,7 @@ This phase is intentionally small. It proves that Hermes can start, answer healt
 - Structured JSONL logs under `logs/hermes-runtime.jsonl`.
 - `.env.example` with placeholders only.
 - OpenAI-compatible multi-model gateway placeholders.
+- WeChat companion-channel placeholders with safe defaults.
 - `Dockerfile` and `docker-compose.yml`.
 - VPS helper scripts under `scripts/`.
 - systemd service template for non-Docker VPS deployment.
@@ -104,6 +105,9 @@ Readiness: ready
 Safe mode: true
 AI provider: supermoxi
 AI API key: configured on server only when provided by the owner
+WeChat mode: disabled
+WeChat channel: official_account
+WeChat personal bridge: disabled
 ```
 
 ## 6. Security Defaults
@@ -116,12 +120,16 @@ AI API key: configured on server only when provided by the owner
 - The systemd service runs as the non-root `hermes` user.
 - The systemd service uses `NoNewPrivileges`, `PrivateTmp`, and restricted write paths.
 - Feishu smoke testing is disabled until credentials are added on the server.
-- No WeChat personal bridge, broker API, shell executor, or public dashboard is enabled.
+- WeChat is configuration-ready only; the real callback adapter is not enabled.
+- WeChat proactive chat is disabled by default.
+- WeChat personal-account bridging is disabled by default.
+- No broker API, shell executor, or public dashboard is enabled.
 
 ## 7. Phase 1 Exit Criteria
 
 - Runtime starts locally.
 - `/health` responds.
+- `/health` reports AI and WeChat configuration state without exposing secrets.
 - `/ready` responds after runtime directories exist.
 - Logs are written.
 - No secrets are committed.

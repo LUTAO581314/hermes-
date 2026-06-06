@@ -48,6 +48,10 @@ Tasks:
 - Add safe stop/start/update commands. Completed locally.
 - Add Docker/Compose deployment files. Completed locally.
 - Add local tests. Completed locally.
+- Add AI model gateway configuration discovery. Completed locally and on VPS.
+- Add WeChat companion-channel safe configuration placeholders. Completed locally.
+- Add WeChat companion-channel strategy and guardrails. Completed locally.
+- Fix graceful systemd shutdown behavior. Completed locally.
 - Optional: send one Feishu test message if credentials are ready.
 - Write Phase 01 Chinese report. Completed.
 
@@ -61,6 +65,9 @@ Verification:
 - Remote service starts through `hermes-runtime.service`.
 - Remote health check returns `ok`.
 - Remote readiness check returns `ready`.
+- Health check reports AI and WeChat configuration state without exposing secrets.
+- WeChat mode remains disabled by default.
+- WeChat personal-account bridge remains disabled by default.
 - No secrets are committed.
 - Chinese report records access method, risks, and next steps.
 
@@ -194,9 +201,11 @@ Tasks:
 - Deploy BaiLongma or create adapter.
 - Evaluate Nuwa Skill for optional advisory persona generation.
 - Define personal memory boundary.
-- Configure Feishu or WeChat-compatible interaction path.
+- Configure Feishu or official WeChat-compatible interaction path.
 - Add personal check-in.
 - Add quick capture.
+- Add natural Chinese companion response policy.
+- Add proactive-chat schedule, limit, mute, and audit controls before enabling proactive messages.
 - Add Brain UI access boundary if used.
 - Write Phase 07 Chinese report.
 
@@ -208,11 +217,14 @@ Verification:
 
 ## Phase 8: WeChat Bridge Review
 
-Goal: support WeChat only within acceptable risk boundaries.
+Goal: support real WeChat messaging only within acceptable risk boundaries.
 
 Tasks:
 
 - Prefer official channels where possible.
+- Choose WeChat Official Account or WeCom customer-service path before any personal bridge.
+- Add callback signature or token verification.
+- Add message receive and reply adapter.
 - Review personal-account automation risks.
 - Avoid bypassing platform restrictions.
 - Add rate limits.

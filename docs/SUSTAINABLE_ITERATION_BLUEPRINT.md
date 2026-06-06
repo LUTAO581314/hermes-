@@ -111,6 +111,7 @@ The repository should keep these document roles clear:
 | `docs/MEMORY_GOVERNANCE.md` | Memory intake, graph, cleanup, correction, and index policy |
 | `docs/API_INTEGRATIONS.md` | External search runtime plus API-first OCR, image, speech, and video strategy |
 | `docs/SEARCH_RUNTIME.md` | TrendRadar/SearXNG search-project runtime plan |
+| `docs/WECHAT_COMPANION.md` | WeChat companion-channel strategy, official-channel preference, proactive chat limits, and memory boundary |
 | `docs/RISK_AND_GUARDRAILS.md` | Safety, approvals, secrets, trading, WeChat, Feishu, memory risks |
 | `docs/ROADMAP.md` | Phase-by-phase delivery plan |
 | `docs/CHINESE_REPORT_POLICY.md` | Required Chinese owner-facing reporting rule |
@@ -254,6 +255,7 @@ Deliverables:
 - Docker or service runner.
 - Environment template.
 - Health check.
+- AI and WeChat configuration-state discovery without exposing secrets.
 - Basic logging.
 - Chinese deployment report.
 
@@ -338,7 +340,9 @@ Deliverables:
 - Quick capture.
 - Lightweight alerts.
 - Personal memory boundaries.
-- WeChat risk review.
+- WeChat official-channel route.
+- Natural Chinese companion response policy.
+- Proactive-chat limit, mute, and audit rules before enabling proactive messages.
 - Chinese phase report.
 
 ### Phase 7: MiroFish Simulation Lab

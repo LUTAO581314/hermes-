@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import logging
 import signal
+import threading
 from typing import Any
 
 from .config import RuntimeConfig, load_config
@@ -57,6 +58,42 @@ class HermesHandler(BaseHTTPRequestHandler):
                         "fast_model": self.server.config.ai_fast_model,
                         "reasoning_model": self.server.config.ai_reasoning_model,
                         "vision_model": self.server.config.ai_vision_model,
+                    },
+                    "wechat": {
+                        "mode": self.server.config.wechat_mode,
+                        "channel": self.server.config.wechat_channel,
+                        "persona_mode": self.server.config.wechat_persona_mode,
+                        "proactive_chat": self.server.config.wechat_proactive_chat,
+                        "max_daily_proactive_messages": (
+                            self.server.config.wechat_max_daily_proactive_messages
+                        ),
+                        "personal_bridge_enabled": (
+                            self.server.config.wechat_personal_bridge_enabled
+                        ),
+                        "official_account": {
+                            "app_id_configured": (
+                                self.server.config.wechat_official_app_id_configured
+                            ),
+                            "app_secret_configured": (
+                                self.server.config.wechat_official_app_secret_configured
+                            ),
+                            "token_configured": (
+                                self.server.config.wechat_official_token_configured
+                            ),
+                            "aes_key_configured": (
+                                self.server.config.wechat_official_aes_key_configured
+                            ),
+                        },
+                        "wecom": {
+                            "corp_id_configured": self.server.config.wecom_corp_id_configured,
+                            "agent_id_configured": (
+                                self.server.config.wecom_agent_id_configured
+                            ),
+                            "secret_configured": self.server.config.wecom_secret_configured,
+                            "customer_service_token_configured": (
+                                self.server.config.wecom_customer_service_token_configured
+                            ),
+                        },
                     },
                     "created_at": utc_now(),
                 },
@@ -116,14 +153,23 @@ def run() -> None:
     server = build_server(config, logger)
     logger.info("starting hermes runtime on %s:%s", config.host, config.port)
     logger.info("runtime config: %s", asdict(config))
+    stop_requested = False
 
     def handle_stop(signum: int, _frame: object) -> None:
+        nonlocal stop_requested
+        if stop_requested:
+            return
+        stop_requested = True
         logger.info("received signal %s; stopping hermes runtime", signum)
-        server.shutdown()
+        threading.Thread(target=server.shutdown, name="hermes-shutdown", daemon=True).start()
 
     signal.signal(signal.SIGTERM, handle_stop)
     signal.signal(signal.SIGINT, handle_stop)
-    server.serve_forever(poll_interval=0.5)
+    try:
+        server.serve_forever(poll_interval=0.5)
+    finally:
+        server.server_close()
+        logger.info("hermes runtime stopped")
 
 
 if __name__ == "__main__":

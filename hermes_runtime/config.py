@@ -46,6 +46,20 @@ class RuntimeConfig:
     ai_reasoning_model: str
     ai_vision_model: str
     ai_timeout_seconds: int
+    wechat_mode: str
+    wechat_channel: str
+    wechat_persona_mode: str
+    wechat_proactive_chat: bool
+    wechat_max_daily_proactive_messages: int
+    wechat_personal_bridge_enabled: bool
+    wechat_official_app_id_configured: bool
+    wechat_official_app_secret_configured: bool
+    wechat_official_token_configured: bool
+    wechat_official_aes_key_configured: bool
+    wecom_corp_id_configured: bool
+    wecom_agent_id_configured: bool
+    wecom_secret_configured: bool
+    wecom_customer_service_token_configured: bool
 
 
 def load_config() -> RuntimeConfig:
@@ -78,4 +92,32 @@ def load_config() -> RuntimeConfig:
         ai_reasoning_model=os.getenv("HERMES_AI_REASONING_MODEL", ""),
         ai_vision_model=os.getenv("HERMES_AI_VISION_MODEL", ""),
         ai_timeout_seconds=_as_int(os.getenv("HERMES_AI_TIMEOUT_SECONDS"), 60),
+        wechat_mode=os.getenv("HERMES_WECHAT_MODE", "disabled"),
+        wechat_channel=os.getenv("HERMES_WECHAT_CHANNEL", "official_account"),
+        wechat_persona_mode=os.getenv("HERMES_WECHAT_PERSONA_MODE", "companion"),
+        wechat_proactive_chat=_as_bool(os.getenv("HERMES_WECHAT_PROACTIVE_CHAT"), False),
+        wechat_max_daily_proactive_messages=_as_int(
+            os.getenv("HERMES_WECHAT_MAX_DAILY_PROACTIVE_MESSAGES"), 3
+        ),
+        wechat_personal_bridge_enabled=_as_bool(
+            os.getenv("HERMES_WECHAT_PERSONAL_BRIDGE_ENABLED"), False
+        ),
+        wechat_official_app_id_configured=bool(
+            os.getenv("HERMES_WECHAT_OFFICIAL_APP_ID", "")
+        ),
+        wechat_official_app_secret_configured=bool(
+            os.getenv("HERMES_WECHAT_OFFICIAL_APP_SECRET", "")
+        ),
+        wechat_official_token_configured=bool(
+            os.getenv("HERMES_WECHAT_OFFICIAL_TOKEN", "")
+        ),
+        wechat_official_aes_key_configured=bool(
+            os.getenv("HERMES_WECHAT_OFFICIAL_AES_KEY", "")
+        ),
+        wecom_corp_id_configured=bool(os.getenv("HERMES_WECOM_CORP_ID", "")),
+        wecom_agent_id_configured=bool(os.getenv("HERMES_WECOM_AGENT_ID", "")),
+        wecom_secret_configured=bool(os.getenv("HERMES_WECOM_SECRET", "")),
+        wecom_customer_service_token_configured=bool(
+            os.getenv("HERMES_WECOM_CUSTOMER_SERVICE_TOKEN", "")
+        ),
     )

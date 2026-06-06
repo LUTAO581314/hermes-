@@ -16,9 +16,9 @@ The goal is not to install one chatbot. The goal is to build a layered AI operat
 
 ## Current Status
 
-Phase 0 planning is complete. Phase 1 runtime foundation has started and now includes a minimal Hermes runtime with health checks, structured logs, environment templates, Docker/Compose files, VPS helper scripts, tests, and a Chinese phase report.
+Phase 0 planning is complete. Phase 1 runtime foundation now includes a minimal Hermes runtime with health checks, structured logs, environment templates, Docker/Compose files, VPS helper scripts, tests, AI gateway discovery, WeChat channel configuration readiness, and Chinese phase reports.
 
-The first runtime stays in safe mode. Feishu, WeChat, Obsidian write-back, TrendRadar, Graphify, BaiLongma, MiroFish, and trading-related capabilities remain future adapters or external runtimes.
+The first runtime stays in safe mode. Feishu, Obsidian write-back, TrendRadar, Graphify, BaiLongma, MiroFish, and trading-related capabilities remain future adapters or external runtimes. WeChat is currently configuration-ready only: official channels are preferred, proactive chat is disabled, and personal-account bridging is disabled.
 
 ## Documents
 
@@ -30,6 +30,7 @@ The first runtime stays in safe mode. Feishu, WeChat, Obsidian write-back, Trend
 - [Phase 01 Runtime Foundation](docs/PHASE_01_RUNTIME_FOUNDATION.md)
 - [Search Runtime Strategy](docs/SEARCH_RUNTIME.md)
 - [AI Model Gateway](docs/AI_MODEL_GATEWAY.md)
+- [WeChat Companion Channel](docs/WECHAT_COMPANION.md)
 - [Memory Governance](docs/MEMORY_GOVERNANCE.md)
 - [API Integrations](docs/API_INTEGRATIONS.md)
 - [Roadmap](docs/ROADMAP.md)
@@ -40,6 +41,7 @@ The first runtime stays in safe mode. Feishu, WeChat, Obsidian write-back, Trend
 - [Sustainable Iteration Chinese Report](reports/phase-00-sustainable-iteration.zh-CN.md)
 - [Candidate Projects Chinese Report](reports/phase-00-candidate-projects.zh-CN.md)
 - [Phase 01 Runtime Foundation Chinese Report](reports/phase-01-runtime-foundation.zh-CN.md)
+- [WeChat Companion Readiness Chinese Report](reports/phase-01-wechat-companion-readiness.zh-CN.md)
 
 ## Run The Minimal Runtime
 
@@ -66,7 +68,7 @@ Build a minimal but useful system through the sustainable iteration loop:
 6. Add external search projects, plus APIs for OCR, image understanding, speech transcription, and video understanding.
 7. End every phase with verification, memory cleanup, and a Chinese owner report.
 
-WeChat companionship, BaiLongma persona features, MiroFish simulations, and trading execution should be added only after the company-management and memory loop is stable.
+WeChat companionship can now be planned against safe runtime flags, but the real callback adapter should still be added after owner-approved official-channel credentials are ready. BaiLongma persona features, MiroFish simulations, and trading execution should be added only after the company-management and memory loop is stable.
 
 ## Guiding Principle
 
