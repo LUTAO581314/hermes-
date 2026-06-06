@@ -16,7 +16,9 @@ The goal is not to install one chatbot. The goal is to build a layered AI operat
 
 ## Current Status
 
-This repository currently contains the full architecture and rollout plan. Runtime deployment files will be added after the model provider, domain, communication channels, and security boundaries are confirmed.
+Phase 0 planning is complete. Phase 1 runtime foundation has started and now includes a minimal Hermes runtime with health checks, structured logs, environment templates, Docker/Compose files, VPS helper scripts, tests, and a Chinese phase report.
+
+The first runtime stays in safe mode. Feishu, WeChat, Obsidian write-back, TrendRadar, Graphify, BaiLongma, MiroFish, and trading-related capabilities remain future adapters or external runtimes.
 
 ## Documents
 
@@ -25,6 +27,7 @@ This repository currently contains the full architecture and rollout plan. Runti
 - [Architecture](docs/ARCHITECTURE.md)
 - [Optimized Architecture](docs/OPTIMIZED_ARCHITECTURE.md)
 - [Candidate Project Evaluation](docs/CANDIDATE_PROJECT_EVALUATION.md)
+- [Phase 01 Runtime Foundation](docs/PHASE_01_RUNTIME_FOUNDATION.md)
 - [Memory Governance](docs/MEMORY_GOVERNANCE.md)
 - [API Integrations](docs/API_INTEGRATIONS.md)
 - [Roadmap](docs/ROADMAP.md)
@@ -34,6 +37,20 @@ This repository currently contains the full architecture and rollout plan. Runti
 - [Memory Governance Chinese Report](reports/phase-00-memory-governance.zh-CN.md)
 - [Sustainable Iteration Chinese Report](reports/phase-00-sustainable-iteration.zh-CN.md)
 - [Candidate Projects Chinese Report](reports/phase-00-candidate-projects.zh-CN.md)
+- [Phase 01 Runtime Foundation Chinese Report](reports/phase-01-runtime-foundation.zh-CN.md)
+
+## Run The Minimal Runtime
+
+```powershell
+python -m hermes_runtime
+```
+
+Health checks:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8787/health
+Invoke-RestMethod http://127.0.0.1:8787/ready
+```
 
 ## Recommended First Milestone
 

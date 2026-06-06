@@ -1,0 +1,15 @@
+services:
+  hermes-runtime:
+    build: .
+    container_name: hermes-runtime
+    env_file:
+      - .env
+    environment:
+      HERMES_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:${HERMES_PORT:-8787}:8787"
+    volumes:
+      - ./data:/opt/hermes-system/data
+      - ./logs:/opt/hermes-system/logs
+      - ./obsidian-vault:/opt/hermes-system/obsidian-vault
+    restart: unless-stopped

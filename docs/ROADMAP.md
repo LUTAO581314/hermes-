@@ -32,6 +32,8 @@ Exit criteria:
 
 ## Phase 1: VPS Runtime Foundation
 
+Status: in progress. Local runtime foundation has been added and is ready for deployment verification.
+
 Goal: deploy the minimal runtime safely on the VPS.
 
 Tasks:
@@ -39,18 +41,24 @@ Tasks:
 - Create non-root service user.
 - Install Docker or selected service runner.
 - Create `/opt/hermes-system`.
-- Add environment template.
-- Add health check.
-- Add basic logs.
-- Add safe stop/start/update commands.
+- Add environment template. Completed locally.
+- Add health check. Completed locally.
+- Add readiness check. Completed locally.
+- Add basic logs. Completed locally.
+- Add safe stop/start/update commands. Completed locally.
+- Add Docker/Compose deployment files. Completed locally.
+- Add local tests. Completed locally.
 - Optional: send one Feishu test message if credentials are ready.
-- Write Phase 01 Chinese report.
+- Write Phase 01 Chinese report. Completed locally.
 
 Verification:
 
-- Service starts.
-- Health check responds.
+- Service starts locally.
+- Health check responds locally.
+- Readiness check responds locally.
 - Logs are readable.
+- VPS SSH TCP reachability is confirmed.
+- Remote deployment verification remains pending until the server runtime is prepared.
 - No secrets are committed.
 - Chinese report records access method, risks, and next steps.
 

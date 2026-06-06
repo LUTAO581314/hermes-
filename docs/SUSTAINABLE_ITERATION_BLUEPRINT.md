@@ -107,6 +107,7 @@ The repository should keep these document roles clear:
 | `docs/ARCHITECTURE.md` | Technical architecture and flows |
 | `docs/OPTIMIZED_ARCHITECTURE.md` | Company/personal/backend plane design |
 | `docs/CANDIDATE_PROJECT_EVALUATION.md` | External project fit, license, and adoption plan |
+| `docs/PHASE_01_RUNTIME_FOUNDATION.md` | Minimal Hermes runtime, health checks, deployment commands, and safe-mode defaults |
 | `docs/MEMORY_GOVERNANCE.md` | Memory intake, graph, cleanup, correction, and index policy |
 | `docs/API_INTEGRATIONS.md` | API-first search, OCR, image, speech, and video strategy |
 | `docs/RISK_AND_GUARDRAILS.md` | Safety, approvals, secrets, trading, WeChat, Feishu, memory risks |
