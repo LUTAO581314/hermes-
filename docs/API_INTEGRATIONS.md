@@ -4,6 +4,8 @@
 
 The first production version should be API-first for heavy model capabilities, but search is project-runtime-first.
 
+The AI model provider should be configured as an OpenAI-compatible multi-model gateway. See [AI Model Gateway](AI_MODEL_GATEWAY.md).
+
 The lightweight VPS is enough when it only runs:
 
 - Hermes orchestration.

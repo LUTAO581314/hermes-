@@ -38,6 +38,14 @@ class RuntimeConfig:
     trendradar_base_url: str
     trendradar_mcp_command: str
     searxng_base_url: str
+    ai_provider: str
+    ai_base_url: str
+    ai_api_key_configured: bool
+    ai_default_model: str
+    ai_fast_model: str
+    ai_reasoning_model: str
+    ai_vision_model: str
+    ai_timeout_seconds: int
 
 
 def load_config() -> RuntimeConfig:
@@ -62,4 +70,12 @@ def load_config() -> RuntimeConfig:
         trendradar_base_url=os.getenv("HERMES_TRENDRADAR_BASE_URL", ""),
         trendradar_mcp_command=os.getenv("HERMES_TRENDRADAR_MCP_COMMAND", ""),
         searxng_base_url=os.getenv("HERMES_SEARXNG_BASE_URL", ""),
+        ai_provider=os.getenv("HERMES_AI_PROVIDER", "supermoxi"),
+        ai_base_url=os.getenv("HERMES_AI_BASE_URL", ""),
+        ai_api_key_configured=bool(os.getenv("HERMES_AI_API_KEY", "")),
+        ai_default_model=os.getenv("HERMES_AI_DEFAULT_MODEL", ""),
+        ai_fast_model=os.getenv("HERMES_AI_FAST_MODEL", ""),
+        ai_reasoning_model=os.getenv("HERMES_AI_REASONING_MODEL", ""),
+        ai_vision_model=os.getenv("HERMES_AI_VISION_MODEL", ""),
+        ai_timeout_seconds=_as_int(os.getenv("HERMES_AI_TIMEOUT_SECONDS"), 60),
     )

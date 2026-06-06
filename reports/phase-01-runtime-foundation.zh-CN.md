@@ -14,6 +14,7 @@
 - 新增 `/version` 版本接口。
 - 新增结构化 JSONL 日志。
 - 新增 `.env.example`，只放占位符，不放真实密钥。
+- 新增多模型 AI 网关配置占位，按 OpenAI-compatible 接入。
 - 新增 `.gitignore`，避免 `.env`、日志、数据、缓存进入 Git。
 - 新增 Dockerfile 和 docker-compose。
 - 新增 VPS 安装、启动、停止、更新脚本。
@@ -46,6 +47,8 @@
 /health：ok
 /ready：ready
 日志文件：/opt/hermes-system/logs/hermes-runtime.jsonl
+AI 网关：supermoxi
+AI 密钥：只允许写入服务器 .env，不进入 GitHub
 ```
 
 它现在还不能做到：

@@ -29,6 +29,7 @@ The first runtime stays in safe mode. Feishu, WeChat, Obsidian write-back, Trend
 - [Candidate Project Evaluation](docs/CANDIDATE_PROJECT_EVALUATION.md)
 - [Phase 01 Runtime Foundation](docs/PHASE_01_RUNTIME_FOUNDATION.md)
 - [Search Runtime Strategy](docs/SEARCH_RUNTIME.md)
+- [AI Model Gateway](docs/AI_MODEL_GATEWAY.md)
 - [Memory Governance](docs/MEMORY_GOVERNANCE.md)
 - [API Integrations](docs/API_INTEGRATIONS.md)
 - [Roadmap](docs/ROADMAP.md)

@@ -33,6 +33,14 @@ class RuntimeTests(unittest.TestCase):
                 trendradar_base_url="",
                 trendradar_mcp_command="",
                 searxng_base_url="",
+                ai_provider="supermoxi",
+                ai_base_url="https://api.supermoxi.cn",
+                ai_api_key_configured=False,
+                ai_default_model="",
+                ai_fast_model="",
+                ai_reasoning_model="",
+                ai_vision_model="",
+                ai_timeout_seconds=60,
             )
             config.log_dir.mkdir()
             config.data_dir.mkdir()
@@ -61,6 +69,14 @@ class RuntimeTests(unittest.TestCase):
                 trendradar_base_url="",
                 trendradar_mcp_command="",
                 searxng_base_url="",
+                ai_provider="supermoxi",
+                ai_base_url="https://api.supermoxi.cn",
+                ai_api_key_configured=True,
+                ai_default_model="",
+                ai_fast_model="",
+                ai_reasoning_model="",
+                ai_vision_model="",
+                ai_timeout_seconds=60,
             )
             logger = configure_logging(config.log_dir)
             server = build_server(config, logger)
@@ -84,6 +100,9 @@ class RuntimeTests(unittest.TestCase):
                 self.assertTrue(payload["safe_mode"])
                 self.assertEqual(payload["search"]["mode"], "external_project")
                 self.assertEqual(payload["search"]["project"], "trendradar")
+                self.assertEqual(payload["ai"]["provider"], "supermoxi")
+                self.assertTrue(payload["ai"]["base_url_configured"])
+                self.assertTrue(payload["ai"]["api_key_configured"])
             finally:
                 server.shutdown()
                 server.server_close()

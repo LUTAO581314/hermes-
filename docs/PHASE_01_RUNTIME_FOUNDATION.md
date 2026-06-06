@@ -14,6 +14,7 @@ This phase is intentionally small. It proves that Hermes can start, answer healt
 - Version endpoint: `GET /version`.
 - Structured JSONL logs under `logs/hermes-runtime.jsonl`.
 - `.env.example` with placeholders only.
+- OpenAI-compatible multi-model gateway placeholders.
 - `Dockerfile` and `docker-compose.yml`.
 - VPS helper scripts under `scripts/`.
 - systemd service template for non-Docker VPS deployment.
@@ -101,6 +102,8 @@ Bind address: 127.0.0.1:8787
 Health: ok
 Readiness: ready
 Safe mode: true
+AI provider: supermoxi
+AI API key: configured on server only when provided by the owner
 ```
 
 ## 6. Security Defaults

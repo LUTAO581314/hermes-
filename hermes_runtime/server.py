@@ -49,6 +49,15 @@ class HermesHandler(BaseHTTPRequestHandler):
                         "mode": self.server.config.search_mode,
                         "project": self.server.config.search_project,
                     },
+                    "ai": {
+                        "provider": self.server.config.ai_provider,
+                        "base_url_configured": bool(self.server.config.ai_base_url),
+                        "api_key_configured": self.server.config.ai_api_key_configured,
+                        "default_model": self.server.config.ai_default_model,
+                        "fast_model": self.server.config.ai_fast_model,
+                        "reasoning_model": self.server.config.ai_reasoning_model,
+                        "vision_model": self.server.config.ai_vision_model,
+                    },
                     "created_at": utc_now(),
                 },
             )
