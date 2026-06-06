@@ -168,6 +168,11 @@ Recommended order:
 5. Video summary.
 6. Financial data.
 
+Candidate tools:
+
+- TrendRadar can provide trend/news intelligence through isolated MCP, HTTP, CLI, or report ingestion.
+- Graphify can provide corpus graphing and document/code/media knowledge maps, especially for Obsidian and repository analysis.
+
 Each new adapter must define:
 
 - Provider.

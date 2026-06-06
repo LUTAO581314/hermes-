@@ -106,6 +106,7 @@ The repository should keep these document roles clear:
 | `docs/MASTER_PLAN.md` | Full product and system plan |
 | `docs/ARCHITECTURE.md` | Technical architecture and flows |
 | `docs/OPTIMIZED_ARCHITECTURE.md` | Company/personal/backend plane design |
+| `docs/CANDIDATE_PROJECT_EVALUATION.md` | External project fit, license, and adoption plan |
 | `docs/MEMORY_GOVERNANCE.md` | Memory intake, graph, cleanup, correction, and index policy |
 | `docs/API_INTEGRATIONS.md` | API-first search, OCR, image, speech, and video strategy |
 | `docs/RISK_AND_GUARDRAILS.md` | Safety, approvals, secrets, trading, WeChat, Feishu, memory risks |
@@ -302,6 +303,11 @@ Deliverables:
 - Obsidian write-back.
 - Chinese phase report.
 
+Candidate additions:
+
+- TrendRadar for external trend/news intelligence, isolated because of GPL-3.0.
+- Graphify for graph and corpus mapping, especially when memory/document visualization is needed.
+
 ### Phase 5: Company Workflow Hardening
 
 Goal:
@@ -348,6 +354,10 @@ Deliverables:
 - Decision note.
 - Chinese phase report.
 
+Candidate additions:
+
+- Nuwa Skill for advisory-board persona generation and simulation roles.
+
 ### Phase 8: Optional Execution Integrations
 
 Goal:
@@ -364,6 +374,10 @@ Examples:
 Default:
 
 Disabled until a separate safety design exists.
+
+Candidate additions:
+
+- Evolver may be evaluated later as an external phase-retrospective reviewer, but it must not self-modify production prompts, memory, or configuration.
 
 ## 8. Operating Cadence
 

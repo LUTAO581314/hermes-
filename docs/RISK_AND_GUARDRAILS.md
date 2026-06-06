@@ -196,3 +196,14 @@ The review should check:
 - No raw sensitive memory promoted to durable memory.
 - No public unauthenticated agent dashboard.
 - A Chinese phase report exists and states the remaining risks.
+
+## 10. External Project License Guardrail
+
+External projects must be reviewed before adoption.
+
+Rules:
+
+- GPL projects, including TrendRadar and Evolver, must remain isolated external runtimes unless a separate license review approves deeper use.
+- MIT projects, including Graphify and Nuwa Skill, may be integrated more flexibly, but large source copying should still be avoided.
+- Candidate tools must not receive secrets unless explicitly approved.
+- Candidate tools must not self-modify production memory, prompts, or configuration.

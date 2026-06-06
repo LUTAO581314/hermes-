@@ -335,3 +335,21 @@ Every phase must end with memory hygiene:
 - Update relevant MOC notes or Canvas maps.
 - Rebuild or invalidate search indexes when memory changes.
 - Record owner corrections when they affect future behavior.
+
+## 19. External Graph Tools
+
+Graph tools may help audit memory quality.
+
+Graphify is a strong candidate for:
+
+- Detecting isolated notes.
+- Mapping relationships between reports, projects, customers, and risks.
+- Creating graph reports for phase reviews.
+- Helping agents query large code/document corpora without reading everything.
+
+Rules:
+
+- Generated graphs are analysis artifacts, not automatically durable memory.
+- Keep only selected graph reports or maps.
+- Do not promote raw graph cache into Obsidian without review.
+- Use Obsidian links and Canvas as the owner-visible memory map.

@@ -24,6 +24,7 @@ This repository currently contains the full architecture and rollout plan. Runti
 - [Master Plan](docs/MASTER_PLAN.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Optimized Architecture](docs/OPTIMIZED_ARCHITECTURE.md)
+- [Candidate Project Evaluation](docs/CANDIDATE_PROJECT_EVALUATION.md)
 - [Memory Governance](docs/MEMORY_GOVERNANCE.md)
 - [API Integrations](docs/API_INTEGRATIONS.md)
 - [Roadmap](docs/ROADMAP.md)
@@ -32,6 +33,7 @@ This repository currently contains the full architecture and rollout plan. Runti
 - [Current Chinese Phase Report](reports/phase-00-architecture-plan.zh-CN.md)
 - [Memory Governance Chinese Report](reports/phase-00-memory-governance.zh-CN.md)
 - [Sustainable Iteration Chinese Report](reports/phase-00-sustainable-iteration.zh-CN.md)
+- [Candidate Projects Chinese Report](reports/phase-00-candidate-projects.zh-CN.md)
 
 ## Recommended First Milestone
 

@@ -91,6 +91,7 @@ Tasks:
 - Add owner preferences and corrections notes.
 - Add MOC topic maps.
 - Add Canvas visual memory map plan.
+- Evaluate Graphify for optional corpus/memory graph generation.
 - Add report templates.
 - Add decision log template.
 - Add memory intake gate.
@@ -115,6 +116,7 @@ Tasks:
 
 - Add search API adapter.
 - Add crawl/extraction adapter.
+- Evaluate TrendRadar as an isolated external trend/news intelligence runtime.
 - Add OCR or image-understanding adapter.
 - Add speech transcription workflow.
 - Add video summary workflow.
@@ -179,6 +181,7 @@ Goal: add Chinese persona and richer personal interaction.
 Tasks:
 
 - Deploy BaiLongma or create adapter.
+- Evaluate Nuwa Skill for optional advisory persona generation.
 - Define personal memory boundary.
 - Configure Feishu or WeChat-compatible interaction path.
 - Add personal check-in.
@@ -246,6 +249,7 @@ Tasks:
 - Add alerting.
 - Add secret rotation notes.
 - Add quarterly memory/index review.
+- Evaluate Evolver only as an external retrospective reviewer, not as an autonomous production mutator.
 - Write Phase 10 Chinese report.
 
 Verification:
