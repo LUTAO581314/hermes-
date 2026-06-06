@@ -20,6 +20,7 @@
 - 新增 systemd 服务模板，支持没有 Docker 的轻量服务器。
 - 新增本地单元测试。
 - 新增 Phase 01 技术说明文档。
+- 已在 VPS 上完成第一次安全模式部署验证。
 
 ## 3. 当前效果
 
@@ -34,6 +35,18 @@
 - 通过 Docker Compose 部署。
 - 通过 systemd 在无 Docker 的 VPS 上后台运行。
 - 以安全模式启动。
+
+远程 VPS 验证结果：
+
+```text
+部署目录：/opt/hermes-system
+服务名称：hermes-runtime.service
+运行用户：hermes
+监听地址：127.0.0.1:8787
+/health：ok
+/ready：ready
+日志文件：/opt/hermes-system/logs/hermes-runtime.jsonl
+```
 
 它现在还不能做到：
 
@@ -76,13 +89,13 @@ Hermes Runtime
 
 当前主要风险：
 
-- 远程 VPS 仍需要实际部署验证。
+- 当前只在服务器本机监听，暂未配置公网反向代理。
 - 如果要公网访问，需要单独配置反向代理、域名、TLS 和认证。
 - 飞书回调上线前还需要签名校验和权限最小化设计。
 
 ## 6. 需要主人确认的事项
 
-后续进入真实部署和 Phase 2 前，需要主人确认：
+后续进入 Phase 2 前，需要主人确认：
 
 - 是否继续使用当前 VPS。
 - 是否准备飞书应用凭据。
@@ -95,13 +108,13 @@ Hermes Runtime
 推荐下一步：
 
 ```text
-Phase 1.5：远程 VPS 实际部署验证
+Phase 2：飞书公司管理 MVP
 ```
 
-如果部署验证通过，再进入：
+如果主人暂时没有飞书凭据，可以先做：
 
 ```text
-Phase 2：飞书公司管理 MVP
+Phase 1.5：公网入口、反向代理、TLS、认证和健康监控
 ```
 
 Phase 2 优先做：
@@ -117,6 +130,7 @@ Phase 2 优先做：
 本阶段应进入长期记忆的内容：
 
 - Hermes 已经有最小运行时骨架。
+- Hermes 已经在 VPS 上以 systemd 安全模式运行。
 - 默认安全模式开启。
 - `.env` 不进入 Git。
 - Feishu、微信、TrendRadar、Graphify、MiroFish 都是后续适配器，不是 Phase 1 核心。
@@ -137,7 +151,8 @@ Phase 2 优先做：
 - 本阶段没有接入交易。
 - 本阶段没有启用微信个人号自动化。
 - 本阶段没有复制外部候选项目源码。
+- 远程服务只监听服务器本机地址，未直接暴露公网。
 
 结论：
 
-Phase 1 本地运行基础可以进入验证和远程部署准备。
+Phase 1 已完成第一版安全运行基础，可以进入飞书 MVP 或公网入口加固。

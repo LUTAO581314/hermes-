@@ -91,6 +91,18 @@ Update:
 bash scripts/update.sh
 ```
 
+Deployed verification snapshot:
+
+```text
+Service: hermes-runtime.service
+Path: /opt/hermes-system
+Runtime user: hermes
+Bind address: 127.0.0.1:8787
+Health: ok
+Readiness: ready
+Safe mode: true
+```
+
 ## 6. Security Defaults
 
 - The default host is `127.0.0.1`.
@@ -111,4 +123,5 @@ bash scripts/update.sh
 - Logs are written.
 - No secrets are committed.
 - VPS SSH reachability is checked before deployment.
+- VPS deployment is verified through systemd.
 - Chinese report is written.
