@@ -310,17 +310,38 @@ Suggested defaults:
 
 ## 13. Garbage Collection
 
-Run memory cleanup regularly.
+Run memory dream consolidation regularly.
+
+The system should not jump directly from "memory looks messy" to deletion. A
+human-like memory layer should first sleep on the material: cluster related
+items, identify repeated patterns, mark test noise, spot sensitive mistakes,
+and produce a reviewable dream report. Cleanup is an action after review; dream
+consolidation is the analysis step before that action.
+
+Dream consolidation mode:
+
+```text
+BaiLongma runtime graph
+  -> memory dream analysis
+  -> noise / duplicate / sensitive / weak-axis signals
+  -> Chinese dream report
+  -> owner review
+  -> forget, merge, inbox, report-only, or promote
+```
+
+Dream mode is read-only by default. It must not delete BaiLongma memory, promote
+anything into Obsidian, or rewrite indexes without owner confirmation.
 
 After every setup phase:
 
 - Query recent BaiLongma memories.
-- Delete or downgrade test memories.
+- Run a memory dream report if memory count increased or the graph looks messy.
+- Delete or downgrade test memories only after the dream report or owner rule makes the decision clear.
 - Confirm memory count did not jump because of smoke tests.
 - Write useful setup facts into a Chinese phase report instead of raw memory.
 - If an item is useful but uncertain, place it in `00-Inbox/needs-review`.
 
-### 13.1 BaiLongma Phase-End Cleanup Runbook
+### 13.1 BaiLongma Phase-End Dream Runbook
 
 For the current Hermes/BaiLongma core, every capability test should have a small memory audit.
 
@@ -338,18 +359,19 @@ After testing:
 record memory_count_after
 if memory_count_after > memory_count_before:
   inspect recent memory items
-  keep only stable preferences, decisions, project facts, repeated patterns, or owner-approved facts
-  delete or downgrade test output, greetings, status checks, and temporary troubleshooting
+  run memory dream consolidation
+  classify stable preferences, decisions, project facts, repeated patterns, or owner-approved facts
+  mark test output, greetings, status checks, and temporary troubleshooting as forget-candidates
   write useful setup facts into the Chinese phase report instead of durable memory
 ```
 
 Recommended labels:
 
-- `promote`: stable and useful enough for Obsidian.
-- `merge`: overlaps with an existing note or `mem_id`.
-- `inbox`: useful but uncertain; place under `00-Inbox/needs-review`.
+- `promote-candidate`: stable and useful enough for Obsidian.
+- `merge-candidate`: overlaps with an existing note or `mem_id`.
+- `inbox-candidate`: useful but uncertain; place under `00-Inbox/needs-review`.
 - `report-only`: useful phase fact, but not a long-term memory.
-- `delete`: test garbage, duplicate, or sensitive accidental capture.
+- `forget-candidate`: test garbage, duplicate, or sensitive accidental capture.
 
 Examples:
 
@@ -360,7 +382,22 @@ Examples:
 | `权限问题已永久解决` | delete unless tied to a reusable runbook |
 | `主人希望每阶段写中文报告` | promote because it is a stable preference |
 | `主人当前阶段冻结视频` | promote or decision note because it affects scope |
-| raw API key, password, QR token | delete or redact immediately |
+| raw API key, password, QR token | forget-candidate or redact immediately |
+
+Local dream report command:
+
+```bash
+curl -fsS -u "owner:$BAILONGMA_PASS" -H "Origin: https://bairui.chat" \
+  "https://bairui.chat/memory/graph?limit=120" > data/memory-graph.json
+python scripts/memory-dream.py \
+  --input data/memory-graph.json \
+  --output data/memory-dream-report.md \
+  --source "https://bairui.chat/memory/graph?limit=120"
+```
+
+The generated report belongs in ignored runtime data by default because it may
+contain private memory content. Commit only a cleaned Chinese phase summary or a
+general rule update.
 
 Weekly:
 

@@ -75,7 +75,7 @@ Finish Phase 2 as a stable core:
 1. Verify Hermes, BaiLongma, TrendRadar, image, voice, and memory count with [Core MVP Runbook](docs/CORE_MVP_RUNBOOK.md).
 2. Keep video frozen until the owner reopens that scope.
 3. Route useful memory candidates through [Obsidian Write-Back Workflow](docs/OBSIDIAN_WRITEBACK_WORKFLOW.md).
-4. Clean BaiLongma setup/test memories after each smoke test.
+4. Run BaiLongma memory dream consolidation after noisy tests, then clean or merge only after review.
 5. Write every phase result into a Chinese report.
 6. After the core loop is stable, move to Feishu company management or TTS based on available credentials.
 
@@ -93,4 +93,4 @@ Every implementation phase must produce a Chinese report for the owner. Research
 
 ## Iteration Rule
 
-Every phase follows the same loop: phase brief, scope lock, implementation, verification, Chinese report, memory cleanup, risk review, and next-phase decision.
+Every phase follows the same loop: phase brief, scope lock, implementation, verification, Chinese report, memory dream consolidation, reviewed cleanup, risk review, and next-phase decision.

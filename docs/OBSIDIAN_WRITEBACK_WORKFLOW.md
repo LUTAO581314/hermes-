@@ -173,23 +173,29 @@ Voice input:
 - Do not store every voice message as a permanent note.
 - If a voice transcript is important but messy, store a cleaned summary with source metadata.
 
-## 7. Phase-End Memory Cleanup
+## 7. Phase-End Memory Dream
 
 At the end of each phase:
 
 1. Record the BaiLongma memory count.
 2. Inspect recent memory additions.
-3. Delete or downgrade setup and smoke-test memories.
-4. Promote only stable decisions and owner-approved facts.
+3. Run a memory dream report when memory grew, clusters look noisy, or the owner says memory is confused.
+4. Mark setup and smoke-test memories as `forget-candidate` or `report-only`.
+5. Promote only stable decisions and owner-approved facts.
 5. Write useful runtime facts into the Chinese phase report.
 6. Move uncertain candidates to `00-Inbox/needs-review`.
 7. Update MOC notes or Canvas maps if the memory graph changed.
 8. Rebuild or invalidate search indexes if notes changed.
 
-## 8. Weekly Cleanup
+Dream reports are read-only review artifacts. They should suggest merge,
+forget, inbox, report-only, or promote actions, but they must not automatically
+rewrite BaiLongma memory or Obsidian notes.
+
+## 8. Weekly Dream And Cleanup
 
 Weekly:
 
+- Run a memory dream report over the current BaiLongma graph.
 - Merge duplicate candidates.
 - Archive closed task notes.
 - Link isolated notes to a project, goal, decision, or report.
@@ -228,6 +234,17 @@ side effect: no permanent promotion without review
 ```
 
 This keeps the system useful while preventing memory from turning into hidden clutter.
+
+The companion automation is a memory dream tool:
+
+```text
+input: BaiLongma /memory/graph JSON
+checks: noise, duplicate, sensitivity, isolated nodes, weak relationship axes
+output: Chinese dream report under ignored runtime data
+side effect: no deletion, no promotion, no Obsidian rewrite
+```
+
+The owner can then approve which dream suggestions become real memory actions.
 
 ## 11. BaiLongma Graph Boundary
 

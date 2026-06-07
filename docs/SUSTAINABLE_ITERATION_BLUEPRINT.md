@@ -11,7 +11,7 @@ The system must become useful through repeated safe iterations:
 - Verify it.
 - Write a Chinese owner-facing report.
 - Capture lessons into Obsidian.
-- Clean memory and remove noise.
+- Run memory dream consolidation, then remove or merge noise after review.
 - Decide the next phase.
 
 ## 2. Permanent Architecture
@@ -108,9 +108,9 @@ The repository should keep these document roles clear:
 | `docs/OPTIMIZED_ARCHITECTURE.md` | Company/personal/backend plane design |
 | `docs/CANDIDATE_PROJECT_EVALUATION.md` | External project fit, license, and adoption plan |
 | `docs/PHASE_01_RUNTIME_FOUNDATION.md` | Minimal Hermes runtime, health checks, deployment commands, and safe-mode defaults |
-| `docs/CORE_MVP_RUNBOOK.md` | Current Hermes + BaiLongma core verification and cleanup checklist |
-| `docs/MEMORY_GOVERNANCE.md` | Memory intake, graph, cleanup, correction, and index policy |
-| `docs/OBSIDIAN_WRITEBACK_WORKFLOW.md` | Practical Obsidian inbox, promotion, correction, and phase cleanup workflow |
+| `docs/CORE_MVP_RUNBOOK.md` | Current Hermes + BaiLongma core verification and memory dream checklist |
+| `docs/MEMORY_GOVERNANCE.md` | Memory intake, graph, dream consolidation, correction, and index policy |
+| `docs/OBSIDIAN_WRITEBACK_WORKFLOW.md` | Practical Obsidian inbox, promotion, correction, dream consolidation, and reviewed cleanup workflow |
 | `docs/API_INTEGRATIONS.md` | External search runtime plus API-first OCR, image, speech, and video strategy |
 | `docs/SEARCH_RUNTIME.md` | TrendRadar/SearXNG search-project runtime plan |
 | `docs/WECHAT_COMPANION.md` | WeChat companion-channel strategy, official-channel preference, proactive chat limits, and memory boundary |
@@ -129,7 +129,7 @@ Every phase follows the same loop.
 3. Implementation or documentation update
 4. Verification
 5. Chinese owner report
-6. Memory update and cleanup
+6. Memory dream consolidation and reviewed cleanup
 7. Risk review
 8. Next-phase decision
 ```
@@ -189,9 +189,9 @@ The report must include:
 
 Research notes may stay in English. Owner-facing phase reports must be Chinese.
 
-### 5.5 Memory Cleanup
+### 5.5 Memory Dream And Reviewed Cleanup
 
-Every phase must end with memory hygiene:
+Every phase must end with memory dream hygiene:
 
 - What should become durable memory?
 - What should stay as a report?
@@ -199,6 +199,10 @@ Every phase must end with memory hygiene:
 - What should be deleted?
 - Which Obsidian links or Canvas maps need updating?
 - Does the search/vector index need rebuilding?
+
+The first step is a read-only dream pass: cluster related memories, detect
+duplicates, find weak relationship axes, and mark sensitive or test garbage.
+Deletion and promotion happen only after review.
 
 ## 6. Quality Gates
 
@@ -411,7 +415,7 @@ Candidate additions:
 Suggested cadence:
 
 - Daily: system health, company briefing, task checks.
-- Weekly: company report, memory cleanup, roadmap check.
+- Weekly: company report, memory dream consolidation, roadmap check.
 - Monthly: architecture review, stale memory review, cost review.
 - Quarterly: security review, permission review, index rebuild, strategy reset.
 
@@ -473,4 +477,4 @@ Hermes core
 + Chinese Phase 2 report
 ```
 
-Video, Feishu, TTS, simulations, and trading should wait until this core loop passes verification and memory cleanup.
+Video, Feishu, TTS, simulations, and trading should wait until this core loop passes verification, memory dream consolidation, and reviewed cleanup.

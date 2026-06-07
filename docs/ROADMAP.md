@@ -3,7 +3,7 @@
 This roadmap follows the sustainable iteration loop:
 
 ```text
-phase brief -> scope lock -> implementation -> verification -> Chinese report -> memory cleanup -> risk review -> next phase
+phase brief -> scope lock -> implementation -> verification -> Chinese report -> memory dream -> reviewed cleanup -> risk review -> next phase
 ```
 
 ## Phase 0: Planning Foundation
@@ -28,7 +28,7 @@ Exit criteria:
 
 - Repository explains the intended system.
 - Every core decision has a document.
-- Future phases have reporting and memory cleanup rules.
+- Future phases have reporting, memory dream, and reviewed cleanup rules.
 
 ## Phase 1: VPS Runtime Foundation
 
@@ -73,7 +73,7 @@ Verification:
 
 ## Phase 2: Core Hermes and BaiLongma MVP
 
-Status: core MVP verified; still open for Obsidian automation, memory cleanup automation, and TTS.
+Status: core MVP verified; still open for Obsidian automation, memory dream actions, and TTS.
 
 Goal: stabilize the personal core before expanding into company workflows or video.
 
@@ -109,12 +109,13 @@ Completed:
 - Write Phase 02 Chinese report. Completed.
 - Add a core capability verification runbook. Completed locally.
 - Add an Obsidian write-back workflow. Completed locally.
-- Add a memory cleanup runbook for BaiLongma runtime memories. Completed locally.
+- Add a memory dream runbook for BaiLongma runtime memories. Completed locally.
+- Add a read-only memory dream report tool. Completed locally.
 
 Remaining:
 
 - Turn Obsidian write-back into a Hermes tool or script.
-- Turn BaiLongma memory cleanup into a one-command check.
+- Turn BaiLongma memory dream suggestions into reviewed forget/merge/inbox/promote actions.
 - Configure TTS only after the owner provides MiniMax, Doubao, OpenAI TTS, or another approved key.
 - Keep BaiLongma web-search settings empty unless a dedicated provider or SearXNG is selected; use Hermes + TrendRadar first.
 
@@ -170,7 +171,7 @@ Tasks:
 - Add decision log template.
 - Add memory intake gate.
 - Add correction/deletion workflow.
-- Add weekly cleanup workflow.
+- Add weekly memory dream and reviewed cleanup workflow.
 - Add stale-memory review metadata.
 - Write Phase 04 Chinese report.
 

@@ -4,7 +4,7 @@
 
 Build a private, long-running personal and company agent system that can remember, research, simulate, summarize, manage workflows, and assist with execution while keeping the owner in control.
 
-This plan should be implemented through the sustainable iteration loop defined in [Sustainable Iteration Blueprint](SUSTAINABLE_ITERATION_BLUEPRINT.md). Each phase must be small, verified, reported in Chinese, and followed by memory cleanup.
+This plan should be implemented through the sustainable iteration loop defined in [Sustainable Iteration Blueprint](SUSTAINABLE_ITERATION_BLUEPRINT.md). Each phase must be small, verified, reported in Chinese, and followed by memory dream consolidation plus reviewed cleanup.
 
 The system should become a practical personal operating layer:
 
@@ -363,7 +363,7 @@ Deliverables:
 - Obsidian MOC notes and Canvas map plan.
 - Inbox and review workflow.
 - Correction and deletion workflow.
-- Staleness and cleanup schedule.
+- Staleness, memory dream, and reviewed cleanup schedule.
 - Report templates.
 - Decision log templates.
 - Agent activity log templates.

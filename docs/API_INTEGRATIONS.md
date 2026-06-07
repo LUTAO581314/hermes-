@@ -204,14 +204,14 @@ The current core MVP should prove:
 2. BaiLongma can call the main model through the custom `gpt-5.5` gateway.
 3. BaiLongma can use local Whisper for voice input.
 4. BaiLongma can analyze one image through `analyze_image`.
-5. Memory growth is governed by explicit intake, review, and cleanup rules.
+5. Memory growth is governed by explicit intake, dream consolidation, review, and cleanup rules.
 6. BaiLongma can visualize runtime memory as a governed candidate graph without promoting it automatically.
 7. Each completed phase writes a Chinese report.
 
 Operational runbook:
 
 - Use [Core MVP Runbook](CORE_MVP_RUNBOOK.md) for service and capability verification.
-- Use [Obsidian Write-Back Workflow](OBSIDIAN_WRITEBACK_WORKFLOW.md) for memory candidates, image conclusions, voice transcripts, corrections, and phase cleanup.
+- Use [Obsidian Write-Back Workflow](OBSIDIAN_WRITEBACK_WORKFLOW.md) for memory candidates, image conclusions, voice transcripts, corrections, dream consolidation, and reviewed phase cleanup.
 
 ## 12. Later API MVP
 

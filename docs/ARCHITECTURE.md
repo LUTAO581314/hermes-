@@ -353,7 +353,8 @@ phase scope
   -> verification
   -> Chinese report
   -> Obsidian memory update
-  -> memory cleanup
+  -> memory dream consolidation
+  -> reviewed cleanup
   -> risk review
   -> next phase
 ```

@@ -31,7 +31,8 @@ owner message
   -> model response
   -> useful result
   -> Obsidian inbox or phase report
-  -> memory cleanup
+  -> memory dream consolidation
+  -> reviewed cleanup
 ```
 
 ## 2. Current Runtime Map
@@ -184,11 +185,24 @@ Before a smoke test:
 After a smoke test:
 
 - Check the memory count again.
-- If memory count increased, inspect whether the new item is useful.
-- Delete, downgrade, or archive setup noise.
+- If memory count increased, run a memory dream report before deciding what to change.
+- Delete, downgrade, merge, or archive setup noise only after review.
 - Put useful setup facts into the phase report, not into permanent memory.
 
 Test output such as `API OK`, `MOXI CORE OK`, `permission fixed`, QR login state, and health-check status should not become durable memory.
+
+Memory dream report command:
+
+```bash
+curl -fsS -u "owner:$BAILONGMA_PASS" -H "Origin: https://bairui.chat" \
+  "https://bairui.chat/memory/graph?limit=120" > data/memory-graph.json
+python scripts/memory-dream.py \
+  --input data/memory-graph.json \
+  --output data/memory-dream-report.md \
+  --source "https://bairui.chat/memory/graph?limit=120"
+```
+
+`data/memory-dream-report.md` is ignored by Git by default because it may contain private memory content. Commit only cleaned phase summaries and general governance rules.
 
 ## 8. Owner-Facing Capability Test Script
 
@@ -200,7 +214,8 @@ Use this checklist when testing through the UI:
 3. Image: upload or point to one harmless image and ask for OCR/description.
 4. Voice: send one short voice input and confirm text transcription.
 5. Memory: ask what it remembers only after the memory count is checked.
-6. Cleanup: remove any setup/test memory that appeared.
+6. Dream: generate a memory dream report if the graph looks noisy.
+7. Cleanup: remove, merge, or downgrade setup/test memory only after review.
 ```
 
 Do not use real credentials, financial account screenshots, private contracts, or sensitive customer material in the first test batch.
@@ -214,7 +229,7 @@ The core phase is considered stable only when:
 - Hermes MCP shows TrendRadar enabled.
 - Image route exposes `analyze_image` and hides video.
 - Voice route returns a real transcript through local Whisper.
-- Memory count does not jump because of smoke tests.
+- Memory count does not jump because of smoke tests, or a memory dream report identifies and contains the noise.
 - Brain UI memory graph shows runtime memory as candidates, with Obsidian marked as source of truth.
 - Obsidian write-back workflow exists.
 - Chinese phase report is updated.
