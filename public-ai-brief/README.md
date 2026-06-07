@@ -13,6 +13,7 @@ Use this folder when asking another AI to:
 - critique risks,
 - compare architecture options,
 - propose missing modules,
+- review sticker/media bridge boundaries,
 - draft engineering tasks.
 
 Do not provide the internal repository root to external AI unless the reviewer

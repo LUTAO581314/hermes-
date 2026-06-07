@@ -49,6 +49,7 @@ Core capabilities to solve first:
 - Tool calling and external project routing.
 - Image understanding and OCR through the active multimodal model.
 - Voice input through local Whisper as a transitional ASR.
+- Sticker/media expression through a metadata-only bridge, with optional runtime image generation after review.
 
 Temporarily out of scope:
 
@@ -73,6 +74,7 @@ Verified current state:
 - Local Whisper `tiny` is installed in a dedicated virtual environment and verified through BaiLongma voice WebSocket flow.
 - Brain UI voice output now has a no-cost browser SpeechSynthesis fallback when `/tts/stream` fails because provider credentials are missing.
 - BaiLongma image understanding tool is available through `analyze_image`; direct GPT-5.5 vision smoke tests work. Brain UI chat now accepts pasted, dragged, or selected image attachments and routes them into `analyze_image`. WeChat ClawBot inbound image items now use the same read-image path after server-side media download.
+- Hermes now includes a metadata-only sticker bridge for cute/kawaii/anime-style prepared stickers. It records sticker intent, provider query, style, license notes, and channel send instructions without committing image files. The current image API can be used later as an optional `image_generation` provider for original MOXI/Moxi stickers after content review and runtime upload.
 - BaiLongma Brain UI exposes a read-only governed memory graph through `/memory/graph`; Obsidian remains the durable source of truth.
 - Feishu personal/bot chat webhook is configured and verified at `https://bairui.chat/social/feishu/webhook`; callback challenge passes through Nginx without Basic Auth, encrypted callback verification is supported, and the backend can obtain a Feishu tenant access token.
 - Feishu inbound identity now keeps each Feishu sender as a separate company-context user (`FEISHU:<open_id>`) while preserving `feishu:open_id:<open_id>` as the reply target.
@@ -81,7 +83,7 @@ Known gaps:
 
 - BaiLongma's own `/settings/web-search` provider keys are empty. Search should use Hermes + TrendRadar first.
 - TTS provider settings exist, but no production TTS key is configured yet. Browser speech fallback is usable for web testing, but it is not a stable provider-grade TTS path.
-- MiniMax is not required for image understanding, including Brain UI image attachments and WeChat inbound image reading. MiniMax is not configured yet, so MiniMax image/music/lyrics/TTS generation stays disabled. `image2` / image generation remains a separate provider capability and is not fixed by the GPT-5.5 vision path.
+- MiniMax is not required for image understanding, including Brain UI image attachments and WeChat inbound image reading. MiniMax is not configured yet, so MiniMax image/music/lyrics/TTS generation stays disabled. The current API path can now provide image generation as a separate runtime provider, but it remains distinct from GPT-5.5 vision/image understanding and should be review-gated before chat delivery.
 - Feishu chat callback and sender identity separation are ready, but file/document and company-management workflows are not implemented yet.
 
 ## 5. Capability Map
@@ -94,7 +96,8 @@ Known gaps:
 | Private memory search | Meilisearch or lightweight local index | Index Obsidian notes, not a replacement for Obsidian |
 | OCR | Active multimodal model first, dedicated OCR API later | Use for screenshots, PDFs, receipts, tables, and images with text |
 | Image understanding | Active multimodal model API | Implemented as BaiLongma `analyze_image` using the current `gpt-5.5` gateway; Brain UI and WeChat inbound images share this path; does not require MiniMax |
-| Image generation | Dedicated image provider | Separate from image understanding; `image2` is still unavailable until a generation provider/key is configured |
+| Image generation | Current image-capable API provider | Separate from image understanding; use for reviewed original stickers or assets, not for reading images |
+| Sticker bridge | Metadata-only provider bridge first; Stipop/GIPHY/image generation later | Do not commit sticker files; Feishu sends by uploaded `image_key`, WeChat by runtime bridge/media id |
 | Speech transcription | Local Whisper tiny first, cloud ASR later if needed | Current transition solution is local Whisper on the VPS |
 | Feishu chat and identity | Official Feishu event callback first | Webhook path must bypass site Basic Auth; encrypted events are supported; each Feishu sender is separated by open_id |
 | Feishu files and docs | Read-only Feishu Drive/Docs/Search APIs first | Add only after permissions, tenant installation, and audit rules are explicit |
@@ -126,6 +129,14 @@ Image and OCR:
 
 - A hosted multimodal model API for general image understanding.
 - A dedicated OCR API when accuracy on Chinese text, tables, or documents matters.
+
+Sticker/media expression:
+
+- Stipop is the preferred first prepared-sticker provider because it is built for messaging sticker APIs.
+- GIPHY stickers can be used only where attribution and API terms can be respected.
+- OpenMoji and Noto Emoji are fallback emoji-style sources, not the main anime/kawaii style.
+- The current image-generation API can create original MOXI sticker candidates at runtime. Keep it review-gated, do not imitate existing anime IP, and never commit generated images.
+- Feishu and WeChat adapters should upload runtime images to the platform and send by platform token (`image_key`, `media_id`, or bridge equivalent).
 
 Speech:
 

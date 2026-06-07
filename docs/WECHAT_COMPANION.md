@@ -72,6 +72,7 @@ Allowed behavior:
 - Context-aware follow-ups from recent conversation and governed memory.
 - Short proactive check-ins when enabled by the owner.
 - Natural pacing, such as avoiding multiple rapid-fire messages for one thought.
+- Cute prepared stickers when the sticker bridge is enabled and the channel can upload/send media.
 - Memory-aware personalization after facts pass the memory intake gate.
 - Summaries, reminders, quick capture, and personal planning.
 
@@ -80,6 +81,7 @@ Not allowed:
 - Pretending to be a real human.
 - Hiding that automation is involved when identity matters.
 - Spamming or mass messaging.
+- Downloading copyrighted sticker packs into Git or sending unreviewed generated images.
 - Using WeChat for weakly authenticated money, HR, legal, or account actions.
 - Bypassing platform login, access, or anti-automation restrictions.
 
@@ -145,6 +147,7 @@ Current BaiLongma rule:
 Allowed by default in WeChat:
 
 - Personal chat.
+- Reviewed companion stickers and lightweight media expression.
 - Personal reminders.
 - Idea capture.
 - Reading safe summaries.
@@ -224,6 +227,30 @@ Boundaries:
 
 Current core phase uses WeChat as a personal surface only. Feishu remains the
 planned company-management surface.
+
+## 9.2 Sticker Bridge Position
+
+WeChat sticker sending should use the shared Hermes sticker bridge rather than
+hard-coded assets in the WeChat adapter.
+
+Flow:
+
+```text
+intent
+  -> sticker metadata or generated candidate
+  -> owner/channel policy review when needed
+  -> runtime upload through the active WeChat bridge or official media API
+  -> send image/media id
+  -> text fallback if upload fails
+```
+
+Rules:
+
+- No sticker image files are committed to Git.
+- No generated images are committed to Git.
+- No WeChat media id, QR state, session token, or bridge credential is committed.
+- AI-generated MOXI stickers must be original, review-gated, and blocked from imitating existing anime IP or real people.
+- Company, finance, HR, legal, and approval flows should not use WeChat sticker reactions as action confirmation.
 
 ## 10. Source Notes
 

@@ -234,10 +234,19 @@ Tasks:
 - Add optional SearXNG configuration only if plain metasearch is still needed.
 - Add OCR or image-understanding adapter.
 - Add speech transcription workflow.
+- Add metadata-only sticker bridge for prepared cute/kawaii/anime stickers.
+- Add optional reviewed image-generation provider for original MOXI stickers.
 - Add video summary workflow only after the core phase is stable.
 - Add cost/rate-limit controls.
 - Add Obsidian write-back templates.
 - Write Phase 05 Chinese report.
+
+Status update:
+
+- Metadata-only sticker bridge is implemented locally.
+- `/health` reports sticker bridge status without exposing keys.
+- Runtime image generation is recognized as a supported optional provider path, but it remains disabled by default and review-gated.
+- No sticker images or generated images are committed to Git.
 
 Verification:
 

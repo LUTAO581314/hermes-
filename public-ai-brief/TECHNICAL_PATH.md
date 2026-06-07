@@ -6,8 +6,8 @@ Technical path source: https://github.com/LUTAO581314/hermes-
 
 MOXI is a lightweight personal and company agent system. It should combine
 natural conversation, tool calling, governed memory, public-opinion
-intelligence, image understanding, voice interaction, and later company
-workflow management.
+intelligence, image understanding, voice interaction, sticker/media expression,
+and later company workflow management.
 
 The first engineering target is not "an agent that can do everything". The
 first target is a stable, auditable, copyable core loop:
@@ -43,6 +43,8 @@ Heavy or specialized work should be API-first or external-runtime-first:
 - large reasoning models,
 - image/OCR understanding,
 - formal TTS,
+- sticker/media expression through APIs, provider metadata, or runtime image
+  upload,
 - search expansion,
 - crawling and extraction,
 - future video understanding,
@@ -59,6 +61,7 @@ Heavy or specialized work should be API-first or external-runtime-first:
 | Memory governor | Intake rules, review, dream consolidation, durable write-back | Working memory is not permanent memory |
 | Tool runtime | Search, crawl, documents, company data, media, server checks | Tools return structured evidence |
 | Public-opinion intelligence | Hot lists, feed cards, source expansion, clustering, reports | Hot items are not facts until verified |
+| Sticker bridge | Prepared-sticker metadata, provider IDs, generated-sticker review, channel upload instructions | Do not bundle third-party or generated sticker files |
 | Company workflow | Tasks, docs, calendar, tables, approvals, reports | Read first, write only after approval |
 | Safety and audit | Permission levels, approval gates, logs, secret handling | High-risk actions are disabled by default |
 
@@ -171,6 +174,11 @@ Keep this stage provider-driven and explicit.
 
 - Browser TTS is enough for a first web voice reply.
 - Provider-grade TTS needs a selected provider key.
+- Prepared stickers should use provider metadata, provider IDs, or runtime
+  image upload rather than bundled image files.
+- Runtime image generation can create original stickers only after review and
+  should not imitate existing anime IP, celebrities, or copyrighted sticker
+  packs.
 - Voice cloning must require explicit authorization and a clear use case.
 - Video understanding should wait until the core loop, memory, and cost control
   are stable.
@@ -178,6 +186,7 @@ Keep this stage provider-driven and explicit.
 Exit criteria:
 
 - voice output has a known provider or browser fallback,
+- sticker sending has a metadata-only source path and a channel upload path,
 - ASR and TTS are separated,
 - video is not silently enabled,
 - media costs and rate limits are visible.

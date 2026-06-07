@@ -60,6 +60,14 @@ class RuntimeConfig:
     wecom_agent_id_configured: bool
     wecom_secret_configured: bool
     wecom_customer_service_token_configured: bool
+    sticker_bridge_enabled: bool
+    sticker_default_provider: str
+    sticker_default_style: str
+    sticker_api_key_configured: bool
+    sticker_image_generation_enabled: bool
+    sticker_image_generation_model: str
+    sticker_generation_review_required: bool
+    sticker_runtime_cache_enabled: bool
 
 
 def load_config() -> RuntimeConfig:
@@ -119,5 +127,27 @@ def load_config() -> RuntimeConfig:
         wecom_secret_configured=bool(os.getenv("HERMES_WECOM_SECRET", "")),
         wecom_customer_service_token_configured=bool(
             os.getenv("HERMES_WECOM_CUSTOMER_SERVICE_TOKEN", "")
+        ),
+        sticker_bridge_enabled=_as_bool(
+            os.getenv("HERMES_STICKER_BRIDGE_ENABLED"), False
+        ),
+        sticker_default_provider=os.getenv(
+            "HERMES_STICKER_DEFAULT_PROVIDER", "metadata_only"
+        ),
+        sticker_default_style=os.getenv(
+            "HERMES_STICKER_DEFAULT_STYLE", "kawaii_anime"
+        ),
+        sticker_api_key_configured=bool(os.getenv("HERMES_STICKER_API_KEY", "")),
+        sticker_image_generation_enabled=_as_bool(
+            os.getenv("HERMES_STICKER_IMAGE_GENERATION_ENABLED"), False
+        ),
+        sticker_image_generation_model=os.getenv(
+            "HERMES_STICKER_IMAGE_GENERATION_MODEL", ""
+        ),
+        sticker_generation_review_required=_as_bool(
+            os.getenv("HERMES_STICKER_GENERATION_REVIEW_REQUIRED"), True
+        ),
+        sticker_runtime_cache_enabled=_as_bool(
+            os.getenv("HERMES_STICKER_RUNTIME_CACHE_ENABLED"), False
         ),
     )

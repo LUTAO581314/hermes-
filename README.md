@@ -26,6 +26,7 @@ Phase 0 planning and Phase 1 runtime foundation are complete. Phase 2 is now foc
 - Local Whisper is configured and verified as the transitional voice-input ASR.
 - Cloud TTS still needs an approved provider key; the Brain UI now falls back to browser speech synthesis when cloud TTS is unavailable.
 - Image understanding is exposed through `analyze_image`.
+- A metadata-only sticker bridge is available for cute/kawaii/anime-style prepared stickers. It stores intent profiles, provider queries, and channel send instructions only. Sticker images, generated images, platform media IDs, and API keys stay out of Git; runtime image generation can be enabled as a reviewed provider path.
 - Video understanding is intentionally frozen for this phase.
 - BaiLongma memory is treated as working memory; Obsidian remains the durable memory source of truth.
 - Feishu callback, encrypted event handling, sender identity separation, event idempotency, fast ACK, and group-reply routing are implemented; real group retest by the owner is still required.
@@ -51,6 +52,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Memory Governance](docs/MEMORY_GOVERNANCE.md)
 - [Obsidian Write-Back Workflow](docs/OBSIDIAN_WRITEBACK_WORKFLOW.md)
 - [API Integrations](docs/API_INTEGRATIONS.md)
+- [Sticker Bridge](docs/STICKER_BRIDGE.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Risk and Guardrails](docs/RISK_AND_GUARDRAILS.md)
 - [Chinese Report Policy](docs/CHINESE_REPORT_POLICY.md)
@@ -63,6 +65,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 02 Core Hermes and BaiLongma Chinese Report](reports/phase-02-core-hermes-bailongma.zh-CN.md)
 - [Phase 03 Feishu Company Management Chinese Report](reports/phase-03-feishu-company-management.zh-CN.md)
 - [Phase 04 Optimized Technical Path Chinese Report](reports/phase-04-optimized-technical-path.zh-CN.md)
+- [Phase 05 Sticker Bridge Chinese Report](reports/phase-05-sticker-bridge.zh-CN.md)
 
 ## Public Copy And Attribution
 

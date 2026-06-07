@@ -38,7 +38,8 @@ You are reviewing the MOXI Agent System technical path.
 Goal:
 Build a lightweight personal and company agent system with conversation, tool
 calling, governed memory, public-opinion intelligence, image understanding,
-voice interaction, and later company workflow management.
+voice interaction, sticker/media expression, and later company workflow
+management.
 
 Architecture:
 - Lightweight VPS is only the orchestrator.
@@ -49,6 +50,9 @@ Architecture:
 - Model gateway exposes fast, summary, reasoning, and vision slots.
 - Memory governor separates working memory from reviewed durable notes.
 - Public-opinion intelligence keeps source and freshness metadata.
+- Sticker/media expression uses a metadata-first bridge: provider metadata,
+  provider IDs, optional reviewed image generation, runtime upload, and text
+  fallback. Do not commit third-party or generated sticker image files.
 - Company workflow starts read-only and uses approval gates before writes.
 - Safety layer controls permissions, logs, secrets, and high-risk actions.
 
@@ -64,7 +68,8 @@ Implementation sequence:
 5. Company workflow: sender identity, group routing, event idempotency, fast
    ACK, read-only docs/tables, daily briefings, approval-gated writes.
 6. Rich media: browser or provider TTS, explicit voice-cloning authorization,
-   future video only after cost and reliability controls.
+   prepared-sticker metadata bridge, reviewed runtime image generation for
+   original stickers, future video only after cost and reliability controls.
 
 Model routing:
 - fast model for labels, routing, deduplication, short extraction.
@@ -89,7 +94,8 @@ Please produce:
 6. Public-opinion intelligence improvements.
 7. Company-workflow hardening suggestions.
 8. Performance improvements for slow multimodal turns.
-9. What should be built next.
+9. Sticker/media bridge risks and a safe implementation sequence.
+10. What should be built next.
 ```
 
 ## Chinese Classmate Prompt

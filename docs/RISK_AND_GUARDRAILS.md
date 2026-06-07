@@ -211,3 +211,21 @@ Rules:
 - MIT projects, including Graphify and Nuwa Skill, may be integrated more flexibly, but large source copying should still be avoided.
 - Candidate tools must not receive secrets unless explicitly approved.
 - Candidate tools must not self-modify production memory, prompts, or configuration.
+
+## 11. Sticker and Generated Image Guardrail
+
+Prepared sticker packs and generated stickers must stay inside the media bridge
+boundary.
+
+Rules:
+
+- Do not download third-party sticker packs into Git.
+- Do not commit runtime-generated images.
+- Store only metadata, provider IDs, queries, license notes, and send rules.
+- Respect provider terms, attribution requirements, rate limits, and API keys.
+- AI-generated stickers must be original and must not imitate existing anime IP,
+  celebrities, private people, platform marks, or copyrighted sticker packs.
+- Generated stickers should require owner review before they become reusable
+  prepared stickers.
+- Platform image keys, media IDs, temporary upload files, and provider secrets
+  are runtime data and must not be committed.

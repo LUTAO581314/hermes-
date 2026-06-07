@@ -53,6 +53,14 @@ def make_config(base: Path, **overrides: object) -> RuntimeConfig:
         "wecom_agent_id_configured": False,
         "wecom_secret_configured": False,
         "wecom_customer_service_token_configured": False,
+        "sticker_bridge_enabled": False,
+        "sticker_default_provider": "metadata_only",
+        "sticker_default_style": "kawaii_anime",
+        "sticker_api_key_configured": False,
+        "sticker_image_generation_enabled": False,
+        "sticker_image_generation_model": "",
+        "sticker_generation_review_required": True,
+        "sticker_runtime_cache_enabled": False,
     }
     values.update(overrides)
     return RuntimeConfig(**values)
@@ -74,6 +82,14 @@ class RuntimeTests(unittest.TestCase):
                 "HERMES_WECHAT_PERSONAL_BRIDGE_ENABLED": "false",
                 "HERMES_WECHAT_OFFICIAL_APP_SECRET": "test-secret",
                 "HERMES_WECOM_SECRET": "test-secret",
+                "HERMES_STICKER_BRIDGE_ENABLED": "true",
+                "HERMES_STICKER_DEFAULT_PROVIDER": "stipop",
+                "HERMES_STICKER_DEFAULT_STYLE": "kawaii_anime",
+                "HERMES_STICKER_API_KEY": "test-secret",
+                "HERMES_STICKER_IMAGE_GENERATION_ENABLED": "true",
+                "HERMES_STICKER_IMAGE_GENERATION_MODEL": "image2",
+                "HERMES_STICKER_GENERATION_REVIEW_REQUIRED": "true",
+                "HERMES_STICKER_RUNTIME_CACHE_ENABLED": "false",
             }
 
             with patch.dict("os.environ", env, clear=True):
@@ -87,6 +103,14 @@ class RuntimeTests(unittest.TestCase):
             self.assertFalse(config.wechat_personal_bridge_enabled)
             self.assertTrue(config.wechat_official_app_secret_configured)
             self.assertTrue(config.wecom_secret_configured)
+            self.assertTrue(config.sticker_bridge_enabled)
+            self.assertEqual(config.sticker_default_provider, "stipop")
+            self.assertEqual(config.sticker_default_style, "kawaii_anime")
+            self.assertTrue(config.sticker_api_key_configured)
+            self.assertTrue(config.sticker_image_generation_enabled)
+            self.assertEqual(config.sticker_image_generation_model, "image2")
+            self.assertTrue(config.sticker_generation_review_required)
+            self.assertFalse(config.sticker_runtime_cache_enabled)
 
     def test_readiness_is_ready_after_directories_exist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -139,6 +163,14 @@ class RuntimeTests(unittest.TestCase):
                     payload["wechat"]["official_account"]["app_secret_configured"]
                 )
                 self.assertFalse(payload["wechat"]["wecom"]["secret_configured"])
+                self.assertFalse(payload["stickers"]["bridge_enabled"])
+                self.assertEqual(payload["stickers"]["default_provider"], "metadata_only")
+                self.assertEqual(payload["stickers"]["default_style"], "kawaii_anime")
+                self.assertFalse(payload["stickers"]["api_key_configured"])
+                self.assertFalse(payload["stickers"]["image_generation_enabled"])
+                self.assertEqual(payload["stickers"]["image_generation_model"], "")
+                self.assertTrue(payload["stickers"]["generation_review_required"])
+                self.assertFalse(payload["stickers"]["runtime_cache_enabled"])
             finally:
                 server.shutdown()
                 server.server_close()

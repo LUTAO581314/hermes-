@@ -95,6 +95,26 @@ class HermesHandler(BaseHTTPRequestHandler):
                             ),
                         },
                     },
+                    "stickers": {
+                        "bridge_enabled": self.server.config.sticker_bridge_enabled,
+                        "default_provider": self.server.config.sticker_default_provider,
+                        "default_style": self.server.config.sticker_default_style,
+                        "api_key_configured": (
+                            self.server.config.sticker_api_key_configured
+                        ),
+                        "image_generation_enabled": (
+                            self.server.config.sticker_image_generation_enabled
+                        ),
+                        "image_generation_model": (
+                            self.server.config.sticker_image_generation_model
+                        ),
+                        "generation_review_required": (
+                            self.server.config.sticker_generation_review_required
+                        ),
+                        "runtime_cache_enabled": (
+                            self.server.config.sticker_runtime_cache_enabled
+                        ),
+                    },
                     "created_at": utc_now(),
                 },
             )
