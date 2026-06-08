@@ -27,16 +27,20 @@ checkout. It is intentionally an overlay, not a full copy of upstream source.
 - Every phase that changes BaiLongma should add a Chinese report under
   `reports/`.
 
-## Planned Patch Files
+## Patch Files
 
-Patch files should be named by phase and purpose:
+- [phase-16-capability-matrix-and-qq-settings.patch](phase-16-capability-matrix-and-qq-settings.patch)
+  adds a Brain UI capability matrix panel, a secret-safe `/capabilities`
+  endpoint that can bridge Hermes backend readiness, and QQ official bot
+  settings fields.
+
+Future patch files should be named by phase and purpose:
 
 ```text
-phase-14-social-settings-ui.patch
-phase-15-qq-connector.patch
-phase-16-runtime-latency.patch
+phase-17-hermes-social-turn-bridge.patch
+phase-18-progress-aware-chat-ui.patch
+phase-19-company-personal-permission-badges.patch
 ```
 
-Until a patch file is exported, the server checkout remains the active working
-copy and this folder documents the intended overlay boundary.
-
+The server checkout may still contain local runtime-specific changes. Patch
+files in this directory are the reviewed MOXI overlay boundary.

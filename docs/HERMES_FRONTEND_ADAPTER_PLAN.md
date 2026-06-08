@@ -81,11 +81,27 @@ BaiLongma / Brain UI
 
 ## Implementation Order
 
-1. Add `/capabilities` to the MOXI runtime.
-2. Render capability cards in the public website and later Brain UI.
-3. Export the first BaiLongma patch for settings UI and QQ entry.
+1. Add `/capabilities` to the MOXI runtime. Done in Phase 15.
+2. Render capability cards in the public website and Brain UI settings. Done in Phase 16.
+3. Export the first BaiLongma patch for settings UI and QQ entry. Done in Phase 16.
 4. Add runtime connector test buttons.
 5. Add progress events to chat UI.
 6. Add company/persona permission badges.
 7. Add GitHub Pages deployment for the public technical path.
 
+## Phase 16 Patch
+
+`patches/bailongma/phase-16-capability-matrix-and-qq-settings.patch` applies
+the first real BaiLongma overlay:
+
+- backend `/capabilities` endpoint inside BaiLongma,
+- Hermes backend bridge probe through `HERMES_RUNTIME_BASE_URL`,
+- QQ official bot credential fields,
+- Brain UI capability matrix cards in the social settings tab,
+- status rendering for runtime, model, image, search, Feishu, WeChat, WeCom,
+  QQ, voice, TTS, stickers, and reviewed image generation.
+
+The patch intentionally reports missing Hermes bridge configuration instead of
+pretending the deep adapter is complete. The next implementation phase should
+start the Hermes runtime bridge and then wire `/social/turn` and `/jobs/event`
+into chat progress.

@@ -86,6 +86,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 13 QQ Connector And Social Settings UI Chinese Report](reports/phase-13-qq-and-social-settings-ui.zh-CN.md)
 - [Phase 14 Repository CI And Upstream Strategy Chinese Report](reports/phase-14-repo-ci-and-upstream-strategy.zh-CN.md)
 - [Phase 15 Frontend Adapter And Capability Matrix Chinese Report](reports/phase-15-frontend-adapter-and-capability-matrix.zh-CN.md)
+- [Phase 16 BaiLongma Capability Matrix Chinese Report](reports/phase-16-bailongma-capability-matrix.zh-CN.md)
 
 ## Repository Automation
 
@@ -108,6 +109,8 @@ not vendor full upstream applications by default.
 - BaiLongma stays in a separate upstream checkout or fork.
 - MOXI-specific BaiLongma changes live as overlays under
   [patches/bailongma](patches/bailongma/README.md).
+- The first exported BaiLongma overlay patch adds Brain UI capability cards,
+  Hermes backend bridge status, and QQ official bot settings.
 - External runtime install notes live under [external](external/README.md).
 - If a full BaiLongma fork becomes necessary, keep this repository as the
   canonical technical-path source and preserve the upstream MIT license.

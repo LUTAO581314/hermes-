@@ -1,0 +1,325 @@
+--- a/src/config.js
++++ b/src/config.js
+@@ -774,6 +774,7 @@
+   'FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_VERIFICATION_TOKEN',
+   'WECHAT_OFFICIAL_APP_ID', 'WECHAT_OFFICIAL_APP_SECRET', 'WECHAT_OFFICIAL_TOKEN',
+   'WECOM_BOT_KEY', 'WECOM_INCOMING_TOKEN',
++  'QQ_BOT_APP_ID', 'QQ_BOT_TOKEN', 'QQ_BOT_SECRET', 'QQ_WEBHOOK_TOKEN',
+ ]
+ 
+ // ── WeChat ClawBot credentials (written automatically after QR scan, not exposed in SOCIAL_ENV_KEYS) ──
+--- a/src/api.js
++++ b/src/api.js
+@@ -87,6 +87,105 @@
+ 
+ function getApiHost() {
+   return String(globalThis.process?.env?.BAILONGMA_HOST || DEFAULT_API_HOST).trim() || DEFAULT_API_HOST
++}
++
++
++function capabilityState(state, label, { plane = 'runtime', configured = false, detail = '', nextAction = '' } = {}) {
++  return { state, label, plane, configured, detail, nextAction }
++}
++
++function summarizeCapabilities(capabilities) {
++  const summary = { ready: 0, partial: 0, missing_config: 0, disabled: 0, planned: 0 }
++  for (const item of Object.values(capabilities)) {
++    const state = item?.state || 'planned'
++    summary[state] = (summary[state] || 0) + 1
++  }
++  return summary
++}
++
++function getHermesRuntimeConfig() {
++  const baseURL = String(process.env.HERMES_RUNTIME_BASE_URL || process.env.MOXI_RUNTIME_BASE_URL || '').trim()
++  const user = String(process.env.HERMES_RUNTIME_BASIC_USER || process.env.MOXI_RUNTIME_BASIC_USER || '').trim()
++  const password = String(process.env.HERMES_RUNTIME_BASIC_PASSWORD || process.env.MOXI_RUNTIME_BASIC_PASSWORD || '').trim()
++  return { baseURL: baseURL.replace(/\/$/, ''), user, password }
++}
++
++async function fetchHermesCapabilityMatrix() {
++  const runtime = getHermesRuntimeConfig()
++  if (!runtime.baseURL) return { connected: false, reason: 'missing_runtime_base_url' }
++  const controller = new AbortController()
++  const timer = setTimeout(() => controller.abort(), 2500)
++  try {
++    const headers = { accept: 'application/json' }
++    if (runtime.user || runtime.password) {
++      headers.authorization = `Basic ${Buffer.from(`${runtime.user}:${runtime.password}`).toString('base64')}`
++    }
++    const resp = await fetch(`${runtime.baseURL}/capabilities`, { headers, signal: controller.signal })
++    if (!resp.ok) return { connected: false, reason: `http_${resp.status}` }
++    const payload = await resp.json()
++    return { connected: true, payload }
++  } catch (err) {
++    return { connected: false, reason: err?.name === 'AbortError' ? 'timeout' : (err?.message || 'request_failed') }
++  } finally {
++    clearTimeout(timer)
++  }
++}
++
++async function buildCapabilityMatrix() {
++  const activation = getActivationStatus()
++  const social = getSocialConfig()
++  const voice = getVoiceConfig()
++  const tts = getTTSConfig()
++  const webSearch = getWebSearchConfig()
++  const minimaxConfigured = !!getMinimaxKey()
++  const hermes = await fetchHermesCapabilityMatrix()
++  const hasAnyWebSearch = !!(webSearch?.serperConfigured || webSearch?.braveConfigured || webSearch?.tavilyConfigured || webSearch?.jinaConfigured || webSearch?.searxngUrl || webSearch?.searxngFromEnv)
++  const socialReady = (...keys) => keys.every(k => !!social?.[k]?.configured)
++  const voiceReady = Object.entries(voice || {}).filter(([key]) => key !== 'voiceProvider').some(([, value]) => !!value?.configured)
++  const ttsReady = !!(tts?.minimaxKey?.configured || tts?.doubaoKey?.configured || tts?.doubaoAppId?.configured || tts?.openaiTtsKey?.configured || tts?.elevenLabsKey?.configured || tts?.volcanoToken?.configured)
++  const capabilities = {
++    runtime: capabilityState('ready', 'BaiLongma / MOXI Brain UI', { configured: true, detail: 'Brain UI, settings, chat, voice panel, and event stream are served by this runtime.' }),
++    hermes_backend: hermes.connected
++      ? capabilityState('ready', 'Hermes backend', { configured: true, detail: 'Hermes /capabilities is reachable through the protected runtime bridge.' })
++      : capabilityState('missing_config', 'Hermes backend', { detail: `Hermes bridge unavailable: ${hermes.reason || 'not configured'}.`, nextAction: 'Set HERMES_RUNTIME_BASE_URL and optional Basic Auth variables for deep backend adaptation.' }),
++    hermes_contract: capabilityState(hermes.connected ? 'ready' : 'partial', 'Hermes native agent contract', {
++      configured: hermes.connected,
++      detail: hermes.connected ? 'Frontend can read Hermes capability state; next step is social-turn/job-event wiring.' : 'Hermes keeps native agent logic; the frontend should call the runtime contract instead of duplicating logic.',
++      nextAction: hermes.connected ? 'Wire /social/turn and /jobs/event for progress-aware chat.' : 'Expose protected Hermes /capabilities to this runtime.',
++    }),
++    model_gateway: activation?.activated
++      ? capabilityState('ready', 'Model gateway', { configured: true, detail: `${activation.provider || 'provider'} - ${activation.model || 'model'}` })
++      : capabilityState('missing_config', 'Model gateway', { detail: 'No active chat model is configured.', nextAction: 'Open LLM settings and configure the model gateway.' }),
++    image_understanding: activation?.activated
++      ? capabilityState('ready', 'Image understanding', { configured: true, detail: 'Image messages use the active multimodal model/tool path.' })
++      : capabilityState('missing_config', 'Image understanding', { detail: 'Image reading needs the model gateway first.', nextAction: 'Configure a vision-capable model.' }),
++    search_intelligence: hasAnyWebSearch
++      ? capabilityState('ready', 'Search and trend intelligence', { configured: true, detail: 'At least one web search provider or SearXNG URL is configured.' })
++      : capabilityState('missing_config', 'Search and trend intelligence', { detail: 'No web search provider is configured.', nextAction: 'Configure SearXNG, Serper, Brave, Tavily, or Jina.' }),
++    feishu_company: socialReady('FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_VERIFICATION_TOKEN')
++      ? capabilityState('ready', 'Feishu company surface', { plane: 'company', configured: true, detail: 'Feishu credentials are configured. Company writes still require confirmation.' })
++      : capabilityState('missing_config', 'Feishu company surface', { plane: 'company', detail: 'Feishu app credentials are incomplete.', nextAction: 'Fill App ID, App Secret, and Verify Token.' }),
++    wechat_official: socialReady('WECHAT_OFFICIAL_APP_ID', 'WECHAT_OFFICIAL_APP_SECRET', 'WECHAT_OFFICIAL_TOKEN')
++      ? capabilityState('ready', 'WeChat official account', { plane: 'personal', configured: true, detail: 'Official account credentials are configured.' })
++      : capabilityState('missing_config', 'WeChat official account', { plane: 'personal', detail: 'Official account credentials are incomplete.', nextAction: 'Fill App ID, App Secret, and Token.' }),
++    wecom: socialReady('WECOM_BOT_KEY', 'WECOM_INCOMING_TOKEN')
++      ? capabilityState('ready', 'WeCom incoming bot', { plane: 'company', configured: true, detail: 'WeCom incoming credentials are configured.' })
++      : capabilityState('missing_config', 'WeCom incoming bot', { plane: 'company', detail: 'WeCom bot key or incoming token is missing.', nextAction: 'Fill Bot Key and Incoming Token.' }),
++    qq: socialReady('QQ_BOT_APP_ID', 'QQ_BOT_TOKEN', 'QQ_BOT_SECRET', 'QQ_WEBHOOK_TOKEN')
++      ? capabilityState('ready', 'QQ official bot', { plane: 'personal', configured: true, detail: 'QQ official bot credentials are configured.' })
++      : capabilityState('missing_config', 'QQ official bot', { plane: 'personal', detail: 'QQ official bot credentials are incomplete.', nextAction: 'Fill App ID, Bot Token, Bot Secret, and Webhook Token.' }),
++    voice_input: voiceReady
++      ? capabilityState('ready', 'Voice input / ASR', { plane: 'personal', configured: true, detail: `Provider: ${voice?.voiceProvider || 'unknown'}` })
++      : capabilityState('partial', 'Voice input / ASR', { plane: 'personal', configured: true, detail: 'Browser or local voice path may be available, but provider credentials are not complete.', nextAction: 'Expose local Whisper health or configure an ASR provider.' }),
++    voice_output: ttsReady
++      ? capabilityState('ready', 'Voice output / TTS', { plane: 'personal', configured: true, detail: `Provider: ${tts?.ttsProvider || 'browser fallback'}` })
++      : capabilityState('partial', 'Voice output / TTS', { plane: 'personal', configured: true, detail: 'Browser TTS fallback is available; cloud TTS is not fully configured.', nextAction: 'Configure cloud TTS only when needed.' }),
++    stickers: capabilityState('planned', 'Sticker bridge', { plane: 'personal', detail: 'Prepared sticker metadata and reviewed image generation are planned as channel adapters.', nextAction: 'Connect channel upload logic before enabling automatic sticker sends.' }),
++    image_generation: minimaxConfigured
++      ? capabilityState('partial', 'Reviewed image generation', { plane: 'personal', configured: true, detail: 'MiniMax/media key is configured; review-before-send is still required.' })
++      : capabilityState('planned', 'Reviewed image generation', { plane: 'personal', detail: 'No media generation provider is configured.', nextAction: 'Configure provider key and review workflow.' }),
++  }
++  return { ok: true, source: 'bailongma-brain-ui', updatedAt: new Date().toISOString(), summary: summarizeCapabilities(capabilities), capabilities, hermes: { connected: hermes.connected, reason: hermes.reason || '', summary: hermes.payload?.summary || null, capabilities: hermes.payload?.capabilities || null }, frontendContract: { pollSeconds: 30, secretPolicy: 'Only configured booleans and next actions are returned; raw secrets are never exposed.' } }
+ }
+ 
+ function isLanAccessEnabled() {
+@@ -1195,6 +1294,12 @@
+           jsonResponse(res, 400, { ok: false, error: err.message })
+         }
+       })
++      return
++    }
++
++    // GET /capabilities ? secret-safe frontend capability matrix with Hermes bridge status
++    if (req.method === 'GET' && url.pathname === '/capabilities') {
++      jsonResponse(res, 200, await buildCapabilityMatrix())
+       return
+     }
+ 
+--- a/src/ui/brain-ui/app-shell.js
++++ b/src/ui/brain-ui/app-shell.js
+@@ -300,6 +300,11 @@
+ 
+         <!-- ── 社交媒体 tab ── -->
+         <div class="settings-tab" data-tab="social">
++          <div class="settings-section settings-capability-panel">
++            <div class="settings-section-label">????</div>
++            <div class="settings-capability-summary" id="capability-summary">?????</div>
++            <div class="settings-capability-grid" id="capability-grid"></div>
++          </div>
+           <div class="settings-section">
+             <div class="settings-section-label">Discord</div>
+             <div class="settings-platform-status" id="social-status-discord"></div>
+@@ -350,6 +355,26 @@
+             <div class="settings-row">
+               <label class="settings-label" for="social-wecom-token">Incoming Token</label>
+               <input class="settings-input" id="social-wecom-token" type="password" placeholder="留空保持原值…" autocomplete="new-password">
++            </div>
++          </div>
++          <div class="settings-section">
++            <div class="settings-section-label">QQ ?????</div>
++            <div class="settings-platform-status" id="social-status-qq"></div>
++            <div class="settings-row">
++              <label class="settings-label" for="social-qq-appid">App ID</label>
++              <input class="settings-input" id="social-qq-appid" type="password" placeholder="???????" autocomplete="new-password">
++            </div>
++            <div class="settings-row">
++              <label class="settings-label" for="social-qq-token">Bot Token</label>
++              <input class="settings-input" id="social-qq-token" type="password" placeholder="???????" autocomplete="new-password">
++            </div>
++            <div class="settings-row">
++              <label class="settings-label" for="social-qq-secret">Bot Secret</label>
++              <input class="settings-input" id="social-qq-secret" type="password" placeholder="???????" autocomplete="new-password">
++            </div>
++            <div class="settings-row">
++              <label class="settings-label" for="social-qq-webhook-token">Webhook Token</label>
++              <input class="settings-input" id="social-qq-webhook-token" type="password" placeholder="???????" autocomplete="new-password">
+             </div>
+           </div>
+           <div class="settings-section">
+--- a/src/ui/brain-ui/app.js
++++ b/src/ui/brain-ui/app.js
+@@ -2691,6 +2691,10 @@
+     "social-wechat-token":   "WECHAT_OFFICIAL_TOKEN",
+     "social-wecom-botkey":   "WECOM_BOT_KEY",
+     "social-wecom-token":    "WECOM_INCOMING_TOKEN",
++    "social-qq-appid":       "QQ_BOT_APP_ID",
++    "social-qq-token":       "QQ_BOT_TOKEN",
++    "social-qq-secret":      "QQ_BOT_SECRET",
++    "social-qq-webhook-token":"QQ_WEBHOOK_TOKEN",
+   };
+ 
+   const SOCIAL_PLATFORM_STATUS = {
+@@ -2698,10 +2702,56 @@
+     "social-status-feishu":  ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_VERIFICATION_TOKEN"],
+     "social-status-wechat":  ["WECHAT_OFFICIAL_APP_ID", "WECHAT_OFFICIAL_APP_SECRET", "WECHAT_OFFICIAL_TOKEN"],
+     "social-status-wecom":   ["WECOM_BOT_KEY", "WECOM_INCOMING_TOKEN"],
++    "social-status-qq":      ["QQ_BOT_APP_ID", "QQ_BOT_TOKEN", "QQ_BOT_SECRET", "QQ_WEBHOOK_TOKEN"],
+   };
++
++  function renderCapabilityMatrix(matrix) {
++    const summaryEl = document.getElementById("capability-summary");
++    const gridEl = document.getElementById("capability-grid");
++    if (!gridEl) return;
++    const caps = matrix?.capabilities || {};
++    const summary = matrix?.summary || {};
++    const hermesSummary = matrix?.hermes?.connected && matrix?.hermes?.summary
++      ? ` ? Hermes ready ${matrix.hermes.summary.ready || 0}`
++      : "";
++    if (summaryEl) {
++      summaryEl.textContent = `Brain UI ready ${summary.ready || 0} ? partial ${summary.partial || 0} ? missing ${summary.missing_config || 0}${hermesSummary}`;
++    }
++    const order = [
++      "runtime", "hermes_backend", "hermes_contract", "model_gateway", "image_understanding",
++      "search_intelligence", "feishu_company", "wechat_official", "wecom",
++      "qq", "voice_input", "voice_output", "image_generation", "stickers",
++    ];
++    gridEl.innerHTML = order.filter(key => caps[key]).map(key => {
++      const item = caps[key];
++      const state = item.state || "planned";
++      const detail = item.detail || item.nextAction || "";
++      const plane = item.plane || "runtime";
++      return `
++        <div class="settings-capability-card ${state}">
++          <div class="settings-capability-head">
++            <span>${item.label || key}</span>
++            <b>${state.replace("missing_config", "missing")}</b>
++          </div>
++          <div class="settings-capability-plane">${plane}</div>
++          <p>${detail}</p>
++        </div>`;
++    }).join("");
++  }
++
++  async function loadCapabilityMatrix() {
++    try {
++      const matrix = await fetch(`${API}/capabilities`).then(r => r.json());
++      renderCapabilityMatrix(matrix);
++    } catch {
++      const summaryEl = document.getElementById("capability-summary");
++      if (summaryEl) summaryEl.textContent = "?????????";
++    }
++  }
+ 
+   async function loadSocialSettings() {
+     try {
++      loadCapabilityMatrix();
+       const { social } = await fetch(`${API}/settings/social`).then(r => r.json());
+       for (const [statusId, keys] of Object.entries(SOCIAL_PLATFORM_STATUS)) {
+         const el = document.getElementById(statusId);
+--- a/src/ui/brain-ui/styles.css
++++ b/src/ui/brain-ui/styles.css
+@@ -1,4 +1,4 @@
+-﻿:root {
++:root {
+   --bg0: #0a1118;
+   --bg1: #0f1822;
+   --bg-deep: #060a10;
+@@ -1811,6 +1811,73 @@
+ }
+ .settings-platform-status.ok    { color: var(--cool); }
+ .settings-platform-status.miss  { color: var(--dim); }
++
++.settings-capability-panel {
++  background: rgba(143,182,216,0.045);
++}
++
++.settings-capability-summary {
++  margin-bottom: 10px;
++  font-size: 10px;
++  font-family: "JetBrains Mono", ui-monospace, monospace;
++  color: var(--ink2);
++}
++
++.settings-capability-grid {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: 8px;
++}
++
++.settings-capability-card {
++  min-height: 74px;
++  padding: 9px 10px;
++  border: 1px solid var(--line);
++  border-radius: 8px;
++  background: rgba(255,255,255,0.025);
++}
++
++.settings-capability-head {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 8px;
++  font-size: 11px;
++  color: var(--ink);
++}
++
++.settings-capability-head b {
++  font-size: 9px;
++  font-family: "JetBrains Mono", ui-monospace, monospace;
++  font-weight: 600;
++  text-transform: uppercase;
++  color: var(--dim);
++}
++
++.settings-capability-plane {
++  margin-top: 3px;
++  font-size: 9px;
++  font-family: "JetBrains Mono", ui-monospace, monospace;
++  color: var(--warm);
++  text-transform: uppercase;
++  letter-spacing: 0.08em;
++}
++
++.settings-capability-card p {
++  margin: 6px 0 0;
++  font-size: 10px;
++  line-height: 1.45;
++  color: var(--dim);
++}
++
++.settings-capability-card.ready { border-color: rgba(114, 205, 161, 0.42); }
++.settings-capability-card.ready .settings-capability-head b { color: var(--cool); }
++.settings-capability-card.partial { border-color: rgba(243, 189, 62, 0.42); }
++.settings-capability-card.partial .settings-capability-head b { color: #d6a63a; }
++.settings-capability-card.missing_config { border-color: rgba(201, 79, 61, 0.42); }
++.settings-capability-card.missing_config .settings-capability-head b { color: var(--warm); }
++.settings-capability-card.disabled,
++.settings-capability-card.planned { opacity: 0.76; }
+ 
+ .settings-hint {
+   font-size: 11px;
+
