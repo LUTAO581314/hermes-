@@ -216,8 +216,12 @@ The second optimization is actual runtime latency:
   token, tool call, final send,
 - use a rule-first intent router before loading heavy context,
 - gate tool schemas by route,
+- expose a context-budget diagnostic so connectors can load only the needed
+  recent messages, memory policy, and tool schemas,
 - move image generation, image reading, search expansion, and company workflows
   into async jobs,
+- expose safe slow-job metadata and state transitions without storing raw
+  messages, screenshots, API responses, or secrets,
 - lock slow multimodal jobs so follow-up text does not cancel them by accident,
 - cache repeated public-opinion and document summaries,
 - use smaller models for labels and deduplication, larger models only when the

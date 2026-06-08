@@ -68,6 +68,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 04 Optimized Technical Path Chinese Report](reports/phase-04-optimized-technical-path.zh-CN.md)
 - [Phase 05 Sticker Bridge Chinese Report](reports/phase-05-sticker-bridge.zh-CN.md)
 - [Phase 06 Social Performance Optimization Chinese Report](reports/phase-06-social-performance-optimization.zh-CN.md)
+- [Phase 07 Context Slimming And Async Jobs Chinese Report](reports/phase-07-context-slimming-async-jobs.zh-CN.md)
 
 ## Public Copy And Attribution
 
@@ -98,7 +99,9 @@ Invoke-RestMethod http://127.0.0.1:8787/health
 Invoke-RestMethod http://127.0.0.1:8787/ready
 Invoke-RestMethod http://127.0.0.1:8787/performance
 Invoke-RestMethod "http://127.0.0.1:8787/route?message=generate%20image%20avatar"
+Invoke-RestMethod "http://127.0.0.1:8787/context?message=generate%20image%20avatar"
 Invoke-RestMethod http://127.0.0.1:8787/latency
+Invoke-RestMethod http://127.0.0.1:8787/jobs
 ```
 
 ## Recommended Current Milestone

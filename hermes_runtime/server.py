@@ -13,7 +13,9 @@ import threading
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from .async_jobs import AsyncJobStore, jobs_payload
 from .config import RuntimeConfig, load_config
+from .context_budget import context_payload
 from .latency import LatencyRecorder, latency_payload
 from .logging_utils import configure_logging
 from .performance import performance_payload
@@ -154,9 +156,26 @@ class HermesHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.OK, performance_payload(self.server.config))
             return
 
+        if path == "/context":
+            message = query.get("message", [""])[0]
+            trace = self.server.latency.trace(route="context_budget")
+            trace.mark("intake_ms")
+            payload = context_payload(message, self.server.config)
+            trace.route = payload["route"]["route"]
+            trace.mark("context_ms")
+            self._send_json(HTTPStatus.OK, payload)
+            trace.mark("final_send_ms")
+            trace.finish()
+            return
+
         if path == "/latency":
             limit = int(query.get("limit", ["50"])[0] or "50")
             self._send_json(HTTPStatus.OK, latency_payload(self.server.latency, limit))
+            return
+
+        if path == "/jobs":
+            limit = int(query.get("limit", ["50"])[0] or "50")
+            self._send_json(HTTPStatus.OK, jobs_payload(self.server.jobs, limit))
             return
 
         if path == "/route":
@@ -175,10 +194,21 @@ class HermesHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed_url = urlparse(self.path)
-        if parsed_url.path != "/latency/turn":
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": parsed_url.path})
+        if parsed_url.path == "/latency/turn":
+            self._handle_latency_turn()
             return
 
+        if parsed_url.path == "/jobs":
+            self._handle_create_job()
+            return
+
+        if parsed_url.path == "/jobs/transition":
+            self._handle_transition_job()
+            return
+
+        self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": parsed_url.path})
+
+    def _handle_latency_turn(self) -> None:
         try:
             payload = self._read_json_body()
             record = self.server.latency.add_external(
@@ -192,6 +222,40 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(HTTPStatus.OK, {"status": "ok", "record": record.__dict__})
+
+    def _handle_create_job(self) -> None:
+        try:
+            payload = self._read_json_body()
+            job = self.server.jobs.create(
+                route=payload.get("route", "unknown"),
+                channel=payload.get("channel", "unknown"),
+                target_id=payload.get("target_id", "unknown"),
+                input_text=payload.get("input", ""),
+                tool_name=payload.get("tool_name", "unknown"),
+                owner_confirmation_required=payload.get(
+                    "owner_confirmation_required", False
+                ),
+            )
+        except ValueError as error:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            return
+
+        self._send_json(HTTPStatus.OK, {"status": "ok", "job": job.__dict__})
+
+    def _handle_transition_job(self) -> None:
+        try:
+            payload = self._read_json_body()
+            job = self.server.jobs.transition(
+                job_id=payload.get("job_id", ""),
+                status=payload.get("status", ""),
+                result_pointer=payload.get("result_pointer", ""),
+                error_message=payload.get("error_message", ""),
+            )
+        except ValueError as error:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            return
+
+        self._send_json(HTTPStatus.OK, {"status": "ok", "job": job.__dict__})
 
     def log_message(self, format: str, *args: Any) -> None:
         self.server.logger.info("%s %s", self.address_string(), format % args)
@@ -224,6 +288,7 @@ class HermesServer(ThreadingHTTPServer):
     config: RuntimeConfig
     logger: logging.Logger
     latency: LatencyRecorder
+    jobs: AsyncJobStore
 
 
 def build_server(config: RuntimeConfig, logger: logging.Logger) -> HermesServer:
@@ -235,6 +300,7 @@ def build_server(config: RuntimeConfig, logger: logging.Logger) -> HermesServer:
     server.config = config
     server.logger = logger
     server.latency = LatencyRecorder()
+    server.jobs = AsyncJobStore()
     return server
 
 

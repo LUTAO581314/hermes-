@@ -180,9 +180,13 @@ The repository runtime exposes:
 - `/health` with performance profile,
 - `/performance` with latency budgets and model slots,
 - `/route?message=...` with safe rule-first route diagnosis,
+- `/context?message=...` with route-specific context and tool-schema budget,
 - `/latency` with recent safe latency records,
 - `POST /latency/turn` for external runtimes to report stage timing without
   storing message bodies,
+- `GET /jobs` with slow-job metadata only,
+- `POST /jobs` to create image/search/company slow jobs after quick ack,
+- `POST /jobs/transition` to move jobs through the safe state machine,
 - environment variables for latency targets:
   - `HERMES_SOCIAL_QUICK_ACK_DELAY_MS`,
   - `HERMES_SOCIAL_FAST_REPLY_TARGET_MS`,
@@ -214,6 +218,37 @@ External latency report shape:
 
 Only whitelisted numeric stage fields are stored. Message text, API responses,
 keys, screenshots, and raw tool output must not be stored in latency telemetry.
+
+Context budget report shape:
+
+```json
+{
+  "route": {"route": "image_generate"},
+  "context_budget": {
+    "max_recent_messages": 4,
+    "allow_long_term_memory": false,
+    "tool_schema_group": "image_generation",
+    "max_tool_schemas": 2
+  }
+}
+```
+
+Async job creation shape:
+
+```json
+{
+  "route": "image_generate",
+  "channel": "wechat",
+  "target_id": "room-or-user-id",
+  "input": "original user text",
+  "tool_name": "image_generation",
+  "owner_confirmation_required": false
+}
+```
+
+The job store keeps only metadata, input preview length, status, timestamps, and
+result pointers. It must not store raw message bodies, screenshots, API
+responses, credentials, or private chat logs.
 
 ## 7. Implementation Order
 

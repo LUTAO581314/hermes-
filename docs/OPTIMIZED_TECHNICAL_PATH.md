@@ -96,8 +96,9 @@ Every inbound turn should record:
 - final send time,
 - total user-visible latency.
 
-The minimal runtime exposes safe performance budgets through `/performance`.
-Secrets and API keys must never appear in performance payloads.
+The minimal runtime exposes safe performance budgets through `/performance` and
+safe stage timing through `/latency`. Secrets and API keys must never appear in
+performance payloads.
 
 ### 4.2 Intent Router
 
@@ -123,6 +124,9 @@ Normal social messages should not carry the full brain:
 - Skip memory consolidation on the live reply path.
 - Move dream consolidation to background or phase-end cleanup.
 
+The minimal runtime exposes `/context?message=...` so a connector can inspect
+the route-specific budget before loading memory or tools.
+
 ### 4.4 Async Slow Jobs
 
 Slow tasks should be represented as jobs:
@@ -144,6 +148,11 @@ Slow-job examples:
 The user should receive an acknowledgement quickly, then the final result when
 the job completes. A follow-up text message should not cancel an in-progress
 image or search job unless the user explicitly says to cancel it.
+
+The minimal runtime exposes `GET /jobs`, `POST /jobs`, and
+`POST /jobs/transition` for image, search, public-opinion, and company workflows.
+The job store keeps metadata, status, timestamps, input preview length, and
+result pointers only.
 
 ### 4.5 Model Routing
 
@@ -249,6 +258,7 @@ Deliver:
 - rule-first intent classification,
 - reduced context for ordinary social chat,
 - tool schema gating,
+- `/context` route-budget diagnostics,
 - fast-model route for simple tasks.
 
 Exit criteria:
@@ -272,6 +282,7 @@ Exit criteria:
 - image/search/company jobs survive follow-up messages,
 - final results are delivered after completion,
 - failures are explained with a next action.
+- `/jobs` records only safe metadata and status.
 
 ### P4: Model Routing And Cost Control
 

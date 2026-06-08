@@ -359,6 +359,127 @@ class RuntimeTests(unittest.TestCase):
                     handler.close()
                 logging.shutdown()
 
+    def test_context_endpoint_exposes_slim_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config = make_config(base)
+            logger = configure_logging(config.log_dir)
+            server = build_server(config, logger)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                base_url = f"http://127.0.0.1:{server.server_port}"
+                with urlopen(
+                    base_url + "/context?message=generate%20image%20avatar",
+                    timeout=2,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+
+                self.assertEqual(payload["status"], "ok")
+                self.assertEqual(payload["route"]["route"], "image_generate")
+                self.assertEqual(
+                    payload["context_budget"]["tool_schema_group"],
+                    "image_generation",
+                )
+                self.assertLessEqual(payload["context_budget"]["max_recent_messages"], 4)
+                self.assertFalse(payload["context_budget"]["allow_long_term_memory"])
+                self.assertNotIn("api_key", json.dumps(payload).lower())
+                self.assertNotIn("secret", json.dumps(payload).lower())
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+                for handler in list(logger.handlers):
+                    logger.removeHandler(handler)
+                    handler.close()
+                logging.shutdown()
+
+    def test_async_job_endpoints_track_slow_work_without_body_storage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config = make_config(base)
+            logger = configure_logging(config.log_dir)
+            server = build_server(config, logger)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                base_url = f"http://127.0.0.1:{server.server_port}"
+                user_input = "make a cute sticker with private-body"
+                create_body = json.dumps(
+                    {
+                        "route": "image_generate",
+                        "channel": "wechat",
+                        "target_id": "room-1",
+                        "input": user_input,
+                        "tool_name": "image_generation",
+                    }
+                ).encode("utf-8")
+                create_request = Request(
+                    base_url + "/jobs",
+                    data=create_body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urlopen(create_request, timeout=2) as response:
+                    created = json.loads(response.read().decode("utf-8"))
+
+                job = created["job"]
+                self.assertEqual(created["status"], "ok")
+                self.assertEqual(job["route"], "image_generate")
+                self.assertEqual(job["status"], "queued")
+                self.assertEqual(job["input_preview_chars"], len(user_input))
+                self.assertNotIn("private-body", json.dumps(job))
+
+                transition_body = json.dumps(
+                    {"job_id": job["job_id"], "status": "running"}
+                ).encode("utf-8")
+                transition_request = Request(
+                    base_url + "/jobs/transition",
+                    data=transition_body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urlopen(transition_request, timeout=2) as response:
+                    running = json.loads(response.read().decode("utf-8"))
+                self.assertEqual(running["job"]["status"], "running")
+
+                complete_body = json.dumps(
+                    {
+                        "job_id": job["job_id"],
+                        "status": "completed",
+                        "result_pointer": "asset://sticker/result-1",
+                    }
+                ).encode("utf-8")
+                complete_request = Request(
+                    base_url + "/jobs/transition",
+                    data=complete_body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urlopen(complete_request, timeout=2) as response:
+                    completed = json.loads(response.read().decode("utf-8"))
+                self.assertEqual(completed["job"]["status"], "completed")
+                self.assertEqual(
+                    completed["job"]["result_pointer"],
+                    "asset://sticker/result-1",
+                )
+
+                with urlopen(base_url + "/jobs?limit=5", timeout=2) as response:
+                    jobs = json.loads(response.read().decode("utf-8"))
+                self.assertEqual(jobs["status"], "ok")
+                self.assertEqual(jobs["jobs"][0]["job_id"], job["job_id"])
+                self.assertNotIn("private-body", json.dumps(jobs))
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+                for handler in list(logger.handlers):
+                    logger.removeHandler(handler)
+                    handler.close()
+                logging.shutdown()
+
 
 if __name__ == "__main__":
     unittest.main()
