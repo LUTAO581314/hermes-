@@ -255,6 +255,8 @@ The second optimization is actual runtime latency:
   slow-job metadata,
 - detect unfinished slow jobs for the same channel and target so follow-up
   messages append context instead of cancelling or duplicating work,
+- enforce that behavior at the chat adapter boundary by returning a
+  non-queued follow-up acknowledgement instead of starting another LLM turn,
 - move image generation, image reading, search expansion, and company workflows
   into async jobs,
 - expose safe slow-job metadata and state transitions without storing raw

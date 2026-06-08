@@ -93,7 +93,9 @@ BaiLongma / Brain UI
 9. Add company/persona permission badges. Done in Phase 20.
 10. Connect BaiLongma native worker lifecycle events to Hermes `/jobs/event`.
     Done in Phase 21.
-11. Add GitHub Pages deployment for the public technical path.
+11. Merge active-job follow-ups without interrupting the running native turn.
+    Done in Phase 22.
+12. Add GitHub Pages deployment for the public technical path.
 
 ## Phase 16 Patch
 
@@ -207,3 +209,20 @@ Server verification used a Feishu-style `/message` request. The returned Hermes
 job advanced to `delivered` with a metadata-only `conversation:<id>` result
 pointer. No raw message bodies, secrets, platform tokens, or media bytes are
 stored in the public job record.
+
+## Phase 22 Follow-Up Job Merge
+
+The BaiLongma overlay patch
+`patches/bailongma/phase-22-follow-up-job-merge.patch` makes `/message` respect
+Hermes `append_to_active_job` plans:
+
+- the natural follow-up ACK is still emitted,
+- the follow-up text is written to the conversation timeline for context,
+- `moxi_progress` emits `append_to_active_job`,
+- the HTTP response exposes `queued:false` and `appended_to_active_job:true`,
+- the follow-up is not pushed into the active LLM queue and does not trigger an
+  interrupt callback.
+
+This closes the user-experience bug where a user sends "make it softer" or
+"also check this" while a slow image, search, or company task is running, and
+the second message accidentally starts another full turn.

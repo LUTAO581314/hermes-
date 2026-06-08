@@ -172,6 +172,11 @@ The BaiLongma overlay now implements this contract inside the native turn loop:
 final delivery with a metadata-only conversation pointer. This is the reference
 pattern for future WeChat, QQ, and Feishu bridge layers.
 
+At the `/message` boundary, BaiLongma also respects
+`first_action=append_to_active_job`: it emits the follow-up acknowledgement,
+persists the user text as context, returns `queued:false`, and avoids pushing a
+new LLM turn that would interrupt the active slow job.
+
 Python connectors can use `hermes_runtime.connector_client.HermesConnectorClient`
 directly. Node.js connectors should mirror the same HTTP contract. The canonical
 integration guide is `docs/CONNECTOR_INTEGRATION_RUNBOOK.md`.

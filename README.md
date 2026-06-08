@@ -92,6 +92,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 19 Progress Aware Chat UI Chinese Report](reports/phase-19-progress-aware-chat-ui.zh-CN.md)
 - [Phase 20 Channel Plane Badges Chinese Report](reports/phase-20-channel-plane-badges.zh-CN.md)
 - [Phase 21 Tool Lifecycle Events Chinese Report](reports/phase-21-tool-lifecycle-events.zh-CN.md)
+- [Phase 22 Follow-Up Job Merge Chinese Report](reports/phase-22-follow-up-job-merge.zh-CN.md)
 
 ## Repository Automation
 
@@ -129,6 +130,9 @@ not vendor full upstream applications by default.
 - The server BaiLongma native turn loop now reports Hermes job lifecycle events
   through `/jobs/event`, including worker start, completion, failure, and final
   message delivery.
+- BaiLongma `/message` now respects Hermes `append_to_active_job` plans: active
+  job follow-ups are acknowledged and persisted as context without entering the
+  queue as a new interrupting LLM turn.
 - External runtime install notes live under [external](external/README.md).
 - If a full BaiLongma fork becomes necessary, keep this repository as the
   canonical technical-path source and preserve the upstream MIT license.

@@ -48,11 +48,15 @@ checkout. It is intentionally an overlay, not a full copy of upstream source.
   connects the native BaiLongma turn loop and `send_message` delivery path back
   to Hermes `/jobs/event`, reporting `worker_started`, `worker_completed`,
   `worker_failed`, and `final_delivered` while keeping secrets out of Git.
+- [phase-22-follow-up-job-merge.patch](phase-22-follow-up-job-merge.patch)
+  makes BaiLongma respect Hermes `append_to_active_job` plans at the `/message`
+  boundary: follow-up text is persisted as context and acknowledged, but not
+  queued as a new interrupting LLM turn.
 
 Future patch files should be named by phase and purpose:
 
 ```text
-phase-22-follow-up-job-merge.patch
+phase-23-company-read-connectors.patch
 ```
 
 The server checkout may still contain local runtime-specific changes. Patch

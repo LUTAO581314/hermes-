@@ -1,0 +1,89 @@
+diff -ruN /home/hermes/backups/bailongma-phase22-20260608183242/src/api.js src/api.js
+--- /home/hermes/backups/bailongma-phase22-20260608183242/src/api.js	2026-06-08 18:32:42.465603872 +0000
++++ src/api.js	2026-06-08 18:32:44.469661866 +0000
+@@ -5,7 +5,7 @@
+ import { fileURLToPath } from 'url'
+ import WebSocket, { WebSocketServer } from 'ws'
+ import { pushMessage } from './queue.js'
+-import { getDB, getConfig, setConfig, insertUISignal, upsertMediaHistory, getMediaHistory, updateLastJarvisConversationContent, getRecentRecallAudits, getRecentExtractAudits, getRecallAuditStats, getExtractAuditStats } from './db.js'
++import { getDB, getConfig, setConfig, insertUISignal, upsertMediaHistory, getMediaHistory, updateLastJarvisConversationContent, getRecentRecallAudits, getRecentExtractAudits, getRecallAuditStats, getExtractAuditStats, normalizeConversationPartyId, upsertEntity, insertConversation } from './db.js'
+ import { emitEvent, addSSEClient, removeSSEClient, addACUIClient, removeACUIClient, removeActiveUICard, emitUICommand, flushStickyEvents, setStickyEvent } from './events.js'
+ import { getQuotaStatus } from './quota.js'
+ import { isRunning, stopLoop, startLoop } from './control.js'
+@@ -24,6 +24,7 @@
+ import { createCloudASRSession } from './voice/cloud-asr.js'
+ import { getHotspots, setHotspotPanelState, getHotspotPanelState } from './hotspots.js'
+ import { getPersonCard, setPersonCardPanelState, getPersonCardPanelState } from './person-cards.js'
++import { resolveCanonicalUserId } from './identity.js'
+ import { setDocPanelState, getDocPanelState, DOC_TOPICS } from './docs.js'
+ 
+ export { emitEvent }
+@@ -212,6 +213,37 @@
+   return true
+ }
+ 
++
++function persistHermesFollowUpMessage({ fromId, content, channel, plan }) {
++  const normalizedRaw = normalizeConversationPartyId(fromId)
++  const canonicalId = resolveCanonicalUserId({ rawFromId: normalizedRaw, channel })
++  const externalPartyId = canonicalId !== normalizedRaw ? normalizedRaw : ''
++  const timestamp = new Date().toISOString()
++  upsertEntity(canonicalId)
++  insertConversation({
++    role: 'user',
++    from_id: canonicalId,
++    content,
++    timestamp,
++    channel: channel || '',
++    external_party_id: externalPartyId,
++    focus_topic: '',
++  })
++  emitEvent('message_in', { from_id: fromId, content, channel, timestamp, hermes_follow_up: true })
++  emitEvent('moxi_progress', {
++    status: 'append_to_active_job',
++    route: plan?.route?.route || plan?.active_job?.route || 'unknown',
++    first_action: 'append_to_active_job',
++    job_id: plan?.active_job?.job_id || '',
++    channel: channel || 'API',
++    timestamp,
++  })
++}
++
++function isHermesActiveJobFollowUp(plan) {
++  return plan?.first_action === 'append_to_active_job' && !!plan?.active_job?.job_id
++}
++
+ async function fetchHermesFrontendContract() {
+   const result = await fetchHermesRuntimeJson('/frontend/contract')
+   return result.ok ? { connected: true, payload: result.payload } : { connected: false, reason: result.reason }
+@@ -784,16 +816,23 @@
+           const trimmed = buildImageAnalysisMessage(content, imageInputs).trim()
+           const hermesPlan = await planHermesSocialTurn({ channel, targetId: from_id, message: trimmed })
+           const ackSent = emitHermesQuickAck(hermesPlan, { fromId: from_id, channel })
+-          pushMessage(from_id, trimmed, channel, {
+-            hermesPlanRoute: hermesPlan?.route?.route || '',
+-            hermesJobId: hermesPlan?.job?.job_id || hermesPlan?.active_job?.job_id || '',
+-            hermesFirstAction: hermesPlan?.first_action || '',
+-            lockUntilProcessed: !!hermesPlan?.job,
+-          })
+-          emitEvent('message_in', { from_id, content: trimmed, channel, timestamp: new Date().toISOString() })
++          const appendToActiveJob = isHermesActiveJobFollowUp(hermesPlan)
++          if (appendToActiveJob) {
++            persistHermesFollowUpMessage({ fromId: from_id, content: trimmed, channel, plan: hermesPlan })
++          } else {
++            pushMessage(from_id, trimmed, channel, {
++              hermesPlanRoute: hermesPlan?.route?.route || '',
++              hermesJobId: hermesPlan?.job?.job_id || hermesPlan?.active_job?.job_id || '',
++              hermesFirstAction: hermesPlan?.first_action || '',
++              lockUntilProcessed: !!hermesPlan?.job,
++            })
++            emitEvent('message_in', { from_id, content: trimmed, channel, timestamp: new Date().toISOString() })
++          }
+           jsonResponse(res, 200, {
+             ok: true,
+             agent_name: getAgentName(),
++            queued: !appendToActiveJob,
++            appended_to_active_job: appendToActiveJob,
+             hermes: hermesPlan ? {
+               first_action: hermesPlan.first_action,
+               route: hermesPlan.route?.route || '',
