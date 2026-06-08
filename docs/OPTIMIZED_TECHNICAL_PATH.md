@@ -127,6 +127,10 @@ Normal social messages should not carry the full brain:
 The minimal runtime exposes `/context?message=...` so a connector can inspect
 the route-specific budget before loading memory or tools.
 
+For real social connectors, the preferred entry is `POST /social/turn`. It
+returns the first visible action, acknowledgement text, route, context budget,
+and optional slow-job metadata in one safe payload.
+
 ### 4.4 Async Slow Jobs
 
 Slow tasks should be represented as jobs:
@@ -259,6 +263,7 @@ Deliver:
 - reduced context for ordinary social chat,
 - tool schema gating,
 - `/context` route-budget diagnostics,
+- `/social/turn` connector first-action planner,
 - fast-model route for simple tasks.
 
 Exit criteria:

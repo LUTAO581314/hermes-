@@ -181,6 +181,8 @@ The repository runtime exposes:
 - `/performance` with latency budgets and model slots,
 - `/route?message=...` with safe rule-first route diagnosis,
 - `/context?message=...` with route-specific context and tool-schema budget,
+- `POST /social/turn` as the connector-ready first-action planner for WeChat,
+  Feishu, and web chat,
 - `/latency` with recent safe latency records,
 - `POST /latency/turn` for external runtimes to report stage timing without
   storing message bodies,
@@ -232,6 +234,25 @@ Context budget report shape:
   }
 }
 ```
+
+Social turn planner shape:
+
+```json
+{
+  "channel": "wechat",
+  "target_id": "room-or-user-id",
+  "message": "original user text"
+}
+```
+
+The planner returns:
+
+- `first_action`: `direct_reply` or `quick_ack`,
+- natural acknowledgement text when slow work is likely,
+- route policy,
+- context budget,
+- optional job metadata when async work is required,
+- preview length only, not the message body.
 
 Async job creation shape:
 

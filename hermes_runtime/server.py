@@ -20,6 +20,7 @@ from .latency import LatencyRecorder, latency_payload
 from .logging_utils import configure_logging
 from .performance import performance_payload
 from .routing import route_payload
+from .social_turn import plan_social_turn
 
 
 def utc_now() -> str:
@@ -206,6 +207,10 @@ class HermesHandler(BaseHTTPRequestHandler):
             self._handle_transition_job()
             return
 
+        if parsed_url.path == "/social/turn":
+            self._handle_social_turn()
+            return
+
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": parsed_url.path})
 
     def _handle_latency_turn(self) -> None:
@@ -256,6 +261,26 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(HTTPStatus.OK, {"status": "ok", "job": job.__dict__})
+
+    def _handle_social_turn(self) -> None:
+        try:
+            payload = self._read_json_body()
+            trace = self.server.latency.trace(route="social_turn")
+            trace.mark("intake_ms")
+            plan = plan_social_turn(
+                message=payload.get("message", ""),
+                channel=payload.get("channel", "unknown"),
+                target_id=payload.get("target_id", "unknown"),
+                config=self.server.config,
+                jobs=self.server.jobs,
+            )
+            trace.route = plan["route"]["route"]
+            trace.mark("context_ms")
+            self._send_json(HTTPStatus.OK, plan)
+            trace.mark("final_send_ms")
+            trace.finish()
+        except ValueError as error:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
 
     def log_message(self, format: str, *args: Any) -> None:
         self.server.logger.info("%s %s", self.address_string(), format % args)

@@ -218,6 +218,9 @@ The second optimization is actual runtime latency:
 - gate tool schemas by route,
 - expose a context-budget diagnostic so connectors can load only the needed
   recent messages, memory policy, and tool schemas,
+- expose a connector first-action planner that returns direct-reply vs
+  quick-ack, natural acknowledgement copy, route, context budget, and optional
+  slow-job metadata,
 - move image generation, image reading, search expansion, and company workflows
   into async jobs,
 - expose safe slow-job metadata and state transitions without storing raw

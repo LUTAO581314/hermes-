@@ -406,7 +406,7 @@ class RuntimeTests(unittest.TestCase):
 
             try:
                 base_url = f"http://127.0.0.1:{server.server_port}"
-                user_input = "make a cute sticker with private-body"
+                user_input = "make a cute sticker with hidden phrase"
                 create_body = json.dumps(
                     {
                         "route": "image_generate",
@@ -430,7 +430,7 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(job["route"], "image_generate")
                 self.assertEqual(job["status"], "queued")
                 self.assertEqual(job["input_preview_chars"], len(user_input))
-                self.assertNotIn("private-body", json.dumps(job))
+                self.assertNotIn("hidden phrase", json.dumps(job))
 
                 transition_body = json.dumps(
                     {"job_id": job["job_id"], "status": "running"}
@@ -470,7 +470,98 @@ class RuntimeTests(unittest.TestCase):
                     jobs = json.loads(response.read().decode("utf-8"))
                 self.assertEqual(jobs["status"], "ok")
                 self.assertEqual(jobs["jobs"][0]["job_id"], job["job_id"])
-                self.assertNotIn("private-body", json.dumps(jobs))
+                self.assertNotIn("hidden phrase", json.dumps(jobs))
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+                for handler in list(logger.handlers):
+                    logger.removeHandler(handler)
+                    handler.close()
+                logging.shutdown()
+
+    def test_social_turn_plans_quick_ack_and_async_job(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config = make_config(base)
+            logger = configure_logging(config.log_dir)
+            server = build_server(config, logger)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                base_url = f"http://127.0.0.1:{server.server_port}"
+                user_input = "generate image avatar with hidden phrase"
+                body = json.dumps(
+                    {
+                        "channel": "wechat",
+                        "target_id": "user-1",
+                        "message": user_input,
+                    }
+                ).encode("utf-8")
+                request = Request(
+                    base_url + "/social/turn",
+                    data=body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urlopen(request, timeout=2) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+
+                self.assertEqual(payload["status"], "ok")
+                self.assertEqual(payload["first_action"], "quick_ack")
+                self.assertTrue(payload["ack"]["should_send"])
+                self.assertIn("马上", payload["ack"]["text"])
+                self.assertEqual(payload["route"]["route"], "image_generate")
+                self.assertEqual(payload["context_budget"]["max_recent_messages"], 4)
+                self.assertIsNotNone(payload["job"])
+                self.assertEqual(payload["job"]["status"], "queued")
+                self.assertEqual(payload["job"]["tool_name"], "image_generation")
+                self.assertEqual(payload["ack"]["next_job_status_after_send"], "acknowledged")
+                self.assertNotIn("hidden phrase", json.dumps(payload))
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+                for handler in list(logger.handlers):
+                    logger.removeHandler(handler)
+                    handler.close()
+                logging.shutdown()
+
+    def test_social_turn_keeps_tiny_chat_on_direct_reply_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config = make_config(base)
+            logger = configure_logging(config.log_dir)
+            server = build_server(config, logger)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                base_url = f"http://127.0.0.1:{server.server_port}"
+                body = json.dumps(
+                    {
+                        "channel": "feishu",
+                        "target_id": "chat-1",
+                        "message": "ok",
+                    }
+                ).encode("utf-8")
+                request = Request(
+                    base_url + "/social/turn",
+                    data=body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urlopen(request, timeout=2) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+
+                self.assertEqual(payload["status"], "ok")
+                self.assertEqual(payload["first_action"], "direct_reply")
+                self.assertFalse(payload["ack"]["should_send"])
+                self.assertEqual(payload["ack"]["text"], "")
+                self.assertEqual(payload["route"]["route"], "casual_chat")
+                self.assertIsNone(payload["job"])
+                self.assertEqual(payload["context_budget"]["tool_schema_group"], "send_only")
             finally:
                 server.shutdown()
                 server.server_close()
