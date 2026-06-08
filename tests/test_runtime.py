@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 from urllib.request import Request, urlopen
 
+from hermes_runtime.connector_client import HermesConnectorClient
 from hermes_runtime.config import RuntimeConfig, load_config
 from hermes_runtime.logging_utils import configure_logging
 from hermes_runtime.server import build_server, readiness
@@ -587,6 +588,50 @@ class RuntimeTests(unittest.TestCase):
                     jobs["jobs"][-1]["result_pointer"],
                     "asset://image/result-2",
                 )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+                for handler in list(logger.handlers):
+                    logger.removeHandler(handler)
+                    handler.close()
+                logging.shutdown()
+
+    def test_connector_client_wraps_social_turn_and_job_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config = make_config(base)
+            logger = configure_logging(config.log_dir)
+            server = build_server(config, logger)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                client = HermesConnectorClient(
+                    f"http://127.0.0.1:{server.server_port}",
+                    timeout_seconds=2,
+                )
+                plan = client.plan_social_turn(
+                    channel="feishu",
+                    target_id="chat-42",
+                    message="generate image avatar with hidden phrase",
+                )
+                self.assertEqual(plan["first_action"], "quick_ack")
+                self.assertIsNotNone(plan["job"])
+                self.assertNotIn("hidden phrase", json.dumps(plan))
+
+                job_id = plan["job"]["job_id"]
+                acknowledged = client.report_job_event(
+                    job_id=job_id,
+                    event="ack_sent",
+                )
+                self.assertEqual(acknowledged["job"]["status"], "acknowledged")
+
+                running = client.report_job_event(
+                    job_id=job_id,
+                    event="worker_started",
+                )
+                self.assertEqual(running["job"]["status"], "running")
             finally:
                 server.shutdown()
                 server.server_close()

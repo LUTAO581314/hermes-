@@ -167,6 +167,10 @@ Connectors should prefer `POST /jobs/event` for normal lifecycle updates:
 `ack_sent`, `worker_started`, `worker_completed`, `worker_failed`,
 `final_delivered`, `failure_delivered`, and `cancel_requested`.
 
+Python connectors can use `hermes_runtime.connector_client.HermesConnectorClient`
+directly. Node.js connectors should mirror the same HTTP contract. The canonical
+integration guide is `docs/CONNECTOR_INTEGRATION_RUNBOOK.md`.
+
 ### 4.5 Model Routing
 
 Use model slots instead of hard-coding one model everywhere:

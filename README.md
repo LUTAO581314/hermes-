@@ -38,6 +38,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [White-label Public AI Brief](public-ai-brief/README.md) - use this folder when asking external AI for technical-path advice without exposing the private runtime stack.
 - [Optimized Technical Path](docs/OPTIMIZED_TECHNICAL_PATH.md) - the current internal engineering path, module boundaries, performance plan, and copy/credit strategy.
 - [Performance Optimization Plan](docs/PERFORMANCE_OPTIMIZATION_PLAN.md) - the surface-first and bottom-layer plan for sub-5-second social responsiveness, async slow jobs, latency telemetry, and model routing.
+- [Connector Integration Runbook](docs/CONNECTOR_INTEGRATION_RUNBOOK.md) - how WeChat, Feishu, and web-chat bridges call `/social/turn` and `/jobs/event`.
 - [Technical Path Chinese Summary](docs/TECHNICAL_PATH_SUMMARY.zh-CN.md)
 - [Sustainable Iteration Blueprint](docs/SUSTAINABLE_ITERATION_BLUEPRINT.md)
 - [Master Plan](docs/MASTER_PLAN.md)
@@ -72,6 +73,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 08 Social Turn Planner Chinese Report](reports/phase-08-social-turn-planner.zh-CN.md)
 - [Phase 09 Active Job Follow-Up Chinese Report](reports/phase-09-active-job-follow-up.zh-CN.md)
 - [Phase 10 Worker Lifecycle Events Chinese Report](reports/phase-10-worker-lifecycle-events.zh-CN.md)
+- [Phase 11 Connector Client And Runbook Chinese Report](reports/phase-11-connector-client-runbook.zh-CN.md)
 
 ## Public Copy And Attribution
 

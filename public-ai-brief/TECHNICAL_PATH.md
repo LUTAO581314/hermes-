@@ -229,6 +229,8 @@ The second optimization is actual runtime latency:
   messages, screenshots, API responses, or secrets,
 - expose connector lifecycle events such as acknowledgement sent, worker
   started, worker completed, and final delivered,
+- provide a small connector client or HTTP runbook so WeChat, Feishu, and web
+  chat bridges do not duplicate the runtime state machine,
 - lock slow multimodal jobs so follow-up text does not cancel them by accident,
 - cache repeated public-opinion and document summaries,
 - use smaller models for labels and deduplication, larger models only when the
