@@ -53,6 +53,13 @@ The frontend should render each capability as a card:
 The frontend should not infer secrets from raw config. It should only trust the
 secret-safe booleans and status labels returned by `/capabilities`.
 
+Frontend-specific progress states, route labels, and channel permission planes
+are exposed through:
+
+```text
+GET /frontend/contract
+```
+
 Recommended polling:
 
 ```text
@@ -70,4 +77,3 @@ frontend. The frontend adapter should:
 - show quick acknowledgement and worker status,
 - keep high-risk action confirmations outside ordinary chat flow,
 - never expose raw secrets, cookies, QR sessions, chat ids, or media files.
-

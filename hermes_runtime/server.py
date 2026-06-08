@@ -16,6 +16,7 @@ from .async_jobs import AsyncJobStore, jobs_payload
 from .capabilities import capability_matrix
 from .config import RuntimeConfig, load_config
 from .context_budget import context_payload
+from .frontend_contract import frontend_contract
 from .latency import LatencyRecorder, latency_payload
 from .logging_utils import configure_logging
 from .performance import performance_payload
@@ -173,6 +174,10 @@ class HermesHandler(BaseHTTPRequestHandler):
 
         if path == "/capabilities":
             self._send_json(HTTPStatus.OK, capability_matrix(self.server.config))
+            return
+
+        if path == "/frontend/contract":
+            self._send_json(HTTPStatus.OK, frontend_contract(self.server.config))
             return
 
         if path == "/context":

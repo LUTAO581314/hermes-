@@ -334,6 +334,55 @@ class RuntimeTests(unittest.TestCase):
                     handler.close()
                 logging.shutdown()
 
+    def test_frontend_contract_exposes_bailongma_adapter_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config = make_config(base)
+            logger = configure_logging(config.log_dir)
+            server = build_server(config, logger)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                url = f"http://127.0.0.1:{server.server_port}/frontend/contract"
+                with urlopen(url, timeout=2) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+
+                self.assertEqual(payload["status"], "ok")
+                self.assertEqual(
+                    payload["endpoints"]["social_turn"]["path"],
+                    "/social/turn",
+                )
+                self.assertEqual(
+                    payload["endpoints"]["jobs_event"]["path"],
+                    "/jobs/event",
+                )
+                self.assertTrue(
+                    payload["frontend_states"]["quick_ack"]["send_ack_first"]
+                )
+                self.assertEqual(
+                    payload["route_ui"]["image_generate"]["progress_kind"],
+                    "image_generation",
+                )
+                self.assertEqual(
+                    payload["channel_planes"]["feishu"]["plane"],
+                    "company",
+                )
+                self.assertFalse(
+                    payload["channel_planes"]["wechat"]["can_do_company_write"]
+                )
+                serialized = json.dumps(payload).lower()
+                self.assertNotIn("api_key_configured", serialized)
+                self.assertNotIn("password-value", serialized)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+                for handler in list(logger.handlers):
+                    logger.removeHandler(handler)
+                    handler.close()
+                logging.shutdown()
+
     def test_route_endpoint_classifies_fast_slow_and_risk_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

@@ -87,6 +87,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 14 Repository CI And Upstream Strategy Chinese Report](reports/phase-14-repo-ci-and-upstream-strategy.zh-CN.md)
 - [Phase 15 Frontend Adapter And Capability Matrix Chinese Report](reports/phase-15-frontend-adapter-and-capability-matrix.zh-CN.md)
 - [Phase 16 BaiLongma Capability Matrix Chinese Report](reports/phase-16-bailongma-capability-matrix.zh-CN.md)
+- [Phase 17 Frontend Contract Chinese Report](reports/phase-17-frontend-contract.zh-CN.md)
 
 ## Repository Automation
 
@@ -111,6 +112,9 @@ not vendor full upstream applications by default.
   [patches/bailongma](patches/bailongma/README.md).
 - The first exported BaiLongma overlay patch adds Brain UI capability cards,
   Hermes backend bridge status, and QQ official bot settings.
+- The runtime now exposes `/frontend/contract` so BaiLongma can render progress
+  states, route UI labels, and personal/company permission badges from the
+  Hermes adapter contract instead of hard-coding them.
 - External runtime install notes live under [external](external/README.md).
 - If a full BaiLongma fork becomes necessary, keep this repository as the
   canonical technical-path source and preserve the upstream MIT license.
@@ -143,6 +147,7 @@ Health checks:
 Invoke-RestMethod http://127.0.0.1:8787/health
 Invoke-RestMethod http://127.0.0.1:8787/ready
 Invoke-RestMethod http://127.0.0.1:8787/capabilities
+Invoke-RestMethod http://127.0.0.1:8787/frontend/contract
 Invoke-RestMethod http://127.0.0.1:8787/performance
 Invoke-RestMethod "http://127.0.0.1:8787/route?message=generate%20image%20avatar"
 Invoke-RestMethod "http://127.0.0.1:8787/context?message=generate%20image%20avatar"

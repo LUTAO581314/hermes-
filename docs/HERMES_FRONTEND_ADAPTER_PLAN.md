@@ -43,6 +43,7 @@ BaiLongma / Brain UI
   -> chat / voice / image / sticker controls
   -> Hermes frontend adapter
        -> GET /capabilities
+       -> GET /frontend/contract
        -> POST /social/turn
        -> POST /jobs/event
        -> GET /latency
@@ -84,10 +85,11 @@ BaiLongma / Brain UI
 1. Add `/capabilities` to the MOXI runtime. Done in Phase 15.
 2. Render capability cards in the public website and Brain UI settings. Done in Phase 16.
 3. Export the first BaiLongma patch for settings UI and QQ entry. Done in Phase 16.
-4. Add runtime connector test buttons.
-5. Add progress events to chat UI.
-6. Add company/persona permission badges.
-7. Add GitHub Pages deployment for the public technical path.
+4. Add runtime frontend contract endpoint. Done in Phase 17.
+5. Add runtime connector test buttons.
+6. Add progress events to chat UI.
+7. Add company/persona permission badges.
+8. Add GitHub Pages deployment for the public technical path.
 
 ## Phase 16 Patch
 
@@ -105,3 +107,21 @@ The patch intentionally reports missing Hermes bridge configuration instead of
 pretending the deep adapter is complete. The next implementation phase should
 start the Hermes runtime bridge and then wire `/social/turn` and `/jobs/event`
 into chat progress.
+
+## Phase 17 Runtime Contract
+
+`GET /frontend/contract` is the machine-readable contract for BaiLongma and any
+future MOXI frontend. It exposes:
+
+- endpoint paths for `/capabilities`, `/performance`, `/social/turn`,
+  `/jobs/event`, and `/latency/turn`,
+- UI states for `direct_reply`, `quick_ack`, `append_to_active_job`, and
+  `approval_required`,
+- route labels and progress kinds for image reading, image generation, search,
+  public opinion, Feishu company tasks, memory review, and high-risk actions,
+- channel planes for WeChat, QQ, web chat, and Feishu,
+- privacy rules that forbid raw messages, media bytes, platform ids, and secrets
+  from being stored in frontend contracts or public job records.
+
+This keeps Hermes as the backend logic owner while giving BaiLongma a stable
+adapter surface for progress UI, permission badges, and slow-task behavior.
