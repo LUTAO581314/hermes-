@@ -20,6 +20,7 @@
 - 更新 `hermes_runtime/config.py`，加入表情包桥接配置。
 - 更新 `hermes_runtime/server.py`，让 `/health` 输出表情包桥接状态。
 - 更新 `.env.example`，加入表情包 provider、风格、生图、审核、缓存和 API key 占位。
+- 追加 `HERMES_STICKER_IMAGE_GENERATION_BASE_URL`，让生图 API base URL 和 key 一起留在服务器 `.env`，不进入公开文档或 Git 提交。
 - 新增 `docs/STICKER_BRIDGE.md`，记录表情包来源、授权边界、飞书/微信发送方式和生图策略。
 - 更新 `docs/API_INTEGRATIONS.md`、`docs/WECHAT_COMPANION.md`、`docs/ROADMAP.md`、`docs/RISK_AND_GUARDRAILS.md`。
 - 更新 `README.md`、`index.html`、`public-ai-brief/TECHNICAL_PATH.md`、`public-ai-brief/COPY_PACK.md`、`public-ai-brief/README.md`。
@@ -114,6 +115,7 @@ Provider 决策：
 
 - 表情包能力采用 metadata-only 桥接。
 - 生图能力可用，但默认审核、运行时缓存、不入 Git。
+- 生图 API 的 base URL、model、key 均按服务器运行时配置处理；健康检查只显示是否配置，不输出真实值。
 - 表情包来源和发送必须受版权、平台、渠道策略约束。
 
 测试句、搜索过程和临时 provider 结果不应进入长期记忆。

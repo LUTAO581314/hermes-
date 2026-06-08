@@ -29,6 +29,7 @@ HERMES_STICKER_BRIDGE_ENABLED=false
 HERMES_STICKER_DEFAULT_PROVIDER=metadata_only
 HERMES_STICKER_DEFAULT_STYLE=kawaii_anime
 HERMES_STICKER_IMAGE_GENERATION_ENABLED=false
+HERMES_STICKER_IMAGE_GENERATION_BASE_URL=
 HERMES_STICKER_IMAGE_GENERATION_MODEL=
 HERMES_STICKER_GENERATION_REVIEW_REQUIRED=true
 HERMES_STICKER_RUNTIME_CACHE_ENABLED=false
@@ -45,6 +46,7 @@ HERMES_STICKER_API_KEY=
     "default_style": "kawaii_anime",
     "api_key_configured": false,
     "image_generation_enabled": false,
+    "image_generation_base_url_configured": false,
     "image_generation_model": "",
     "generation_review_required": true,
     "runtime_cache_enabled": false
@@ -129,6 +131,7 @@ LINE Messaging API 可以通过 `packageId` 和 `stickerId` 发送平台内置 s
 边界：
 
 - 默认关闭：`HERMES_STICKER_IMAGE_GENERATION_ENABLED=false`。
+- API Base URL 只写入服务器 `.env`：`HERMES_STICKER_IMAGE_GENERATION_BASE_URL=`。
 - 默认需要审核：`HERMES_STICKER_GENERATION_REVIEW_REQUIRED=true`。
 - 生成图片只允许运行时缓存，不提交 Git。
 - 发送前需要内容安全检查和主人确认规则。
@@ -142,6 +145,21 @@ original kawaii anime chat sticker, soft pastel girl, expressive,
 ```
 
 不要生成带平台商标、现成动漫角色、真人肖像或第三方 IP 风格的表情。
+
+服务器 `.env` 示例：
+
+```env
+HERMES_STICKER_BRIDGE_ENABLED=true
+HERMES_STICKER_DEFAULT_PROVIDER=image_generation
+HERMES_STICKER_IMAGE_GENERATION_ENABLED=true
+HERMES_STICKER_IMAGE_GENERATION_BASE_URL=<image-api-base-url>
+HERMES_STICKER_IMAGE_GENERATION_MODEL=<image-model-name>
+HERMES_STICKER_GENERATION_REVIEW_REQUIRED=true
+HERMES_STICKER_RUNTIME_CACHE_ENABLED=false
+HERMES_STICKER_API_KEY=<server-side-secret>
+```
+
+注意：上面的 `<server-side-secret>` 只允许写在服务器 `.env`，不要写进仓库、报告、公开 copy pack 或聊天截图。
 
 ## 5. 渠道发送策略
 

@@ -105,6 +105,9 @@ class HermesHandler(BaseHTTPRequestHandler):
                         "image_generation_enabled": (
                             self.server.config.sticker_image_generation_enabled
                         ),
+                        "image_generation_base_url_configured": bool(
+                            self.server.config.sticker_image_generation_base_url
+                        ),
                         "image_generation_model": (
                             self.server.config.sticker_image_generation_model
                         ),

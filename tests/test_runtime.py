@@ -58,6 +58,7 @@ def make_config(base: Path, **overrides: object) -> RuntimeConfig:
         "sticker_default_style": "kawaii_anime",
         "sticker_api_key_configured": False,
         "sticker_image_generation_enabled": False,
+        "sticker_image_generation_base_url": "",
         "sticker_image_generation_model": "",
         "sticker_generation_review_required": True,
         "sticker_runtime_cache_enabled": False,
@@ -87,6 +88,7 @@ class RuntimeTests(unittest.TestCase):
                 "HERMES_STICKER_DEFAULT_STYLE": "kawaii_anime",
                 "HERMES_STICKER_API_KEY": "test-secret",
                 "HERMES_STICKER_IMAGE_GENERATION_ENABLED": "true",
+                "HERMES_STICKER_IMAGE_GENERATION_BASE_URL": "https://example.invalid",
                 "HERMES_STICKER_IMAGE_GENERATION_MODEL": "image2",
                 "HERMES_STICKER_GENERATION_REVIEW_REQUIRED": "true",
                 "HERMES_STICKER_RUNTIME_CACHE_ENABLED": "false",
@@ -108,6 +110,9 @@ class RuntimeTests(unittest.TestCase):
             self.assertEqual(config.sticker_default_style, "kawaii_anime")
             self.assertTrue(config.sticker_api_key_configured)
             self.assertTrue(config.sticker_image_generation_enabled)
+            self.assertEqual(
+                config.sticker_image_generation_base_url, "https://example.invalid"
+            )
             self.assertEqual(config.sticker_image_generation_model, "image2")
             self.assertTrue(config.sticker_generation_review_required)
             self.assertFalse(config.sticker_runtime_cache_enabled)
@@ -168,6 +173,9 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(payload["stickers"]["default_style"], "kawaii_anime")
                 self.assertFalse(payload["stickers"]["api_key_configured"])
                 self.assertFalse(payload["stickers"]["image_generation_enabled"])
+                self.assertFalse(
+                    payload["stickers"]["image_generation_base_url_configured"]
+                )
                 self.assertEqual(payload["stickers"]["image_generation_model"], "")
                 self.assertTrue(payload["stickers"]["generation_review_required"])
                 self.assertFalse(payload["stickers"]["runtime_cache_enabled"])

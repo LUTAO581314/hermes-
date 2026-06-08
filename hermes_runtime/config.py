@@ -65,6 +65,7 @@ class RuntimeConfig:
     sticker_default_style: str
     sticker_api_key_configured: bool
     sticker_image_generation_enabled: bool
+    sticker_image_generation_base_url: str
     sticker_image_generation_model: str
     sticker_generation_review_required: bool
     sticker_runtime_cache_enabled: bool
@@ -140,6 +141,9 @@ def load_config() -> RuntimeConfig:
         sticker_api_key_configured=bool(os.getenv("HERMES_STICKER_API_KEY", "")),
         sticker_image_generation_enabled=_as_bool(
             os.getenv("HERMES_STICKER_IMAGE_GENERATION_ENABLED"), False
+        ),
+        sticker_image_generation_base_url=os.getenv(
+            "HERMES_STICKER_IMAGE_GENERATION_BASE_URL", ""
         ),
         sticker_image_generation_model=os.getenv(
             "HERMES_STICKER_IMAGE_GENERATION_MODEL", ""
