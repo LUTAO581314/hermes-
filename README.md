@@ -99,6 +99,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 25 WeChat Media Send Plan Chinese Report](reports/phase-25-wechat-media-send-plan.zh-CN.md)
 - [Phase 26 WeChat Media Probe Chinese Report](reports/phase-26-wechat-media-probe.zh-CN.md)
 - [Phase 27 Brain UI Routing Fix Chinese Report](reports/phase-27-brain-ui-routing-fix.zh-CN.md)
+- [Phase 28 Brain UI Settings State Cleanup Chinese Report](reports/phase-28-settings-tab-state-cleanup.zh-CN.md)
 
 ## Repository Automation
 

@@ -69,11 +69,15 @@ checkout. It is intentionally an overlay, not a full copy of upstream source.
   documents the Brain UI browser-side routing fix: use same-origin API paths
   instead of `127.0.0.1:3721`, and configure `/events` as an SSE-friendly Nginx
   reverse-proxy location.
+- [phase-28-settings-tab-state-cleanup.patch](phase-28-settings-tab-state-cleanup.patch)
+  documents the Brain UI settings-panel state cleanup: one shared tab activation
+  path, per-tab refresh behavior, and repaired Chinese labels for the capability
+  and QQ settings blocks.
 
 Future patch files should be named by phase and purpose:
 
 ```text
-phase-28-feishu-readiness-ui.patch
+phase-29-feishu-readiness-ui.patch
 ```
 
 The server checkout may still contain local runtime-specific changes. Patch

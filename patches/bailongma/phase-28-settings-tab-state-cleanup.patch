@@ -1,0 +1,131 @@
+--- a/src/ui/brain-ui/app.js
++++ b/src/ui/brain-ui/app.js
+@@ -2594,18 +2594,42 @@
+ 
+   let cachedProviders = null;
+ 
+-  overlay.querySelectorAll(".settings-nav-item").forEach(btn => {
+-    btn.addEventListener("click", () => {
+-      overlay.querySelectorAll(".settings-nav-item").forEach(b => b.classList.remove("active"));
+-      overlay.querySelectorAll(".settings-tab").forEach(t => t.classList.remove("active"));
+-      btn.classList.add("active");
+-      const tab = btn.dataset.tab;
+-      overlay.querySelector(`.settings-tab[data-tab="${tab}"]`)?.classList.add("active");
+-      if (tab === "social") loadSocialSettings();
+-      if (tab === "security") loadSecuritySettings();
+-      if (tab === "web-search") loadWebSearchSettings();
+-      if (tab === "update") loadUpdateSettings();
++  function activateSettingsTab(tab = "appearance", { refresh = true } = {}) {
++    const selectedTab = tab || "appearance";
++    overlay.querySelectorAll(".settings-nav-item").forEach(btn => {
++      btn.classList.toggle("active", btn.dataset.tab === selectedTab);
++    });
++    overlay.querySelectorAll(".settings-tab").forEach(panel => {
++      panel.classList.toggle("active", panel.dataset.tab === selectedTab);
+     });
++    if (!refresh) return;
++    switch (selectedTab) {
++      case "llm":
++      case "media":
++        loadSettings();
++        break;
++      case "social":
++        loadSocialSettings();
++        break;
++      case "voice":
++        loadVoiceSettings();
++        break;
++      case "web-search":
++        loadWebSearchSettings();
++        break;
++      case "security":
++        loadSecuritySettings();
++        break;
++      case "update":
++        loadUpdateSettings();
++        break;
++      default:
++        break;
++    }
++  }
++
++  overlay.querySelectorAll(".settings-nav-item").forEach(btn => {
++    btn.addEventListener("click", () => activateSettingsTab(btn.dataset.tab || "appearance"));
+   });
+ 
+   function showFeedback(el, msg, isError = false) {
+@@ -2750,7 +2774,7 @@
+       renderCapabilityMatrix(matrix);
+     } catch {
+       const summaryEl = document.getElementById("capability-summary");
+-      if (summaryEl) summaryEl.textContent = "?????????";
++      if (summaryEl) summaryEl.textContent = "能力状态暂时不可用";
+     }
+   }
+ 
+@@ -3142,19 +3166,10 @@
+ 
+   function openSettings(tab = null) {
+     overlay.hidden = false;
+-    loadSettings();
+-    loadVoiceSettings();
+-    if (tab) {
+-      overlay.querySelectorAll(".settings-nav-item").forEach(b => {
+-        b.classList.toggle("active", b.dataset.tab === tab);
+-      });
+-      overlay.querySelectorAll(".settings-tab").forEach(t => {
+-        t.classList.toggle("active", t.dataset.tab === tab);
+-      });
+-      if (tab === "social") loadSocialSettings();
+-      if (tab === "web-search") loadWebSearchSettings();
+-      if (tab === "update") loadUpdateSettings();
+-    }
++    const currentTab = tab
++      || overlay.querySelector(".settings-nav-item.active")?.dataset.tab
++      || "appearance";
++    activateSettingsTab(currentTab);
+   }
+ 
+   function closeSettings() {
+--- a/src/ui/brain-ui/app-shell.js
++++ b/src/ui/brain-ui/app-shell.js
+@@ -301,8 +301,8 @@
+         <!-- ── 社交媒体 tab ── -->
+         <div class="settings-tab" data-tab="social">
+           <div class="settings-section settings-capability-panel">
+-            <div class="settings-section-label">????</div>
+-            <div class="settings-capability-summary" id="capability-summary">?????</div>
++            <div class="settings-section-label">能力总览</div>
++            <div class="settings-capability-summary" id="capability-summary">正在读取能力状态...</div>
+             <div class="settings-capability-grid" id="capability-grid"></div>
+           </div>
+           <div class="settings-section">
+@@ -358,23 +358,23 @@
+             </div>
+           </div>
+           <div class="settings-section">
+-            <div class="settings-section-label">QQ ?????</div>
++            <div class="settings-section-label">QQ 官方机器人</div>
+             <div class="settings-platform-status" id="social-status-qq"></div>
+             <div class="settings-row">
+               <label class="settings-label" for="social-qq-appid">App ID</label>
+-              <input class="settings-input" id="social-qq-appid" type="password" placeholder="???????" autocomplete="new-password">
++              <input class="settings-input" id="social-qq-appid" type="password" placeholder="留空保持原值..." autocomplete="new-password">
+             </div>
+             <div class="settings-row">
+               <label class="settings-label" for="social-qq-token">Bot Token</label>
+-              <input class="settings-input" id="social-qq-token" type="password" placeholder="???????" autocomplete="new-password">
++              <input class="settings-input" id="social-qq-token" type="password" placeholder="留空保持原值..." autocomplete="new-password">
+             </div>
+             <div class="settings-row">
+               <label class="settings-label" for="social-qq-secret">Bot Secret</label>
+-              <input class="settings-input" id="social-qq-secret" type="password" placeholder="???????" autocomplete="new-password">
++              <input class="settings-input" id="social-qq-secret" type="password" placeholder="留空保持原值..." autocomplete="new-password">
+             </div>
+             <div class="settings-row">
+               <label class="settings-label" for="social-qq-webhook-token">Webhook Token</label>
+-              <input class="settings-input" id="social-qq-webhook-token" type="password" placeholder="???????" autocomplete="new-password">
++              <input class="settings-input" id="social-qq-webhook-token" type="password" placeholder="留空保持原值..." autocomplete="new-password">
+             </div>
+           </div>
+           <div class="settings-section">
