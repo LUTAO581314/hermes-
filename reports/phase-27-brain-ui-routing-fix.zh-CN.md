@@ -38,6 +38,38 @@ A listener indicated an asynchronous response by returning true...
 - `scripts/probe-bailongma-frontend-routing.sh`
 - `patches/bailongma/phase-27-frontend-same-origin-routing.patch`
 
+## 服务器实修结果
+
+已在服务器 `/home/hermes/external/BaiLongma` 实际修复：
+
+- `src/ui/brain-ui/app.js`
+  - `import { API }` 改为 `import { API, apiUrl }`。
+  - 两处 `fetch("http://127.0.0.1:3721/settings/voice")` 改为 `fetch(apiUrl('/settings/voice'))`。
+- `src/ui/brain-ui/api-client.js`
+  - 浏览器端默认 API base 改为空字符串，即同源路径。
+  - 禁止把 `127.0.0.1` / `localhost` 作为公网 Brain UI 的浏览器 API base。
+- `/etc/nginx/conf.d/bairui-chat.conf`
+  - 在 HTTPS server block 增加 `location = /events`。
+  - `/events` 关闭 `proxy_buffering`，设置 `proxy_http_version 1.1` 和 `X-Accel-Buffering no`。
+
+服务器备份目录：
+
+```text
+/home/hermes/backups/bailongma-phase27-frontend-routing-20260609010607
+```
+
+验证结果：
+
+- `node --check src/ui/brain-ui/app.js`: 通过。
+- `node --check src/ui/brain-ui/api-client.js`: 通过。
+- `nginx -t`: 通过。
+- `systemctl restart bailongma`: 完成，服务 active。
+- `systemctl reload nginx`: 完成，服务 active。
+- `https://bairui.chat/settings/voice`: 返回 HTTP 200。
+- 公网 `app.js` 不再包含 `127.0.0.1:3721/settings/voice`。
+- 公网 `app.js` 包含 `apiUrl('/settings/voice')`。
+- `https://bairui.chat/events` 用 HTTP/1.1 可收到 SSE `connected` 事件。
+
 ## 服务器探测命令
 
 ```bash
@@ -73,4 +105,4 @@ location /events {
 
 ## 下一步
 
-主人在服务器运行探测脚本，把输出贴回 Codex。确认真实文件名后，直接修改服务器 BaiLongma 前端 API base 和 Nginx `/events` 配置。
+主人刷新浏览器并清缓存后复测 Brain UI。若仍看到 `127.0.0.1:3721`，优先排查浏览器缓存或旧 service worker；若仍看到 `/events` HTTP2 报错，再检查浏览器是否复用了旧连接。

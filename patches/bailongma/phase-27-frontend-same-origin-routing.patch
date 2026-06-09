@@ -2,45 +2,39 @@ diff --git a/src/ui/brain-ui/app.js b/src/ui/brain-ui/app.js
 --- a/src/ui/brain-ui/app.js
 +++ b/src/ui/brain-ui/app.js
 @@
-+function resolveBrainApiBase() {
-+  const configured = String(window.__BRAIN_API_BASE__ || '').trim()
-+  if (configured && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(configured)) {
-+    return configured.replace(/\/+$/, '')
-+  }
-+  // Browser-side code must use the public same-origin backend. A literal
-+  // 127.0.0.1 points at the user's computer, not the VPS.
-+  return ''
-+}
-+
-+const API = resolveBrainApiBase()
-+
-+function apiUrl(pathname) {
-+  const path = String(pathname || '')
-+  return `${API}${path.startsWith('/') ? path : `/${path}`}`
-+}
-+
+-import { API } from "./api-client.js";
++import { API, apiUrl } from "./api-client.js";
 @@
--fetch(`${API}/settings/voice`)
-+fetch(apiUrl('/settings/voice'))
+-      const resp = await fetch("http://127.0.0.1:3721/settings/voice");
++      const resp = await fetch(apiUrl('/settings/voice'));
 @@
--fetch(`${API}/settings/social`)
-+fetch(apiUrl('/settings/social'))
-@@
--fetch(`${API}/capabilities`)
-+fetch(apiUrl('/capabilities'))
-+
-diff --git a/src/ui/brain-ui/events.js b/src/ui/brain-ui/events.js
---- a/src/ui/brain-ui/events.js
-+++ b/src/ui/brain-ui/events.js
-@@
--const events = new EventSource(`${API}/events`)
-+const events = new EventSource(apiUrl('/events'))
+-          const resp = await fetch("http://127.0.0.1:3721/settings/voice", {
++          const resp = await fetch(apiUrl('/settings/voice'), {
 
-diff --git a/nginx/bairui.chat.conf b/nginx/bairui.chat.conf
---- a/nginx/bairui.chat.conf
-+++ b/nginx/bairui.chat.conf
+diff --git a/src/ui/brain-ui/api-client.js b/src/ui/brain-ui/api-client.js
+--- a/src/ui/brain-ui/api-client.js
++++ b/src/ui/brain-ui/api-client.js
 @@
-+location /events {
++export const API = (() => {
++  const configured = String(globalThis.__BRAIN_API_BASE__ || '').trim();
++  if (configured && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(configured)) {
++    return configured.replace(/\/+$/, '');
++  }
++  // Browser code must use same-origin paths. 127.0.0.1 would point at the
++  // user's computer, not the VPS that serves Brain UI.
++  return '';
++})();
++
++export function apiUrl(path) {
++  const p = String(path || '');
++  return `${API}${p.startsWith('/') ? p : `/${p}`}`;
++}
+
+diff --git a/etc/nginx/conf.d/bairui-chat.conf b/etc/nginx/conf.d/bairui-chat.conf
+--- a/etc/nginx/conf.d/bairui-chat.conf
++++ b/etc/nginx/conf.d/bairui-chat.conf
+@@
++location = /events {
 +  proxy_pass http://127.0.0.1:3721/events;
 +  proxy_http_version 1.1;
 +  proxy_set_header Connection '';
