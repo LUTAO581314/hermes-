@@ -105,6 +105,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 30 Hermes Config Schema Chinese Report](reports/phase-30-hermes-config-schema.zh-CN.md)
 - [Phase 31 BaiLongma Runtime Config UI Chinese Report](reports/phase-31-bailongma-runtime-config-ui.zh-CN.md)
 - [Phase 32 QQ Personal Scan Panel Chinese Report](reports/phase-32-qq-personal-scan-panel.zh-CN.md)
+- [Phase 33 QQ Personal NapCat Bridge Chinese Report](reports/phase-33-qq-personal-napcat-bridge.zh-CN.md)
 
 ## Repository Automation
 
@@ -137,6 +138,9 @@ not vendor full upstream applications by default.
   so slow routes can show a natural quick ACK and report `ack_sent`.
 - The Brain UI overlay now consumes `moxi_progress` SSE events and renders a
   compact route-aware progress strip while slow work is running.
+- QQ personal scan is now backed by a NapCat Docker bridge on the server:
+  `/social/qq-personal/qr`, `/start`, and `/logout` report real bridge state
+  while keeping QR URLs, WebUI tokens, and QQ session files out of Git.
 - Brain UI chat bubbles now show channel-plane badges so web/personal/company,
   runtime progress, and owner-confirmation surfaces are visibly separated.
 - The server BaiLongma native turn loop now reports Hermes job lifecycle events

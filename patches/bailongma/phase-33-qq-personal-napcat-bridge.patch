@@ -1,0 +1,172 @@
+diff --git a/src/social/qq-personal-bridge.js b/src/social/qq-personal-bridge.js
+new file mode 100644
+--- /dev/null
++++ b/src/social/qq-personal-bridge.js
+@@
++// NapCat-based personal QQ bridge adapter.
++// Runtime-only state such as QR URLs, WebUI tokens, QQ sessions, and cookies
++// must stay on the server and must not be committed to the MOXI repository.
++import { execFile } from 'child_process'
++import { promisify } from 'util'
++
++const execFileAsync = promisify(execFile)
++const CONTAINER_NAME = process.env.QQ_PERSONAL_CONTAINER || 'moxi-napcat'
++const IMAGE = process.env.QQ_PERSONAL_IMAGE || 'mlikiowa/napcat-docker:latest'
++const WEBUI_PORT = Number(process.env.QQ_PERSONAL_WEBUI_PORT || 6099)
++const ONEBOT_PORT = Number(process.env.QQ_PERSONAL_ONEBOT_PORT || 3001)
++const PUBLIC_WEBUI_URL = String(process.env.QQ_PERSONAL_PUBLIC_WEBUI_URL || '').trim()
++const CONFIG_DIR = process.env.QQ_PERSONAL_CONFIG_DIR || '/opt/napcat/config'
++const DATA_DIR = process.env.QQ_PERSONAL_DATA_DIR || '/opt/napcat/qq-data'
++
++function webuiURL() {
++  return PUBLIC_WEBUI_URL || `http://127.0.0.1:${WEBUI_PORT}`
++}
++
++async function runDocker(args, { timeoutMs = 15000 } = {}) {
++  try {
++    const { stdout, stderr } = await execFileAsync('docker', args, {
++      timeout: timeoutMs,
++      maxBuffer: 1024 * 1024,
++    })
++    return { ok: true, stdout: stdout || '', stderr: stderr || '' }
++  } catch (err) {
++    return {
++      ok: false,
++      stdout: (err && err.stdout) || '',
++      stderr: (err && err.stderr) || (err && err.message) || 'docker_failed',
++      code: (err && err.code) || 'docker_failed',
++    }
++  }
++}
++
++async function inspectContainer() {
++  const result = await runDocker(
++    ['inspect', CONTAINER_NAME, '--format', '{{.State.Status}}|{{.State.Running}}|{{.Config.Image}}'],
++    { timeoutMs: 5000 },
++  )
++  if (!result.ok) return { exists: false, running: false, status: 'missing', image: IMAGE }
++  const [status = 'unknown', running = 'false', image = IMAGE] = result.stdout.trim().split('|')
++  return { exists: true, running: running === 'true', status, image }
++}
++
++async function recentLogs() {
++  const result = await runDocker(['logs', '--tail', '240', CONTAINER_NAME], { timeoutMs: 5000 })
++  if (!result.ok) return ''
++  return `${result.stdout || ''}\n${result.stderr || ''}`
++}
++
++function extractQrUrl(logs) {
++  const match = String(logs || '').match(/二维码解码URL:\s*(https?:\/\/\S+)/)
++  return match ? match[1].trim() : ''
++}
++
++export async function getQQPersonalBridgeStatus() {
++  const container = await inspectContainer()
++  if (!container.exists) return { status: 'bridge_missing', bridge: 'qq-personal', provider: 'napcat', container }
++  if (!container.running) return { status: 'stopped', bridge: 'qq-personal', provider: 'napcat', container, webui_url: webuiURL() }
++
++  const logs = await recentLogs()
++  const qrUrl = extractQrUrl(logs)
++  if (qrUrl) return { status: 'qr_ready', bridge: 'qq-personal', provider: 'napcat', container, qr_url: qrUrl, webui_url: webuiURL() }
++  return { status: 'webui_ready', bridge: 'qq-personal', provider: 'napcat', container, webui_url: webuiURL() }
++}
++
++export async function startQQPersonalBridge() {
++  const current = await inspectContainer()
++  if (current.exists) {
++    const started = await runDocker(['start', CONTAINER_NAME], { timeoutMs: 12000 })
++    if (!started.ok) return { ok: false, status: 'error', error: started.stderr || 'docker_start_failed' }
++    return { ok: true, ...(await getQQPersonalBridgeStatus()) }
++  }
++  await execFileAsync('mkdir', ['-p', CONFIG_DIR, DATA_DIR], { timeout: 5000 })
++  const started = await runDocker([
++    'run', '-d', '--name', CONTAINER_NAME, '--restart', 'unless-stopped',
++    '-e', 'TZ=Asia/Shanghai',
++    '-p', `127.0.0.1:${WEBUI_PORT}:6099`,
++    '-p', `127.0.0.1:${ONEBOT_PORT}:3001`,
++    '-v', `${CONFIG_DIR}:/app/napcat/config`,
++    '-v', `${DATA_DIR}:/app/.config/QQ`,
++    IMAGE,
++  ], { timeoutMs: 120000 })
++  if (!started.ok) return { ok: false, status: 'install_failed', error: started.stderr || started.stdout || 'docker_run_failed', provider: 'napcat', image: IMAGE }
++  return { ok: true, ...(await getQQPersonalBridgeStatus()) }
++}
++
++export async function stopQQPersonalBridge() {
++  const current = await inspectContainer()
++  if (!current.exists) return { ok: true, status: 'bridge_missing' }
++  const stopped = await runDocker(['stop', CONTAINER_NAME], { timeoutMs: 15000 })
++  if (!stopped.ok) return { ok: false, status: 'error', error: stopped.stderr || 'docker_stop_failed' }
++  return { ok: true, status: 'stopped', bridge: 'qq-personal', provider: 'napcat' }
++}
+diff --git a/src/api.js b/src/api.js
+@@
++import { getQQPersonalBridgeStatus, startQQPersonalBridge, stopQQPersonalBridge } from './social/qq-personal-bridge.js'
+@@
+-    // GET /social/qq-personal/qr - placeholder for a future personal QQ scan bridge
++    // GET /social/qq-personal/qr - real NapCat personal QQ bridge status and scan entry
+     if (req.method === 'GET' && url.pathname === '/social/qq-personal/qr') {
+       if (!hasAllowedAccess(req, url)) return jsonResponse(res, 403, { ok: false, error: 'forbidden' })
+-      return jsonResponse(res, 200, {
+-        ok: true,
+-        status: 'bridge_missing',
+-        bridge: 'qq-personal',
+-        provider: 'planned',
+-        message: 'QQ personal scan bridge is not installed yet. Install NapCat or Lagrange bridge before QR login.',
+-      })
++      const status = await getQQPersonalBridgeStatus()
++      return jsonResponse(res, 200, { ok: true, ...status })
+     }
+@@
+-    // POST /social/qq-personal/start - planned connector entry, kept explicit
++    // POST /social/qq-personal/start - start or create the local NapCat bridge container
+     if (req.method === 'POST' && url.pathname === '/social/qq-personal/start') {
+       if (!requireLocalOrToken(req, res, url)) return
+-      emitEvent('social_status', { platform: 'qq-personal', status: 'bridge_missing' })
+-      return jsonResponse(res, 501, {
+-        ok: false,
+-        error: 'qq_personal_bridge_missing',
+-        status: 'bridge_missing',
+-        message: 'QQ personal scan bridge is not installed yet.',
+-      })
++      const result = await startQQPersonalBridge()
++      emitEvent('social_status', { platform: 'qq-personal', status: result.status || 'starting' })
++      return jsonResponse(res, result.ok === false ? 503 : 200, result)
+     }
+@@
+-    // POST /social/qq-personal/logout - planned disconnect entry, harmless today
++    // POST /social/qq-personal/logout - stop the local NapCat bridge without deleting QQ data
+     if (req.method === 'POST' && url.pathname === '/social/qq-personal/logout') {
+       if (!requireLocalOrToken(req, res, url)) return
+-      emitEvent('social_status', { platform: 'qq-personal', status: 'idle' })
+-      return jsonResponse(res, 200, { ok: true, status: 'idle' })
++      const result = await stopQQPersonalBridge()
++      emitEvent('social_status', { platform: 'qq-personal', status: result.status || 'stopped' })
++      return jsonResponse(res, result.ok === false ? 503 : 200, result)
+     }
+diff --git a/src/ui/brain-ui/app.js b/src/ui/brain-ui/app.js
+@@
+       } else if (data.status === "qr_ready" && data.qr_url) {
+         setQQPersonalStatus("等待扫码", false);
+         if (qqPersonalQrImg) qqPersonalQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.qr_url)}`;
+         if (qqPersonalQrArea) qqPersonalQrArea.style.display = "block";
+         if (qqPersonalQrHint) qqPersonalQrHint.textContent = "等待扫码…";
++      } else if (data.status === "webui_ready" || data.status === "starting") {
++        setQQPersonalStatus(data.status === "webui_ready" ? "WebUI 等待扫码" : "启动中", false);
++        if (qqPersonalQrArea) qqPersonalQrArea.style.display = "block";
++        if (qqPersonalQrImg) qqPersonalQrImg.style.display = "none";
++        if (qqPersonalQrHint) qqPersonalQrHint.innerHTML = data.webui_url ? `打开 <a href="${data.webui_url}" target="_blank" rel="noreferrer">NapCat WebUI</a> 扫码登录 QQ` : "NapCat 正在启动，稍后刷新状态";
++        if (showMessage) showFeedback(qqPersonalFeedback, data.message || "打开 NapCat WebUI 扫码登录");
++      } else if (data.status === "stopped") {
++        setQQPersonalStatus("已停止", false);
++        if (qqPersonalQrArea) qqPersonalQrArea.style.display = "none";
++        if (showMessage) showFeedback(qqPersonalFeedback, "QQ 个人桥接已停止");
+       } else if (data.status === "bridge_missing") {
+-        setQQPersonalStatus("未安装桥接器", false);
++        setQQPersonalStatus("未创建桥接器", false);
+         if (qqPersonalQrArea) qqPersonalQrArea.style.display = "none";
+-        if (showMessage) showFeedback(qqPersonalFeedback, "QQ 个人扫码桥接器还没安装，后续接 NapCat 或 Lagrange", true);
++        if (showMessage) showFeedback(qqPersonalFeedback, "点击启动扫码会创建 NapCat 容器", true);
+       } else {
+         setQQPersonalStatus(data.status || "未连接", false);
+       }

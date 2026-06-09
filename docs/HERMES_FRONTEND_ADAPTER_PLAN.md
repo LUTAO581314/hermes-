@@ -322,3 +322,21 @@ The personal scan panel currently exposes planned endpoints and returns
 `bridge_missing` because the QQ personal bridge is not installed yet. This keeps
 the product boundary honest: the user sees that personal QQ should be QR-based,
 but the UI does not pretend QR login is available before the bridge exists.
+
+## Phase 33 QQ Personal NapCat Bridge
+
+The QQ personal scan path now has a real runtime bridge behind the panel:
+
+- BaiLongma imports a `qq-personal-bridge` adapter.
+- `GET /social/qq-personal/qr` reads the local NapCat container state and
+  surfaces `qr_ready` when NapCat emits a login QR URL.
+- `POST /social/qq-personal/start` starts or creates the local NapCat Docker
+  container.
+- `POST /social/qq-personal/logout` stops the container without deleting QQ
+  session data.
+- Brain UI renders `qr_ready`, `webui_ready`, `starting`, `stopped`, and
+  `bridge_missing`.
+
+The bridge intentionally binds NapCat WebUI and OneBot to `127.0.0.1` only.
+WebUI tokens, QR URLs, QQ sessions, cookies, and account ids are treated as
+runtime secrets and are not part of the repository overlay.

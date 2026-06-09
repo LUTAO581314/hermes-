@@ -15,9 +15,15 @@ QQ should be added as a third social connector after the runtime contract is
 stable, using the same `/social/turn` and `/jobs/event` lifecycle as WeChat and
 Feishu.
 
-## 2. Recommended QQ Route
+## 2. Recommended QQ Routes
 
-Use the official QQ bot route first.
+MOXI now keeps two QQ routes separate:
+
+- Official QQ bot: lower protocol risk, best for public or formal bot use.
+- Personal QQ scan bridge: NapCat-backed personal account route, useful for
+  companionship and private chat surfaces, but with higher platform-risk.
+
+Use the official QQ bot route for stable public deployments.
 
 Expected credentials:
 
@@ -29,6 +35,26 @@ Expected credentials:
 
 The runtime health endpoint only reports whether these values are configured.
 It must never return the raw values.
+
+### Personal QQ Scan Bridge
+
+The first implemented personal route uses NapCat in Docker:
+
+- container name: `moxi-napcat`,
+- WebUI bound to `127.0.0.1:6099`,
+- OneBot bound to `127.0.0.1:3001`,
+- runtime config directory: `/opt/napcat/config`,
+- runtime QQ data directory: `/opt/napcat/qq-data`.
+
+BaiLongma exposes:
+
+- `GET /social/qq-personal/qr`
+- `POST /social/qq-personal/start`
+- `POST /social/qq-personal/logout`
+
+The status endpoint may return `bridge_missing`, `stopped`, `starting`,
+`webui_ready`, `qr_ready`, or `connected`. QR URLs and WebUI tokens are runtime
+materials only and must not be committed or copied into public docs.
 
 ## 3. Runtime Target IDs
 
@@ -78,3 +104,11 @@ Feishu, WeCom, and WeChat ClawBot:
 - webhook copy button,
 - last check result and timestamp,
 - clear warning that QQ should not execute high-risk company actions.
+
+For the personal scan card, the frontend should render:
+
+- `qr_ready`: generate a QR image from `qr_url`,
+- `webui_ready`: show a WebUI link if available,
+- `starting`: keep polling,
+- `connected`: hide QR and show connected status,
+- `stopped` / `bridge_missing`: show a start action.

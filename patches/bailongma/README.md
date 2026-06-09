@@ -90,6 +90,10 @@ checkout. It is intentionally an overlay, not a full copy of upstream source.
   splits QQ into official bot credentials and a planned personal scan bridge
   panel. The personal path reports `bridge_missing` until NapCat or Lagrange is
   installed.
+- [phase-33-qq-personal-napcat-bridge.patch](phase-33-qq-personal-napcat-bridge.patch)
+  turns the QQ personal scan path into a real NapCat Docker bridge: BaiLongma
+  can start/stop the local container, read status, surface QR-ready login state,
+  and keep session material outside Git.
 
 Future patch files should be named by phase and purpose:
 
