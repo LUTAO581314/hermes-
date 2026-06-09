@@ -62,6 +62,30 @@ class OutboundStickerPayload:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class OutboundMediaPayload:
+    """Connector-neutral media envelope for chat surfaces.
+
+    Channel adapters can send a real image when their bridge supports upload.
+    If not, they must send ``text_fallback`` and log ``fallback_reason`` instead
+    of silently dropping the media turn.
+    """
+
+    kind: Literal["sticker", "image"]
+    channel: Channel
+    action: str
+    send_strategy: str
+    text_fallback: str
+    upload_required: bool
+    review_required: bool
+    fallback_reason: str
+    platform_payload: dict[str, object] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
 INTENT_REGISTRY: dict[str, StickerIntentProfile] = {
     "cute_greeting": StickerIntentProfile(
         intent="cute_greeting",
@@ -221,6 +245,86 @@ def build_outbound_payload(
             "license_note": candidate.license_note,
             "attribution_required": candidate.attribution_required,
             "runtime_upload_required": candidate.runtime_upload_required,
+        },
+    )
+
+
+def build_media_envelope(
+    candidate: StickerCandidate,
+    channel: Channel = "generic",
+    *,
+    kind: Literal["sticker", "image"] = "sticker",
+    bridge_supports_upload: bool = False,
+    review_required: bool = True,
+) -> OutboundMediaPayload:
+    """Build a normalized outbound media payload for social connectors."""
+
+    sticker_payload = build_outbound_payload(candidate, channel)
+    normalized_channel = sticker_payload.channel
+    upload_required = candidate.runtime_upload_required
+
+    platform_payloads: dict[Channel, dict[str, object]] = {
+        "feishu": {
+            "message_type": "image",
+            "requires": "image_key",
+            "upload_then_send": True,
+        },
+        "wechat": {
+            "message_type": "image",
+            "requires": "media_id_or_bridge_file",
+            "upload_then_send": True,
+            "compatible_text_fallback": True,
+        },
+        "wecom": {
+            "message_type": "image",
+            "requires": "media_id",
+            "upload_then_send": True,
+        },
+        "web": {
+            "message_type": "image_preview_or_text",
+            "requires": "preview_url_or_runtime_blob",
+        },
+        "line": {
+            "message_type": "sticker" if candidate.provider == "line_official" else "image",
+            "requires": "packageId/stickerId or image upload",
+        },
+        "generic": {
+            "message_type": "image_or_text",
+            "requires": "adapter_capability_check",
+        },
+    }
+
+    if bridge_supports_upload and upload_required:
+        send_strategy = "upload_then_send"
+        fallback_reason = ""
+    elif sticker_payload.action == "send_platform_sticker_id":
+        send_strategy = "send_platform_sticker_id"
+        fallback_reason = ""
+    elif upload_required:
+        send_strategy = "text_fallback_until_upload_supported"
+        fallback_reason = "channel media upload is not confirmed for this bridge"
+    else:
+        send_strategy = "send_text_fallback"
+        fallback_reason = "metadata-only provider has no resolved image asset"
+
+    return OutboundMediaPayload(
+        kind=kind,
+        channel=normalized_channel,
+        action=sticker_payload.action,
+        send_strategy=send_strategy,
+        text_fallback=sticker_payload.text_fallback,
+        upload_required=upload_required,
+        review_required=review_required and candidate.provider == "image_generation",
+        fallback_reason=fallback_reason,
+        platform_payload=platform_payloads[normalized_channel],
+        metadata={
+            "intent": candidate.intent,
+            "provider": candidate.provider,
+            "style": candidate.style,
+            "query": candidate.query,
+            "license_note": candidate.license_note,
+            "attribution_required": candidate.attribution_required,
+            "instructions": sticker_payload.instructions,
         },
     )
 

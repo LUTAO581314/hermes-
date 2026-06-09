@@ -177,6 +177,12 @@ At the `/message` boundary, BaiLongma also respects
 persists the user text as context, returns `queued:false`, and avoids pushing a
 new LLM turn that would interrupt the active slow job.
 
+For social images and stickers, `/social/turn` can return an `outbound_media`
+envelope. Channel adapters should upload and send media when verified; otherwise
+they must send `text_fallback` and log `fallback_reason`. This keeps WeChat and
+other personal bridges from silently dropping image replies while their concrete
+media-upload path is still being verified.
+
 For the Feishu company plane, the first tool layer is read-only:
 `feishu_lookup_user` for sender/company identity and
 `feishu_bitable_list_records` for structured project/task/customer tables.

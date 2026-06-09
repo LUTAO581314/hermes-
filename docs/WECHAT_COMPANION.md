@@ -244,6 +244,17 @@ intent
   -> text fallback if upload fails
 ```
 
+Compatibility rule:
+
+- `/social/turn` returns `outbound_media` for image/sticker routes.
+- If the active WeChat bridge supports image upload or bridge-file sending, it
+  should upload/send the runtime image.
+- If the bridge does not support image delivery yet, it must send
+  `outbound_media.text_fallback` and log `outbound_media.fallback_reason`
+  instead of dropping the reply.
+- This keeps WeChat usable before the exact personal-bridge media API is
+  verified.
+
 Rules:
 
 - No sticker image files are committed to Git.

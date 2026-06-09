@@ -40,7 +40,7 @@ IMAGE_READ_RE = re.compile(
 )
 IMAGE_GENERATE_RE = re.compile(
     r"(generate image|image generation|create image|draw|paint|sticker|avatar|"
-    r"gpt-image|image2|生成图片|画图|画一张|生图|表情包|头像)",
+    r"gpt-image|image2|生成图片|画图|画一张|生图|发图|发图片|发张图|表情包|头像)",
     re.I,
 )
 SEARCH_RE = re.compile(

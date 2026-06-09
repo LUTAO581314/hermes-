@@ -96,7 +96,8 @@ BaiLongma / Brain UI
 11. Merge active-job follow-ups without interrupting the running native turn.
     Done in Phase 22.
 12. Add read-only Feishu company data tools. Done in Phase 23.
-13. Add GitHub Pages deployment for the public technical path.
+13. Add social image/sticker compatibility through `outbound_media`. Done in Phase 24.
+14. Add GitHub Pages deployment for the public technical path.
 
 ## Phase 16 Patch
 
@@ -246,3 +247,20 @@ This is intentionally not a full company operator yet. It proves the safe tool
 shape first; Feishu app credentials, contact read scope, Bitable app/table
 configuration, and tenant publication must be verified before real company
 data can be returned.
+
+## Phase 24 Social Media Compatibility
+
+Hermes `/social/turn` now exposes `outbound_media` for image/sticker routes.
+The frontend and social adapters should treat it as the source of truth for
+media sends:
+
+- `send_strategy=upload_then_send`: upload through the channel bridge, then send
+  the platform image message.
+- `send_strategy=text_fallback_until_upload_supported`: send
+  `text_fallback` immediately and log `fallback_reason`.
+- WeChat personal bridges should use the fallback branch until image upload or
+  bridge-file sending is verified.
+- Feishu adapters should upload first and send by `image_key`.
+
+The companion BaiLongma overlay snippet is
+`patches/bailongma/phase-24-social-media-fallback.patch`.

@@ -9,6 +9,7 @@ from typing import Any
 from .async_jobs import AsyncJob, AsyncJobStore
 from .context_budget import budget_for_policy
 from .routing import RoutePolicy, RouteType, classify_route
+from .sticker_bridge import build_media_envelope, select_sticker
 
 
 ACK_TEXT: dict[RouteType, str] = {
@@ -83,6 +84,7 @@ def plan_social_turn(
         "context_budget": asdict(budget),
         "job": asdict(job) if job is not None else None,
         "active_job": None,
+        "outbound_media": _outbound_media(policy, clean_channel, config),
         "message_preview_chars": min(len(str(message or "")), 160),
         "privacy": "message body is not stored in the plan payload",
     }
@@ -128,6 +130,7 @@ def _follow_up_payload(
         },
         "job": None,
         "active_job": asdict(active_job),
+        "outbound_media": None,
         "message_preview_chars": min(len(str(message or "")), 160),
         "privacy": "message body is not stored in the plan payload",
     }
@@ -144,6 +147,36 @@ def _ack_text(policy: RoutePolicy) -> str:
 
 def _is_cancel_request(message: str) -> bool:
     return bool(CANCEL_RE.search(str(message or "")))
+
+
+def _outbound_media(
+    policy: RoutePolicy,
+    channel: str,
+    config: Any,
+) -> dict[str, Any] | None:
+    if policy.route != RouteType.IMAGE_GENERATE:
+        return None
+
+    provider = getattr(config, "sticker_default_provider", "metadata_only")
+    if policy.tool_group == "image_generation" and getattr(
+        config, "sticker_image_generation_enabled", False
+    ):
+        provider = "image_generation"
+
+    candidate = select_sticker(
+        "cute_greeting",
+        provider=provider,
+        style=getattr(config, "sticker_default_style", "kawaii_anime"),
+    )
+    bridge_supports_upload = channel in {"feishu", "web"} and provider != "metadata_only"
+    payload = build_media_envelope(
+        candidate,
+        channel if channel in {"web", "feishu", "wechat", "wecom", "line"} else "generic",
+        kind="sticker",
+        bridge_supports_upload=bridge_supports_upload,
+        review_required=getattr(config, "sticker_generation_review_required", True),
+    )
+    return payload.to_dict()
 
 
 def _clean_label(value: str, default: str) -> str:

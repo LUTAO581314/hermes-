@@ -1,0 +1,64 @@
+diff --git a/src/moxi-runtime-bridge.js b/src/moxi-runtime-bridge.js
+--- a/src/moxi-runtime-bridge.js
++++ b/src/moxi-runtime-bridge.js
+@@
++export function normalizeOutboundMedia(plan = {}, channel = 'generic') {
++  const media = plan && typeof plan === 'object' ? plan.outbound_media : null
++  if (!media || typeof media !== 'object') return null
++  const sendStrategy = String(media.send_strategy || '').trim()
++  const textFallback = String(media.text_fallback || '').trim()
++  const fallbackReason = String(media.fallback_reason || '').trim()
++  return {
++    kind: String(media.kind || 'image'),
++    channel: String(media.channel || channel || 'generic'),
++    action: String(media.action || ''),
++    sendStrategy,
++    textFallback,
++    uploadRequired: Boolean(media.upload_required),
++    reviewRequired: Boolean(media.review_required),
++    fallbackReason,
++    platformPayload: media.platform_payload && typeof media.platform_payload === 'object'
++      ? media.platform_payload
++      : {},
++    metadata: media.metadata && typeof media.metadata === 'object' ? media.metadata : {},
++    shouldSendTextFallback: sendStrategy === 'text_fallback_until_upload_supported' && Boolean(textFallback),
++  }
++}
++
+diff --git a/src/server.js b/src/server.js
+--- a/src/server.js
++++ b/src/server.js
+@@
+-import { planSocialTurn } from './moxi-runtime-bridge.js'
++import { planSocialTurn, normalizeOutboundMedia } from './moxi-runtime-bridge.js'
+@@
+   const plan = await planSocialTurn(...)
++  const outboundMedia = normalizeOutboundMedia(plan, channel)
++  if (outboundMedia?.shouldSendTextFallback) {
++    console.info('[MOXI] outbound media fallback', {
++      channel: outboundMedia.channel,
++      kind: outboundMedia.kind,
++      reason: outboundMedia.fallbackReason,
++    })
++    // Connector-specific send path should use the same target as the current reply.
++    // For WeChat/ClawBot, send this text immediately when image upload is not verified.
++    content = `${content || ''}\n${outboundMedia.textFallback}`.trim()
++  }
++
+diff --git a/src/social/wechat-send.js b/src/social/wechat-send.js
+--- a/src/social/wechat-send.js
++++ b/src/social/wechat-send.js
+@@
++export async function sendWechatCompatibleReply({ target, text, outboundMedia, bridge }) {
++  if (outboundMedia?.sendStrategy === 'upload_then_send' && bridge?.sendImage) {
++    return bridge.sendImage(target, outboundMedia)
++  }
++  if (outboundMedia?.textFallback) {
++    console.info('[MOXI] WeChat media fallback', {
++      targetType: target?.type || 'unknown',
++      reason: outboundMedia.fallbackReason || 'media upload unsupported',
++    })
++    return bridge.sendText(target, outboundMedia.textFallback)
++  }
++  return bridge.sendText(target, text)
++}

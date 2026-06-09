@@ -29,6 +29,7 @@ Phase 0 planning and Phase 1 runtime foundation are complete. Phase 2 is now foc
 - Cloud TTS still needs an approved provider key; the Brain UI now falls back to browser speech synthesis when cloud TTS is unavailable.
 - Image understanding is exposed through `analyze_image`.
 - A metadata-only sticker bridge is available for cute/kawaii/anime-style prepared stickers. It stores intent profiles, provider queries, and channel send instructions only. Sticker images, generated images, platform media IDs, and API keys stay out of Git; runtime image generation can be enabled as a reviewed provider path.
+- Social image/sticker sending now has a connector-neutral `outbound_media` compatibility envelope. WeChat and other bridges that cannot yet upload images must send the text fallback and log the reason instead of silently dropping the image reply.
 - Video understanding is intentionally frozen for this phase.
 - BaiLongma memory is treated as working memory; Obsidian remains the durable memory source of truth.
 - Feishu callback, encrypted event handling, sender identity separation, event idempotency, fast ACK, and group-reply routing are implemented; real group retest by the owner is still required.
@@ -94,6 +95,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 21 Tool Lifecycle Events Chinese Report](reports/phase-21-tool-lifecycle-events.zh-CN.md)
 - [Phase 22 Follow-Up Job Merge Chinese Report](reports/phase-22-follow-up-job-merge.zh-CN.md)
 - [Phase 23 Feishu Read-Only Tools Chinese Report](reports/phase-23-feishu-read-only-tools.zh-CN.md)
+- [Phase 24 Social Media Compatibility Chinese Report](reports/phase-24-social-media-compat.zh-CN.md)
 
 ## Repository Automation
 
@@ -138,6 +140,9 @@ not vendor full upstream applications by default.
   tools for identity lookup and Bitable record listing. They are low-risk,
   source-shaped, and require tenant permissions/configuration before returning
   real company data.
+- The runtime now exposes `outbound_media` for image/sticker social turns so
+  frontends and WeChat/Feishu/QQ adapters can either upload-and-send media or
+  fall back to text explicitly.
 - External runtime install notes live under [external](external/README.md).
 - If a full BaiLongma fork becomes necessary, keep this repository as the
   canonical technical-path source and preserve the upstream MIT license.

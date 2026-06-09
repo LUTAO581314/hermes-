@@ -364,6 +364,14 @@ class RuntimeTests(unittest.TestCase):
                     payload["route_ui"]["image_generate"]["progress_kind"],
                     "image_generation",
                 )
+                self.assertIn(
+                    "outbound_media",
+                    payload["endpoints"]["social_turn"]["response_keys"],
+                )
+                self.assertEqual(
+                    payload["outbound_media"]["wechat_rule"],
+                    "Personal WeChat bridges may lack image upload; they must gracefully fall back to text until media_id or bridge-file sending is verified.",
+                )
                 self.assertEqual(
                     payload["channel_planes"]["feishu"]["plane"],
                     "company",
@@ -662,6 +670,19 @@ class RuntimeTests(unittest.TestCase):
                 self.assertIn("\u9a6c\u4e0a", payload["ack"]["text"])
                 self.assertEqual(payload["route"]["route"], "image_generate")
                 self.assertEqual(payload["context_budget"]["max_recent_messages"], 4)
+                self.assertEqual(
+                    payload["outbound_media"]["channel"],
+                    "wechat",
+                )
+                self.assertEqual(
+                    payload["outbound_media"]["send_strategy"],
+                    "text_fallback_until_upload_supported",
+                )
+                self.assertEqual(
+                    payload["outbound_media"]["platform_payload"]["requires"],
+                    "media_id_or_bridge_file",
+                )
+                self.assertTrue(payload["outbound_media"]["text_fallback"])
                 self.assertIsNotNone(payload["job"])
                 self.assertEqual(payload["job"]["status"], "queued")
                 self.assertEqual(payload["job"]["tool_name"], "image_generation")
@@ -907,6 +928,7 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(payload["ack"]["text"], "")
                 self.assertEqual(payload["route"]["route"], "casual_chat")
                 self.assertIsNone(payload["job"])
+                self.assertIsNone(payload["outbound_media"])
                 self.assertEqual(payload["context_budget"]["tool_schema_group"], "send_only")
             finally:
                 server.shutdown()

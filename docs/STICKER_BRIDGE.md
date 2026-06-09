@@ -163,6 +163,36 @@ HERMES_STICKER_API_KEY=<server-side-secret>
 
 ## 5. 渠道发送策略
 
+### 5.0 统一出站媒体兼容层
+
+`/social/turn` 的图片/表情路线可以返回 `outbound_media`，让所有聊天软件先读同一个结构：
+
+```json
+{
+  "kind": "sticker",
+  "channel": "wechat",
+  "send_strategy": "text_fallback_until_upload_supported",
+  "text_fallback": "嘿嘿，来啦～",
+  "upload_required": true,
+  "review_required": true,
+  "fallback_reason": "channel media upload is not confirmed for this bridge",
+  "platform_payload": {
+    "message_type": "image",
+    "requires": "media_id_or_bridge_file",
+    "upload_then_send": true,
+    "compatible_text_fallback": true
+  }
+}
+```
+
+兼容规则：
+
+- 渠道适配器支持上传时：运行时生成/解析图片，然后上传并发送平台图片消息。
+- 渠道适配器暂不支持上传时：立即发送 `text_fallback`，并记录 `fallback_reason`，不能静默失败。
+- 微信个人桥接优先采用这个降级策略，因为不同 WeChat bridge 对图片发送的支持差异很大。
+- 飞书和企微必须先上传拿到平台 token，例如 `image_key` 或 `media_id`，再发送图片消息。
+- 所有 `image_key`、`media_id`、临时文件路径和 provider secret 都只允许在运行时存在，不进入 Git。
+
 ### 5.1 Web
 
 Web 可以做表情候选预览，但只有在 provider 允许 embed 或 API 展示时才渲染远程预览。
@@ -205,6 +235,7 @@ resolve or generate -> upload through WeChat bridge or official media API -> sen
 失败时：
 
 - 使用文本兜底。
+- 记录 `fallback_reason`，方便后续确认到底是上传失败、平台策略限制，还是桥接器暂不支持。
 - 不重试刷屏。
 - 不让公司、高风险动作走微信表情入口。
 

@@ -56,11 +56,16 @@ checkout. It is intentionally an overlay, not a full copy of upstream source.
   adds read-only Feishu OpenAPI tools for company identity lookup and Bitable
   record listing, including tool schemas, router triggers, low-risk policy, and
   secret-safe result shaping.
+- [phase-24-social-media-fallback.patch](phase-24-social-media-fallback.patch)
+  documents the BaiLongma-side media compatibility adapter: read Hermes
+  `outbound_media`, upload and send when the channel supports it, or send the
+  text fallback and log the reason when WeChat-style image delivery is not
+  verified yet.
 
 Future patch files should be named by phase and purpose:
 
 ```text
-phase-24-feishu-readiness-ui.patch
+phase-25-feishu-readiness-ui.patch
 ```
 
 The server checkout may still contain local runtime-specific changes. Patch

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from hermes_runtime.sticker_bridge import (
+    build_media_envelope,
     build_outbound_payload,
     list_intents,
     select_sticker,
@@ -44,6 +45,36 @@ class StickerBridgeTests(unittest.TestCase):
         self.assertEqual(payload.action, "generate_review_upload_send")
         self.assertIn("original kawaii anime", payload.metadata["query"])
         self.assertEqual(payload.text_fallback, "哼，才没有很想你呢。")
+
+    def test_wechat_media_envelope_falls_back_without_upload_support(self) -> None:
+        candidate = select_sticker("happy_praise", provider="image_generation")
+        payload = build_media_envelope(
+            candidate,
+            "wechat",
+            bridge_supports_upload=False,
+        ).to_dict()
+
+        self.assertEqual(payload["channel"], "wechat")
+        self.assertEqual(payload["kind"], "sticker")
+        self.assertEqual(payload["send_strategy"], "text_fallback_until_upload_supported")
+        self.assertEqual(payload["platform_payload"]["requires"], "media_id_or_bridge_file")
+        self.assertTrue(payload["upload_required"])
+        self.assertTrue(payload["review_required"])
+        self.assertIn("fallback", payload["send_strategy"])
+        self.assertNotIn("api_key", payload)
+
+    def test_feishu_media_envelope_can_upload_then_send(self) -> None:
+        candidate = select_sticker("happy_praise", provider="stipop")
+        payload = build_media_envelope(
+            candidate,
+            "feishu",
+            bridge_supports_upload=True,
+        ).to_dict()
+
+        self.assertEqual(payload["channel"], "feishu")
+        self.assertEqual(payload["send_strategy"], "upload_then_send")
+        self.assertEqual(payload["platform_payload"]["requires"], "image_key")
+        self.assertEqual(payload["text_fallback"], "啊啊啊太棒啦！")
 
     def test_list_intents_is_owner_reviewable(self) -> None:
         intents = list_intents()

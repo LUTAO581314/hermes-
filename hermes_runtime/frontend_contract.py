@@ -52,6 +52,7 @@ def frontend_contract(config: Any) -> dict[str, Any]:
                     "context_budget",
                     "job",
                     "active_job",
+                    "outbound_media",
                 ],
             },
             "jobs_event": {
@@ -96,6 +97,24 @@ def frontend_contract(config: Any) -> dict[str, Any]:
             },
         },
         "route_ui": _route_ui(config),
+        "outbound_media": {
+            "purpose": "Normalize image/sticker sending across web, WeChat, QQ, Feishu, and future connectors.",
+            "keys": [
+                "kind",
+                "channel",
+                "action",
+                "send_strategy",
+                "text_fallback",
+                "upload_required",
+                "review_required",
+                "fallback_reason",
+                "platform_payload",
+                "metadata",
+            ],
+            "adapter_rule": "If send_strategy is text_fallback_until_upload_supported, send text_fallback immediately and log fallback_reason instead of dropping the media.",
+            "wechat_rule": "Personal WeChat bridges may lack image upload; they must gracefully fall back to text until media_id or bridge-file sending is verified.",
+            "feishu_rule": "Feishu image messages require runtime upload and image_key before send.",
+        },
         "channel_planes": {
             "wechat": {
                 "plane": "personal",

@@ -52,7 +52,8 @@ Architecture:
 - Public-opinion intelligence keeps source and freshness metadata.
 - Sticker/media expression uses a metadata-first bridge: provider metadata,
   provider IDs, optional reviewed image generation, runtime upload, and text
-  fallback. Do not commit third-party or generated sticker image files.
+  fallback through `outbound_media` when a channel cannot upload images yet. Do
+  not commit third-party or generated sticker image files.
 - Company workflow starts read-only and uses approval gates before writes.
 - Safety layer controls permissions, logs, secrets, and high-risk actions.
 

@@ -642,7 +642,7 @@
         </div>
         <div class="metric">
           <b>Media-Safe</b>
-          <span>Sticker bridges use provider metadata, reviewed generation, runtime upload, and text fallback.</span>
+          <span>Sticker bridges use provider metadata, reviewed generation, runtime upload, and explicit text fallback.</span>
         </div>
         <div class="metric">
           <b>CI Checked</b>
@@ -707,7 +707,7 @@ Architecture:
 - Memory governor separates working memory from reviewed durable notes.
 - Public-opinion intelligence keeps source and freshness metadata.
 - Company workflow starts read-only and uses approval gates before writes.
-- Sticker/media expression stores provider metadata or reviewed generation instructions, not bundled image files.
+- Sticker/media expression stores provider metadata or reviewed generation instructions, not bundled image files; channels that cannot upload images use explicit text fallback.
 - Safety layer controls permissions, logs, secrets, and high-risk actions.
 
 Please produce feasibility, risks, missing modules, optimized roadmap, memory governance improvements, public-opinion improvements, company-workflow hardening, performance improvements, and the next engineering task.</pre>
@@ -792,7 +792,7 @@ Please produce feasibility, risks, missing modules, optimized roadmap, memory go
           <div class="stage"><b>3. Memory</b><p>Working memory, durable notes, review gates, dream consolidation, correction workflow.</p></div>
           <div class="stage"><b>4. Intelligence</b><p>Hot-list panel, source links, search expansion, deduplication, clustering, reports.</p></div>
           <div class="stage"><b>5. Company</b><p>Identity, group routing, idempotency, read-only Feishu user lookup and Bitable records, then approval-gated writes.</p></div>
-          <div class="stage"><b>6. Media</b><p>Browser or provider TTS, metadata-only sticker bridge, reviewed runtime image generation, future video after controls.</p></div>
+          <div class="stage"><b>6. Media</b><p>Browser or provider TTS, metadata-only sticker bridge, reviewed runtime image generation, upload-or-fallback media sends.</p></div>
         </div>
       </section>
 
@@ -809,7 +809,7 @@ Please produce feasibility, risks, missing modules, optimized roadmap, memory go
           <article class="module"><h3>Orchestration Core</h3><p>Queueing, priority, retries, task locks, model selection, and tool routing.</p></article>
           <article class="module"><h3>Memory Governor</h3><p>Admission rules, review, dream consolidation, durable write-back, and correction.</p></article>
           <article class="module"><h3>Intelligence Layer</h3><p>Hot lists, search expansion, source freshness, clustering, risk scoring, reports.</p></article>
-          <article class="module"><h3>Sticker Bridge</h3><p>Prepared-sticker metadata, optional reviewed image generation, runtime upload, and text fallback.</p></article>
+          <article class="module"><h3>Sticker Bridge</h3><p>Prepared-sticker metadata, optional reviewed image generation, runtime upload, and explicit fallback when a channel cannot send images.</p></article>
           <article class="module"><h3>Safety And Audit</h3><p>Permission levels, approval gates, logs, secret handling, rollback boundaries.</p></article>
         </div>
       </section>

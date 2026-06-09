@@ -97,7 +97,7 @@ Known gaps:
 | OCR | Active multimodal model first, dedicated OCR API later | Use for screenshots, PDFs, receipts, tables, and images with text |
 | Image understanding | Active multimodal model API | Implemented as BaiLongma `analyze_image` using the current `gpt-5.5` gateway; Brain UI and WeChat inbound images share this path; does not require MiniMax |
 | Image generation | Current image-capable API provider | Separate from image understanding; use for reviewed original stickers or assets, not for reading images |
-| Sticker bridge | Metadata-only provider bridge first; Stipop/GIPHY/image generation later | Do not commit sticker files; Feishu sends by uploaded `image_key`, WeChat by runtime bridge/media id |
+| Sticker bridge | Metadata-only provider bridge first; Stipop/GIPHY/image generation later | `outbound_media` now defines upload-or-text-fallback behavior; do not commit sticker files; Feishu sends by uploaded `image_key`, WeChat by runtime bridge/media id when verified |
 | Speech transcription | Local Whisper tiny first, cloud ASR later if needed | Current transition solution is local Whisper on the VPS |
 | Feishu chat and identity | Official Feishu event callback first | Webhook path must bypass site Basic Auth; encrypted events are supported; each Feishu sender is separated by open_id |
 | Feishu files and docs | Read-only Feishu Drive/Docs/Search APIs first | Drive/docs search remains planned until tenant scopes are confirmed |
@@ -137,6 +137,7 @@ Sticker/media expression:
 - OpenMoji and Noto Emoji are fallback emoji-style sources, not the main anime/kawaii style.
 - The current image-generation API can create original MOXI sticker candidates at runtime. Keep it review-gated, do not imitate existing anime IP, and never commit generated images.
 - Feishu and WeChat adapters should upload runtime images to the platform and send by platform token (`image_key`, `media_id`, or bridge equivalent).
+- If a channel cannot upload media yet, adapters must send `outbound_media.text_fallback` and log `outbound_media.fallback_reason` instead of silently dropping the image reply.
 
 Speech:
 

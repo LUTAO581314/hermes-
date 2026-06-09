@@ -213,6 +213,9 @@ Keep this stage provider-driven and explicit.
 - Runtime image generation can create original stickers only after review and
   should not imitate existing anime IP, celebrities, or copyrighted sticker
   packs.
+- Social media sends should use a neutral `outbound_media` envelope. If a
+  channel cannot upload images yet, send the text fallback and log the reason
+  instead of silently dropping the reply.
 - Voice cloning must require explicit authorization and a clear use case.
 - Video understanding should wait until the core loop, memory, and cost control
   are stable.
