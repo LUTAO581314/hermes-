@@ -76,6 +76,8 @@ The old explanatory documents have been removed. Phase summaries remain under
 - [GitHub Repository Cleanup Policy](docs/15-github-repository-cleanup.md)
 - [Commercial Delivery Development Plan](docs/16-commercial-delivery-development-plan.md)
 - [Three-Pillar Commercial Project Plan](docs/17-three-pillar-commercial-project-plan.md)
+- [Vendor Runtime Integration](docs/18-vendor-runtime-integration.md)
+- [Brand And Trademark Fields](docs/19-brand-and-trademark-fields.md)
 
 ## Engineering Rule
 
@@ -89,3 +91,5 @@ The repository must converge toward production ownership:
   `reports/`.
 - New runtime code must be rebuilt under `src/`.
 - New tests must be rebuilt under `tests/`.
+- External runtime source lives under `vendor/runtimes/` and must keep its
+  license and adapter boundary.

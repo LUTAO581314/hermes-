@@ -1,0 +1,9 @@
+[submodule "vendor/runtimes/everos"]
+	path = vendor/runtimes/everos
+	url = https://github.com/EverMind-AI/EverOS.git
+[submodule "vendor/runtimes/trendradar"]
+	path = vendor/runtimes/trendradar
+	url = https://github.com/sansan0/TrendRadar.git
+[submodule "vendor/runtimes/mirofish"]
+	path = vendor/runtimes/mirofish
+	url = https://github.com/666ghj/MiroFish.git

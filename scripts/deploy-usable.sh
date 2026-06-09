@@ -37,7 +37,7 @@ ensure_env_value() {
   fi
 }
 
-step "Preparing MOXI Hermes skeleton environment"
+step "Preparing MOXI Hermes runtime environment"
 ensure_env_file
 ensure_env_value "POSTGRES_DB" "moxi"
 ensure_env_value "POSTGRES_USER" "moxi"
@@ -46,7 +46,9 @@ if ! grep -qE '^POSTGRES_PASSWORD=.+$' .env; then
   ensure_env_value "POSTGRES_PASSWORD" "$(new_secret)"
 fi
 
-ensure_env_value "HERMES_ENV" "development"
+ensure_env_value "HERMES_ENV" "production"
+ensure_env_value "HERMES_HOST" "127.0.0.1"
+ensure_env_value "HERMES_PORT" "8787"
 
 mkdir -p src tests data/postgres logs obsidian-vault
 
@@ -55,9 +57,17 @@ if [[ "$MODE" == "domain" && -z "$DOMAIN" ]]; then
   exit 1
 fi
 
-step "Skeleton environment is ready"
-printf 'Source directory: src/\n'
-printf 'Tests directory:  tests/\n'
-printf 'PostgreSQL data:  data/postgres/\n'
-printf 'Obsidian vault:   obsidian-vault/\n'
-printf 'Next step: rebuild Hermes runtime source under src/ from the current docs.\n'
+step "Starting PostgreSQL and Hermes"
+if docker compose version >/dev/null 2>&1; then
+  docker compose -f docker-compose.production.yml up -d --build
+elif command -v docker-compose >/dev/null 2>&1; then
+  docker-compose -f docker-compose.production.yml up -d --build
+else
+  echo "Docker Compose is required." >&2
+  exit 1
+fi
+
+step "Deployment started"
+printf 'Hermes health:       http://127.0.0.1:8787/health\n'
+printf 'Hermes ready:        http://127.0.0.1:8787/ready\n'
+printf 'Hermes capabilities: http://127.0.0.1:8787/capabilities\n'

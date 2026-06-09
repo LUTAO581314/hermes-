@@ -19,15 +19,21 @@ services:
       retries: 10
     restart: unless-stopped
 
-  hermes-placeholder:
+  hermes-runtime:
     build: .
-    container_name: moxi-hermes-placeholder
+    container_name: moxi-hermes-runtime
     env_file:
       - .env
+    environment:
+      HERMES_HOST: 0.0.0.0
+      HERMES_DATABASE_URL: postgresql://${POSTGRES_USER:-moxi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-moxi}
+    ports:
+      - "127.0.0.1:${HERMES_PORT:-8787}:8787"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./src:/app/src
+      - ./data/hermes:/app/data/hermes
+      - ./logs/hermes:/app/logs/hermes
       - ./obsidian-vault:/opt/hermes-system/obsidian-vault
-    restart: "no"
+    restart: unless-stopped

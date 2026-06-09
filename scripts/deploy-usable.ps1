@@ -37,7 +37,7 @@ function Ensure-EnvValue($Name, $Value) {
     Add-Content -LiteralPath ".env" -Value "$Name=$Value"
 }
 
-Write-Step "Preparing MOXI Hermes skeleton environment"
+Write-Step "Preparing MOXI Hermes runtime environment"
 Ensure-EnvFile
 Ensure-EnvValue "POSTGRES_DB" "moxi"
 Ensure-EnvValue "POSTGRES_USER" "moxi"
@@ -47,7 +47,9 @@ if ($envContent -match "(?m)^POSTGRES_PASSWORD=\s*$" -or $envContent -notmatch "
     Ensure-EnvValue "POSTGRES_PASSWORD" (New-Secret)
 }
 
-Ensure-EnvValue "HERMES_ENV" "development"
+Ensure-EnvValue "HERMES_ENV" "production"
+Ensure-EnvValue "HERMES_HOST" "127.0.0.1"
+Ensure-EnvValue "HERMES_PORT" "8787"
 
 New-Item -ItemType Directory -Force -Path "src", "tests", "data/postgres", "logs", "obsidian-vault" | Out-Null
 
@@ -55,9 +57,11 @@ if ($Mode -eq "domain" -and [string]::IsNullOrWhiteSpace($Domain)) {
     throw "Domain mode requires -Domain, for example: -Mode domain -Domain moxi.example.com"
 }
 
-Write-Step "Skeleton environment is ready"
-Write-Host "Source directory: src/"
-Write-Host "Tests directory:  tests/"
-Write-Host "PostgreSQL data:  data/postgres/"
-Write-Host "Obsidian vault:   obsidian-vault/"
-Write-Host "Next step: rebuild Hermes runtime source under src/ from the current docs."
+Write-Step "Starting PostgreSQL and Hermes"
+& docker compose -f docker-compose.production.yml up -d --build
+if ($LASTEXITCODE -ne 0) { throw "docker compose failed" }
+
+Write-Step "Deployment started"
+Write-Host "Hermes health:       http://127.0.0.1:8787/health"
+Write-Host "Hermes ready:        http://127.0.0.1:8787/ready"
+Write-Host "Hermes capabilities: http://127.0.0.1:8787/capabilities"
