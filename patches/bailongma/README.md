@@ -82,11 +82,15 @@ checkout. It is intentionally an overlay, not a full copy of upstream source.
   documents the next BaiLongma-side writable-settings overlay: proxy Hermes
   `/config/schema` and `/config/update`, render schema groups dynamically, and
   keep secret fields write-only.
+- [phase-31-runtime-config-ui.patch](phase-31-runtime-config-ui.patch)
+  records the deployed BaiLongma runtime-config settings UI: schema proxy
+  endpoints, `运行配置` tab, dynamic field rendering, changed-field save, and
+  schema form styling.
 
 Future patch files should be named by phase and purpose:
 
 ```text
-phase-31-<purpose>.patch
+phase-32-<purpose>.patch
 ```
 
 The server checkout may still contain local runtime-specific changes. Patch

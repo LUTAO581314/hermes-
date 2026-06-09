@@ -1,0 +1,85 @@
+diff --git a/src/api.js b/src/api.js
+--- a/src/api.js
++++ b/src/api.js
+@@
++    // GET /config/schema - proxy Hermes writable config schema through BaiLongma
++    if (req.method === 'GET' && url.pathname === '/config/schema') {
++      const schema = await fetchHermesReadOnly('/config/schema')
++      if (!schema.connected) {
++        jsonResponse(res, 503, { ok: false, error: 'hermes_config_schema_unavailable', reason: schema.reason || 'unknown' })
++        return
++      }
++      jsonResponse(res, 200, { ok: true, source: 'bailongma-hermes-bridge', ...(schema.payload || {}) })
++      return
++    }
++
++    // POST /config/update - save whitelisted Hermes runtime config values
++    if (req.method === 'POST' && url.pathname === '/config/update') {
++      if (!requireLocalOrToken(req, res, url)) return
++      const chunks = []
++      req.on('data', chunk => chunks.push(chunk))
++      req.on('end', async () => {
++        try {
++          const body = JSON.parse(Buffer.concat(chunks).toString('utf-8') || '{}')
++          const result = await postHermesRuntimeJson('/config/update', body, { timeoutMs: 5000 })
++          if (!result.ok) {
++            jsonResponse(res, 502, { ok: false, error: 'hermes_config_update_failed', reason: result.reason || 'unknown' })
++            return
++          }
++          jsonResponse(res, 200, { ok: true, source: 'bailongma-hermes-bridge', ...(result.payload || {}) })
++        } catch (err) {
++          jsonResponse(res, 400, { ok: false, error: err.message })
++        }
++      })
++      return
++    }
+diff --git a/src/ui/brain-ui/app-shell.js b/src/ui/brain-ui/app-shell.js
+--- a/src/ui/brain-ui/app-shell.js
++++ b/src/ui/brain-ui/app-shell.js
+@@
++        <button class="settings-nav-item" data-tab="runtime-config" type="button">????</button>
+@@
++        <div class="settings-tab" data-tab="runtime-config">
++          <div class="settings-section settings-channel-intro">
++            <div class="settings-section-label">Hermes ????</div>
++            <p class="settings-hint">??? Hermes /config/schema ????????????????????????????????????????????????????????</p>
++          </div>
++          <div class="settings-section">
++            <div class="settings-section-label">????</div>
++            <div class="settings-schema-status" id="hermes-config-status">?? Hermes /config/schema</div>
++            <div class="settings-schema-grid" id="hermes-config-form"></div>
++          </div>
++          <div class="settings-section settings-section-action">
++            <button class="settings-save-btn" id="hermes-config-save" type="button">??????</button>
++            <span class="settings-feedback" id="hermes-config-feedback"></span>
++          </div>
++        </div>
+diff --git a/src/ui/brain-ui/app.js b/src/ui/brain-ui/app.js
+--- a/src/ui/brain-ui/app.js
++++ b/src/ui/brain-ui/app.js
+@@
++      case "runtime-config":
++        loadHermesConfigSchema();
++        break;
+@@
++  // Phase 31: render Hermes /config/schema dynamically and save changed fields
++  // through /config/update. Secret inputs are write-only; empty values are skipped.
++  function escapeSettingsHtml(value) { /* see deployed patch for full helper */ }
++  function renderHermesConfigField(field) { /* text/url/int/bool/select/secret */ }
++  function renderHermesConfigSchema(schema) { /* grouped schema renderer */ }
++  async function loadHermesConfigSchema() { /* GET /config/schema */ }
++  function collectHermesConfigUpdates() { /* changed fields only */ }
++  async function saveHermesConfigUpdates() { /* POST /config/update */ }
++  document.getElementById("hermes-config-save")?.addEventListener("click", saveHermesConfigUpdates);
+diff --git a/src/ui/brain-ui/styles.css b/src/ui/brain-ui/styles.css
+--- a/src/ui/brain-ui/styles.css
++++ b/src/ui/brain-ui/styles.css
+@@
++/* Phase 31 Hermes schema-driven runtime settings */
++.settings-schema-status { margin-bottom: 12px; color: var(--ink2); font-size: 11px; font-family: "JetBrains Mono", ui-monospace, monospace; }
++.settings-schema-grid { display: grid; gap: 14px; }
++.settings-schema-group { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: rgba(255,255,255,0.018); }
++.settings-schema-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
++.settings-schema-field { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(0,0,0,0.08); }
++.settings-schema-pill.ready { border-color: rgba(114,207,161,0.45); color: var(--cool); }
++.settings-schema-pill.missing { border-color: rgba(220,104,90,0.48); color: var(--warm); }

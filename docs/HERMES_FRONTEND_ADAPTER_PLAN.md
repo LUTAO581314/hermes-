@@ -105,6 +105,7 @@ BaiLongma / Brain UI
 13. Add social image/sticker compatibility through `outbound_media`. Done in Phase 24.
 14. Add GitHub Pages deployment for the public technical path.
 15. Add secret-safe writable Hermes config schema. Done in Phase 30.
+16. Render Hermes writable config schema inside BaiLongma Brain UI. Done in Phase 31.
 
 ## Phase 16 Patch
 
@@ -291,3 +292,18 @@ keys and invalid values are rejected before any env file write.
 The next BaiLongma overlay should render this schema in the settings panel,
 proxy `/config/schema` and `/config/update`, and keep native Hermes logic as the
 backend owner.
+
+## Phase 31 Runtime Config UI
+
+The server BaiLongma Brain UI now includes a `运行配置` settings tab. It:
+
+- proxies `GET /config/schema` and `POST /config/update`,
+- renders Hermes schema groups dynamically,
+- supports text, url, int, bool, select, and secret fields,
+- skips empty secret inputs so existing keys stay untouched,
+- submits only changed values,
+- refreshes schema, overview, and capability state after save.
+
+This makes the settings center schema-driven instead of a collection of
+hard-coded one-off forms. Existing model, media, and search pages remain
+available while their fields are gradually migrated into the Hermes schema.

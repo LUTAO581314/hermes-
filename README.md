@@ -103,6 +103,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 28 Brain UI Settings State Cleanup Chinese Report](reports/phase-28-settings-tab-state-cleanup.zh-CN.md)
 - [Phase 29 Hermes Settings Control Center Chinese Report](reports/phase-29-settings-control-center.zh-CN.md)
 - [Phase 30 Hermes Config Schema Chinese Report](reports/phase-30-hermes-config-schema.zh-CN.md)
+- [Phase 31 BaiLongma Runtime Config UI Chinese Report](reports/phase-31-bailongma-runtime-config-ui.zh-CN.md)
 
 ## Repository Automation
 
@@ -165,6 +166,9 @@ not vendor full upstream applications by default.
 - The runtime now exposes a secret-safe writable configuration schema through
   `/config/schema` and `/config/update`, so Brain UI can save whitelisted
   Hermes model, search, media, and performance settings without leaking secrets.
+- The server BaiLongma Brain UI now has a schema-driven `运行配置` settings tab:
+  it proxies `/config/schema` and `/config/update`, renders Hermes fields
+  dynamically, skips empty secret inputs, and refreshes runtime state after save.
 - External runtime install notes live under [external](external/README.md).
 - If a full BaiLongma fork becomes necessary, keep this repository as the
   canonical technical-path source and preserve the upstream MIT license.
