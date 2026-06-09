@@ -13,7 +13,10 @@ $required = @(
     "tests/test_runtime.py",
     "Dockerfile",
     "docker-compose.production.yml",
-    ".env.example"
+    ".env.example",
+    "infra/hermes/env.example",
+    "infra/hermes/systemd/bairui-hermes.service",
+    "infra/hermes/scripts/deploy-hermes.sh"
 )
 
 foreach ($path in $required) {

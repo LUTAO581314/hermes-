@@ -53,6 +53,12 @@ Local production:
 bash scripts/deploy-usable.sh
 ```
 
+Commercial Linux service asset preparation:
+
+```bash
+sh infra/hermes/scripts/deploy-hermes.sh
+```
+
 Domain server production preparation:
 
 ```bash
@@ -129,3 +135,17 @@ Next deploy layers:
 - Feishu callback verification;
 - backup and restore automation;
 - release rollback.
+
+## 8. Commercial Service Assets
+
+Hermes P0 commercial deployment assets live under `infra/hermes`:
+
+- `env.example`: placeholder server environment file.
+- `systemd/bairui-hermes.service`: Linux service template.
+- `scripts/deploy-hermes.sh`: validates source, runs tests, prepares runtime
+  directories, optionally starts Docker Compose, and prepares the systemd unit
+  template.
+
+Production values belong in protected server-side files such as
+`/etc/bairui/hermes.env`. Do not commit license secrets, model API keys,
+database passwords, connector tokens, SSH keys, or customer data.

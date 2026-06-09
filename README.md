@@ -79,6 +79,23 @@ The old explanatory documents have been removed. Phase summaries remain under
 - [Vendor Runtime Integration](docs/18-vendor-runtime-integration.md)
 - [Brand And Trademark Fields](docs/19-brand-and-trademark-fields.md)
 
+## P0 Hermes Deployment
+
+Local usable deployment remains:
+
+```bash
+bash scripts/deploy-usable.sh
+```
+
+Commercial Linux service assets live under `infra/hermes`:
+
+```bash
+sh infra/hermes/scripts/deploy-hermes.sh
+```
+
+Copy `infra/hermes/env.example` to a protected server path such as
+`/etc/bairui/hermes.env` and set real values before production service install.
+
 ## Engineering Rule
 
 The repository must converge toward production ownership:
