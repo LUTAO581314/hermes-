@@ -32,6 +32,7 @@ def make_config(base: Path, **overrides: object) -> RuntimeConfig:
         "search_project": "trendradar",
         "trendradar_base_url": "",
         "trendradar_mcp_command": "",
+        "trendradar_output_dir": base / "trendradar-output",
         "searxng_base_url": "",
         "ai_provider": "supermoxi",
         "ai_base_url": "https://api.supermoxi.cn",
@@ -88,6 +89,7 @@ class RuntimeTests(unittest.TestCase):
                 "HERMES_DATA_DIR": str(base / "data"),
                 "HERMES_LOG_DIR": str(base / "logs"),
                 "HERMES_OBSIDIAN_VAULT_DIR": str(base / "obsidian-vault"),
+                "HERMES_TRENDRADAR_OUTPUT_DIR": str(base / "trendradar-output"),
                 "HERMES_AI_SUMMARY_MODEL": "5.4",
                 "HERMES_WECHAT_MODE": "planned",
                 "HERMES_WECHAT_CHANNEL": "wecom_customer_service",
@@ -122,6 +124,7 @@ class RuntimeTests(unittest.TestCase):
                 config = load_config()
 
             self.assertEqual(config.wechat_mode, "planned")
+            self.assertEqual(config.trendradar_output_dir, base / "trendradar-output")
             self.assertEqual(config.ai_summary_model, "5.4")
             self.assertEqual(config.wechat_channel, "wecom_customer_service")
             self.assertEqual(config.wechat_persona_mode, "companion")
@@ -296,6 +299,7 @@ class RuntimeTests(unittest.TestCase):
                 sticker_bridge_enabled=True,
             )
             config.obsidian_vault_dir.mkdir(parents=True)
+            config.trendradar_output_dir.mkdir(parents=True)
             logger = configure_logging(config.log_dir)
             server = build_server(config, logger)
             thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -315,12 +319,13 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(
                     payload["capabilities"]["search_intelligence"]["state"], "ready"
                 )
+                self.assertEqual(payload["capabilities"]["hotspots"]["state"], "ready")
                 self.assertEqual(
                     payload["capabilities"]["memory_governance"]["state"], "ready"
                 )
                 self.assertEqual(payload["capabilities"]["qq"]["state"], "ready")
                 self.assertEqual(payload["capabilities"]["wechat"]["state"], "missing_config")
-                self.assertEqual(payload["summary"]["ready"], 8)
+                self.assertEqual(payload["summary"]["ready"], 9)
                 self.assertIn("frontend_contract", payload)
                 serialized = json.dumps(payload).lower()
                 self.assertNotIn("api_key", serialized)
@@ -1189,6 +1194,56 @@ class RuntimeTests(unittest.TestCase):
                 self.assertIsNone(payload["job"])
                 self.assertIsNone(payload["outbound_media"])
                 self.assertEqual(payload["context_budget"]["tool_schema_group"], "send_only")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+                for handler in list(logger.handlers):
+                    logger.removeHandler(handler)
+                    handler.close()
+                logging.shutdown()
+
+    def test_hotspots_endpoint_reads_trendradar_json_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            output_dir = base / "trendradar-output"
+            output_dir.mkdir()
+            (output_dir / "latest.json").write_text(
+                json.dumps(
+                    {
+                        "items": [
+                            {
+                                "title": "AI trend",
+                                "summary": "Source-backed trend item",
+                                "url": "https://example.com/ai",
+                                "source": "rss",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config = make_config(base, trendradar_output_dir=output_dir)
+            logger = configure_logging(config.log_dir)
+            server = build_server(config, logger)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                url = f"http://127.0.0.1:{server.server_port}/hotspots"
+                with urlopen(url, timeout=2) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+
+                self.assertEqual(payload["status"], "ok")
+                self.assertEqual(payload["source"], "hermes")
+                self.assertTrue(payload["output_dir_exists"])
+                self.assertEqual(payload["items"][0]["title"], "AI trend")
+                self.assertEqual(payload["items"][0]["url"], "https://example.com/ai")
+                self.assertEqual(payload["platforms"][0]["id"], "trendradar")
+                self.assertEqual(
+                    payload["migration"]["from"],
+                    "BaiLongma src/hotspots.js data shape",
+                )
             finally:
                 server.shutdown()
                 server.server_close()

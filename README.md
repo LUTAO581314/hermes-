@@ -1,7 +1,7 @@
 # MOXI Agent System
 
 This repository is the planning, control-plane, and deployment home for a
-personal and company agent system built around Hermes, Obsidian, BaiLongma,
+personal and company agent system built around Hermes, Obsidian, MOXI / Brain UI,
 MiroFish, Feishu, WeChat, QQ, and API-first intelligence adapters.
 
 The goal is not to install one chatbot. The goal is to build a layered AI operating system for both personal work and company management:
@@ -10,7 +10,7 @@ The goal is not to install one chatbot. The goal is to build a layered AI operat
 - Hermes runs backend automation, research, tools, and scheduled jobs.
 - Feishu is the primary company management console.
 - WeChat is the personal companionship and lightweight reminder channel.
-- BaiLongma provides a Chinese-facing interaction/persona layer across WeChat, Feishu, voice, and Brain UI style workflows.
+- MOXI / Brain UI provides the Chinese-facing frontend surface. BaiLongma is now treated as an upstream frontend-design source to migrate from, not the long-term backend authority.
 - MiroFish acts as a scenario simulation and report lab.
 - Feishu and WeChat deliver summaries, alerts, and human confirmation loops.
 - Financial workflows stay research-first and require explicit human approval before any real trading action.
@@ -18,20 +18,20 @@ The goal is not to install one chatbot. The goal is to build a layered AI operat
 
 ## Current Status
 
-Phase 0 planning and Phase 1 runtime foundation are complete. Phase 2 is now focused on the core Hermes + BaiLongma loop:
+Phase 0 planning and Phase 1 runtime foundation are complete. Phase 2 is now converging on the single-backend Hermes architecture:
 
-- BaiLongma Brain UI is running behind the protected `bairui.chat` domain.
-- The public-facing Brain UI brand, browser title, agent profile name, and mark now show `MOXI`; BaiLongma remains the underlying runtime/project name.
+- Brain UI is running behind the protected `bairui.chat` domain while migration proceeds.
+- The public-facing Brain UI brand, browser title, agent profile name, and mark now show `MOXI`; BaiLongma remains an upstream source for UI migration, not the final backend name.
 - Hermes is installed on the VPS.
 - TrendRadar is enabled as an isolated Hermes MCP search/trend runtime.
-- The active BaiLongma model path uses the custom GPT-5.5 gateway.
+- The active model path uses the custom GPT-5.5-compatible gateway. New configuration should be owned by Hermes.
 - Local Whisper is configured and verified as the transitional voice-input ASR.
 - Cloud TTS still needs an approved provider key; the Brain UI now falls back to browser speech synthesis when cloud TTS is unavailable.
 - Image understanding is exposed through `analyze_image`.
 - A metadata-only sticker bridge is available for cute/kawaii/anime-style prepared stickers. It stores intent profiles, provider queries, and channel send instructions only. Sticker images, generated images, platform media IDs, and API keys stay out of Git; runtime image generation can be enabled as a reviewed provider path.
 - Social image/sticker sending now has a connector-neutral `outbound_media` compatibility envelope. WeChat and other bridges that cannot yet upload images must send the text fallback and log the reason instead of silently dropping the image reply.
 - Video understanding is intentionally frozen for this phase.
-- BaiLongma memory is treated as working memory; Obsidian remains the durable memory source of truth.
+- BaiLongma backend memory is being retired as an authority; Obsidian remains the durable memory source of truth.
 - Feishu callback, encrypted event handling, sender identity separation, event idempotency, fast ACK, and group-reply routing are implemented; real group retest by the owner is still required.
 
 Current priority: finish the stable core while continuing Feishu Phase 3 with owner retesting, company identity mapping, read-only company data, and owner-confirmed actions.
@@ -44,6 +44,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Performance Optimization Plan](docs/PERFORMANCE_OPTIMIZATION_PLAN.md) - the surface-first and bottom-layer plan for sub-5-second social responsiveness, async slow jobs, latency telemetry, and model routing.
 - [Capability Matrix](docs/CAPABILITY_MATRIX.md) - secret-safe readiness contract for frontend settings panels and dashboards.
 - [Hermes Frontend Adapter Plan](docs/HERMES_FRONTEND_ADAPTER_PLAN.md) - how MOXI connects to Hermes native logic without rewriting it in the frontend.
+- [Single Backend Hermes Architecture](docs/SINGLE_BACKEND_HERMES_ARCHITECTURE.md) - the migration path to Hermes as the only backend and MOXI / Brain UI as the only frontend.
 - [Hermes Config Schema](docs/HERMES_CONFIG_SCHEMA.md) - secret-safe writable settings schema for Brain UI and connector panels.
 - [Connector Integration Runbook](docs/CONNECTOR_INTEGRATION_RUNBOOK.md) - how WeChat, Feishu, and web-chat bridges call `/social/turn` and `/jobs/event`.
 - [Upstream Dependency Strategy](docs/UPSTREAM_DEPENDENCY_STRATEGY.md) - how BaiLongma and other upstream runtimes are managed without copying full source trees into this repository.
@@ -108,6 +109,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 33 QQ Personal NapCat Bridge Chinese Report](reports/phase-33-qq-personal-napcat-bridge.zh-CN.md)
 - [Phase 34 QQ QR Expiry Hotfix Chinese Report](reports/phase-34-qq-qr-expiry-hotfix.zh-CN.md)
 - [Phase 35 Channel Isolation And QQ Route Correction Chinese Report](reports/phase-35-channel-isolation-and-qq-route-correction.zh-CN.md)
+- [Phase 36 Single Backend Hermes Migration Chinese Report](reports/phase-36-single-backend-hermes-migration.zh-CN.md)
 
 ## Repository Automation
 
@@ -127,34 +129,20 @@ Git.
 This repository is the MOXI control plane and technical-path source. It does
 not vendor full upstream applications by default.
 
-- BaiLongma stays in a separate upstream checkout or fork.
-- MOXI-specific BaiLongma changes live as overlays under
-  [patches/bailongma](patches/bailongma/README.md).
-- The first exported BaiLongma overlay patch adds Brain UI capability cards,
-  Hermes backend bridge status, and QQ official bot settings.
-- The runtime now exposes `/frontend/contract` so BaiLongma can render progress
-  states, route UI labels, and personal/company permission badges from the
-  Hermes adapter contract instead of hard-coding them.
-- The server BaiLongma overlay now proxies `/frontend/contract` and calls
-  Hermes `/social/turn` before `/message` enters the native BaiLongma queue,
-  so slow routes can show a natural quick ACK and report `ack_sent`.
-- The Brain UI overlay now consumes `moxi_progress` SSE events and renders a
-  compact route-aware progress strip while slow work is running.
-- QQ personal scan is now backed by a NapCat Docker bridge on the server:
-  `/social/qq-personal/qr`, `/start`, and `/logout` report real bridge state
-  while keeping QR URLs, WebUI tokens, and QQ session files out of Git.
-- Brain UI chat bubbles now show channel-plane badges so web/personal/company,
-  runtime progress, and owner-confirmation surfaces are visibly separated.
-- The server BaiLongma native turn loop now reports Hermes job lifecycle events
-  through `/jobs/event`, including worker start, completion, failure, and final
-  message delivery.
-- BaiLongma `/message` now respects Hermes `append_to_active_job` plans: active
-  job follow-ups are acknowledged and persisted as context without entering the
-  queue as a new interrupting LLM turn.
-- The BaiLongma overlay now includes the first read-only Feishu company-data
-  tools for identity lookup and Bitable record listing. They are low-risk,
-  source-shaped, and require tenant permissions/configuration before returning
-  real company data.
+- BaiLongma stays in a separate upstream checkout or fork until migration is
+  complete.
+- MOXI-specific BaiLongma history lives as overlays under
+  [patches/bailongma](patches/bailongma/README.md), but new backend authority
+  belongs to Hermes.
+- Useful BaiLongma work to migrate: Brain UI layout, settings UX, progress
+  states, channel-plane badges, voice/image frontend controls, and hotspot
+  panel design.
+- Retired BaiLongma backend responsibilities: native model loop, durable memory
+  authority, settings authority, Feishu/QQ backend control, and NapCat as a
+  default QQ route.
+- Hermes now exposes `/frontend/contract`, `/config/schema`, `/config/update`,
+  `/social/turn`, `/jobs/event`, `/media/plan-send`, and `/hotspots` so the
+  final MOXI / Brain UI frontend can call the backend directly.
 - The runtime now exposes `outbound_media` for image/sticker social turns so
   frontends and WeChat/Feishu/QQ adapters can either upload-and-send media or
   fall back to text explicitly.
@@ -166,22 +154,22 @@ not vendor full upstream applications by default.
   outbound image/file send function.
 - `scripts/probe-bailongma-frontend-routing.sh` is the read-only server probe
   for Brain UI browser-side API base and `/events` SSE reverse-proxy issues.
-- The Brain UI settings overlay now acts as a Hermes control center: capability
+- The Brain UI settings target acts as a Hermes control center: capability
   matrix, frontend contract, performance budget, memory state, async jobs,
   social channels, model, media, voice, search, security, appearance, and
   update settings are separated by domain.
 - The runtime now exposes a secret-safe writable configuration schema through
   `/config/schema` and `/config/update`, so Brain UI can save whitelisted
   Hermes model, search, media, and performance settings without leaking secrets.
-- The server BaiLongma Brain UI now has a schema-driven `运行配置` settings tab:
-  it proxies `/config/schema` and `/config/update`, renders Hermes fields
-  dynamically, skips empty secret inputs, and refreshes runtime state after save.
+- The final Brain UI should render Hermes `/config/schema` directly, call
+  `/config/update`, skip empty secret inputs, and refresh runtime state after
+  save.
 - QQ now has two clearly separated setup paths in Brain UI: official bot
   credentials and a planned personal scan bridge panel. The personal scan panel
   currently reports `bridge_missing` until NapCat or Lagrange is installed.
 - External runtime install notes live under [external](external/README.md).
-- If a full BaiLongma fork becomes necessary, keep this repository as the
-  canonical technical-path source and preserve the upstream MIT license.
+- If a full BaiLongma frontend fork becomes necessary, keep this repository as
+  the canonical technical-path source and preserve the upstream MIT license.
 
 ## Public Copy And Attribution
 
@@ -213,6 +201,7 @@ Invoke-RestMethod http://127.0.0.1:8787/ready
 Invoke-RestMethod http://127.0.0.1:8787/capabilities
 Invoke-RestMethod http://127.0.0.1:8787/frontend/contract
 Invoke-RestMethod http://127.0.0.1:8787/config/schema
+Invoke-RestMethod http://127.0.0.1:8787/hotspots
 Invoke-RestMethod http://127.0.0.1:8787/performance
 Invoke-RestMethod "http://127.0.0.1:8787/route?message=generate%20image%20avatar"
 Invoke-RestMethod "http://127.0.0.1:8787/context?message=generate%20image%20avatar"
@@ -235,10 +224,10 @@ When a connector calls a protected server URL instead of localhost, configure
 
 Finish Phase 2 as a stable core:
 
-1. Verify Hermes, BaiLongma, TrendRadar, image, voice, and memory count with [Core MVP Runbook](docs/CORE_MVP_RUNBOOK.md).
+1. Verify Hermes, MOXI / Brain UI, TrendRadar, image, voice, and memory count with [Core MVP Runbook](docs/CORE_MVP_RUNBOOK.md).
 2. Keep video frozen until the owner reopens that scope.
 3. Route useful memory candidates through [Obsidian Write-Back Workflow](docs/OBSIDIAN_WRITEBACK_WORKFLOW.md).
-4. Run BaiLongma memory dream consolidation after noisy tests, then clean or merge only after review.
+4. Run memory dream consolidation after noisy tests, then clean or merge only after review.
 5. Write every phase result into a Chinese report.
 6. Start Feishu company management from real-message verification, not from broad company write permissions.
 

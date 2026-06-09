@@ -22,6 +22,7 @@ from .config_schema import (
 )
 from .context_budget import context_payload
 from .frontend_contract import frontend_contract
+from .hotspots import hotspots_payload
 from .latency import LatencyRecorder, latency_payload
 from .logging_utils import configure_logging
 from .media_delivery import plan_media_delivery
@@ -184,6 +185,11 @@ class HermesHandler(BaseHTTPRequestHandler):
 
         if path == "/frontend/contract":
             self._send_json(HTTPStatus.OK, frontend_contract(self.server.config))
+            return
+
+        if path == "/hotspots":
+            limit = int(query.get("limit", ["24"])[0] or "24")
+            self._send_json(HTTPStatus.OK, hotspots_payload(self.server.config, limit=limit))
             return
 
         if path == "/config/schema":

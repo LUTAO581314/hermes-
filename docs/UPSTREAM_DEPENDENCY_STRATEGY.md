@@ -21,23 +21,24 @@ The main repository owns:
 
 Upstream repositories own their original source trees and licenses.
 
-## BaiLongma Model
+## BaiLongma Migration Model
 
 BaiLongma is an MIT-licensed upstream runtime. MOXI may fork it or copy selected
-files if needed, but the preferred path is:
+frontend files if needed, but the preferred path has changed to migration, not
+long-term backend operation:
 
 ```text
 git clone upstream BaiLongma under /home/hermes/external/BaiLongma
-apply MOXI overlay patches
+inspect and extract useful Brain UI assets
 configure secrets only on the server
-run BaiLongma behind the protected domain
-call Hermes runtime for durable social-turn planning
+serve the final MOXI / Brain UI through Hermes
 ```
 
 This keeps the relationship clear:
 
-- BaiLongma provides an interaction shell and Brain UI runtime.
-- Hermes runtime provides the stable social-turn contract.
+- BaiLongma provides frontend design reference and MIT-licensed UI assets.
+- Hermes runtime provides the backend authority, settings, tools, memory,
+  social-turn contract, hotspot endpoint, jobs, and media planning.
 - MOXI documentation and patches explain the reproducible path.
 
 ## Dependency Layout
@@ -82,4 +83,3 @@ Technical path source: https://github.com/LUTAO581314/hermes-
 
 Any copied BaiLongma source or binary must preserve the upstream MIT license and
 copyright notice.
-

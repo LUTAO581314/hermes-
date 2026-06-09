@@ -100,6 +100,7 @@ def capability_matrix(config: RuntimeConfig) -> dict[str, Any]:
         config.trendradar_base_url
         or config.trendradar_mcp_command
         or config.searxng_base_url
+        or config.trendradar_output_dir.exists()
     )
     wechat_ready = (
         config.wechat_personal_bridge_enabled
@@ -175,6 +176,18 @@ def capability_matrix(config: RuntimeConfig) -> dict[str, Any]:
                 "Search and trend intelligence",
                 detail="No external search runtime URL or command is configured.",
                 next_action="Configure TrendRadar or SearXNG runtime settings.",
+            )
+        ),
+        "hotspots": (
+            _ready(
+                "Hotspot panel",
+                detail="Hermes /hotspots can read TrendRadar output for Brain UI.",
+            )
+            if config.trendradar_output_dir.exists()
+            else _missing(
+                "Hotspot panel",
+                detail="TrendRadar output directory is missing or empty from this runtime view.",
+                next_action="Set HERMES_TRENDRADAR_OUTPUT_DIR or run TrendRadar before opening the hotspot panel.",
             )
         ),
         "memory_governance": (

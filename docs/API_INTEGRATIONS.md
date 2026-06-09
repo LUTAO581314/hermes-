@@ -9,7 +9,7 @@ The AI model provider should be configured as an OpenAI-compatible multi-model g
 The lightweight VPS is enough when it only runs:
 
 - Hermes orchestration.
-- Feishu and optional WeChat/BaiLongma adapters.
+- Feishu and optional WeChat/MOXI frontend adapters.
 - API request routing.
 - External search project routing.
 - Queues, retries, and rate limits.
@@ -65,23 +65,23 @@ These out-of-scope capabilities can be added later after the core loop is stable
 
 Verified current state:
 
-- BaiLongma backend is running behind `https://bairui.chat/brain-ui.html`.
+- Brain UI is running behind `https://bairui.chat/brain-ui.html` while the backend converges to Hermes.
 - MOXI Brain UI has a visible hotspot button that opens the current hot-list/public-opinion panel.
 - Main model is configured as a custom OpenAI-compatible endpoint using `gpt-5.5`.
 - Hermes is installed and available on the server.
 - TrendRadar MCP is enabled for Hermes at `127.0.0.1:3333/mcp`.
-- BaiLongma `/hotspots` returns real hot-list content across Douyin, Xiaohongshu, WeChat hot topics, and Weibo, plus a TrendRadar-backed news/RSS feed for the bottom public-opinion event stream. This is a visual hot-list surface; deeper public-opinion analysis should be routed to Hermes + TrendRadar or a dedicated public-opinion runtime.
+- Hermes `/hotspots` is the target hotspot backend. It normalizes TrendRadar-backed news/RSS output for the Brain UI panel. BaiLongma's hotspot code is migration reference, not the final backend authority.
 - Local Whisper `tiny` is installed in a dedicated virtual environment and verified through BaiLongma voice WebSocket flow.
 - Brain UI voice output now has a no-cost browser SpeechSynthesis fallback when `/tts/stream` fails because provider credentials are missing.
-- BaiLongma image understanding tool is available through `analyze_image`; direct GPT-5.5 vision smoke tests work. Brain UI chat now accepts pasted, dragged, or selected image attachments and routes them into `analyze_image`. WeChat ClawBot inbound image items now use the same read-image path after server-side media download.
+- Image understanding should be owned by Hermes through the configured multimodal gateway. The existing Brain UI image attachment behavior is a frontend pattern to preserve during migration.
 - Hermes now includes a metadata-only sticker bridge for cute/kawaii/anime-style prepared stickers. It records sticker intent, provider query, style, license notes, and channel send instructions without committing image files. The current image API can be used later as an optional `image_generation` provider for original MOXI/Moxi stickers after content review and runtime upload.
-- BaiLongma Brain UI exposes a read-only governed memory graph through `/memory/graph`; Obsidian remains the durable source of truth.
+- Brain UI should expose a read-only governed memory graph from Hermes/Obsidian-derived state; Obsidian remains the durable source of truth.
 - Feishu personal/bot chat webhook is configured and verified at `https://bairui.chat/social/feishu/webhook`; callback challenge passes through Nginx without Basic Auth, encrypted callback verification is supported, and the backend can obtain a Feishu tenant access token.
 - Feishu inbound identity now keeps each Feishu sender as a separate company-context user (`FEISHU:<open_id>`) while preserving `feishu:open_id:<open_id>` as the reply target.
 
 Known gaps:
 
-- BaiLongma's own `/settings/web-search` provider keys are empty. Search should use Hermes + TrendRadar first.
+- BaiLongma's own `/settings/web-search` provider keys are irrelevant to the final architecture. Search should use Hermes + TrendRadar first.
 - TTS provider settings exist, but no production TTS key is configured yet. Browser speech fallback is usable for web testing, but it is not a stable provider-grade TTS path.
 - MiniMax is not required for image understanding, including Brain UI image attachments and WeChat inbound image reading. MiniMax is not configured yet, so MiniMax image/music/lyrics/TTS generation stays disabled. The current API path can now provide image generation as a separate runtime provider, but it remains distinct from GPT-5.5 vision/image understanding and should be review-gated before chat delivery.
 - Feishu chat callback and sender identity separation are ready, but file/document and company-management workflows are not implemented yet.
@@ -95,7 +95,7 @@ Known gaps:
 | Web crawling | Firecrawl or equivalent API | Convert pages to Markdown or structured JSON |
 | Private memory search | Meilisearch or lightweight local index | Index Obsidian notes, not a replacement for Obsidian |
 | OCR | Active multimodal model first, dedicated OCR API later | Use for screenshots, PDFs, receipts, tables, and images with text |
-| Image understanding | Active multimodal model API | Implemented as BaiLongma `analyze_image` using the current `gpt-5.5` gateway; Brain UI and WeChat inbound images share this path; does not require MiniMax |
+| Image understanding | Active multimodal model API | Move the current image-read behavior behind Hermes; Brain UI and WeChat inbound images should share the Hermes path; does not require MiniMax |
 | Image generation | Current image-capable API provider | Separate from image understanding; use for reviewed original stickers or assets, not for reading images |
 | Sticker bridge | Metadata-only provider bridge first; Stipop/GIPHY/image generation later | `outbound_media` now defines upload-or-text-fallback behavior; do not commit sticker files; Feishu sends by uploaded `image_key`, WeChat by runtime bridge/media id when verified |
 | Speech transcription | Local Whisper tiny first, cloud ASR later if needed | Current transition solution is local Whisper on the VPS |
@@ -241,11 +241,11 @@ decisions or tasks
 The current core MVP should prove:
 
 1. Hermes can call TrendRadar or another external project runtime.
-2. BaiLongma can call the main model through the custom `gpt-5.5` gateway.
-3. BaiLongma can use local Whisper for voice input.
-4. BaiLongma can analyze one image through `analyze_image`.
+2. Hermes can call the main model through the custom `gpt-5.5` gateway.
+3. Hermes or its approved media adapter can use local Whisper for voice input.
+4. Hermes can analyze one image through the configured multimodal gateway.
 5. Memory growth is governed by explicit intake, dream consolidation, review, and cleanup rules.
-6. BaiLongma can visualize runtime memory as a governed candidate graph without promoting it automatically.
+6. Brain UI can visualize runtime memory as a governed candidate graph without promoting it automatically.
 7. Each completed phase writes a Chinese report.
 
 Operational runbook:

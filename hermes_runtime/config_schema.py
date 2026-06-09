@@ -139,6 +139,15 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
         "",
     ),
     ConfigField(
+        "HERMES_TRENDRADAR_OUTPUT_DIR",
+        "search",
+        "TrendRadar Output Directory",
+        "text",
+        "trendradar_output_dir",
+        "/home/hermes/external/TrendRadar/output",
+        help="Directory scanned by Hermes /hotspots for source-backed TrendRadar JSON output.",
+    ),
+    ConfigField(
         "HERMES_SEARXNG_BASE_URL",
         "search",
         "SearXNG Base URL",
@@ -365,8 +374,18 @@ def _field_payload(field: ConfigField, config: RuntimeConfig) -> dict[str, Any]:
     if field.secret:
         item["configured"] = bool(getattr(config, field.config_attr or "", False))
     else:
-        item["value"] = getattr(config, field.config_attr or "", field.default)
+        item["value"] = _json_safe_value(
+            getattr(config, field.config_attr or "", field.default)
+        )
     return item
+
+
+def _json_safe_value(value: Any) -> str | int | bool | None:
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, (str, int, bool)) or value is None:
+        return value
+    return str(value)
 
 
 def _normalize_value(field: ConfigField, raw_value: Any) -> str:

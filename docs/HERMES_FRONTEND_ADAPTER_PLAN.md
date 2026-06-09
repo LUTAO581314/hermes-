@@ -7,6 +7,11 @@ Technical path source: https://github.com/LUTAO581314/hermes-
 Hermes has its own agent logic. MOXI should integrate with it instead of
 rewriting that logic in the frontend.
 
+Phase 36 tightens this decision: Hermes is the only long-term backend
+authority. BaiLongma should no longer run as a second backend once its useful
+frontend assets and hotspot-panel shape are migrated. The target is MOXI /
+Brain UI calling Hermes endpoints directly.
+
 The frontend adapter owns:
 
 - channel UI,
@@ -37,15 +42,16 @@ MOXI runtime owns:
 ## Frontend Architecture
 
 ```text
-BaiLongma / Brain UI
+MOXI / Brain UI
   -> settings panel
   -> capability matrix panel
   -> chat / voice / image / sticker controls
-  -> Hermes frontend adapter
+  -> Hermes backend
        -> GET /capabilities
        -> GET /frontend/contract
        -> GET /config/schema
        -> POST /config/update
+       -> GET /hotspots
        -> POST /social/turn
        -> POST /jobs/event
        -> GET /latency
@@ -107,6 +113,8 @@ BaiLongma / Brain UI
 15. Add secret-safe writable Hermes config schema. Done in Phase 30.
 16. Render Hermes writable config schema inside BaiLongma Brain UI. Done in Phase 31.
 17. Split QQ setup into official bot and personal scan bridge surfaces. Done in Phase 32.
+18. Retire BaiLongma as a backend authority and move hotspot data to Hermes
+    `/hotspots`. Started in Phase 36.
 
 ## Phase 16 Patch
 

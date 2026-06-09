@@ -120,6 +120,17 @@ def frontend_contract(config: Any) -> dict[str, Any]:
                     "safe_log",
                 ],
             },
+            "hotspots": {
+                "method": "GET",
+                "path": "/hotspots",
+                "purpose": "Render the MOXI/Brain UI hotspot panel from Hermes-native normalized TrendRadar output.",
+                "response_keys": [
+                    "items",
+                    "feed",
+                    "platforms",
+                    "migration",
+                ],
+            },
             "latency_turn": {
                 "method": "POST",
                 "path": "/latency/turn",

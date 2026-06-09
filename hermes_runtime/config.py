@@ -37,6 +37,7 @@ class RuntimeConfig:
     search_project: str
     trendradar_base_url: str
     trendradar_mcp_command: str
+    trendradar_output_dir: Path
     searxng_base_url: str
     ai_provider: str
     ai_base_url: str
@@ -103,6 +104,12 @@ def load_config() -> RuntimeConfig:
         search_project=os.getenv("HERMES_SEARCH_PROJECT", "trendradar"),
         trendradar_base_url=os.getenv("HERMES_TRENDRADAR_BASE_URL", ""),
         trendradar_mcp_command=os.getenv("HERMES_TRENDRADAR_MCP_COMMAND", ""),
+        trendradar_output_dir=Path(
+            os.getenv(
+                "HERMES_TRENDRADAR_OUTPUT_DIR",
+                "/home/hermes/external/TrendRadar/output",
+            )
+        ).resolve(),
         searxng_base_url=os.getenv("HERMES_SEARXNG_BASE_URL", ""),
         ai_provider=os.getenv("HERMES_AI_PROVIDER", "supermoxi"),
         ai_base_url=os.getenv("HERMES_AI_BASE_URL", ""),

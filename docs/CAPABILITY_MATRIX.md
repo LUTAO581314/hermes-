@@ -39,6 +39,7 @@ GET /capabilities
 - `voice_output`
 - `stickers`
 - `image_generation`
+- `hotspots`
 
 ## Frontend Contract
 
@@ -77,3 +78,6 @@ frontend. The frontend adapter should:
 - show quick acknowledgement and worker status,
 - keep high-risk action confirmations outside ordinary chat flow,
 - never expose raw secrets, cookies, QR sessions, chat ids, or media files.
+
+Phase 36 adds `GET /hotspots` as a Hermes-owned frontend endpoint. The hotspot
+panel should no longer depend on BaiLongma backend routes after migration.
