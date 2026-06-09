@@ -252,6 +252,9 @@ Compatibility rule:
 - After an image worker produces a local image reference, the bridge should call
   `/media/plan-send` and follow its `action` instead of sending a bare
   `/media/image/...png` path as text.
+- Use `scripts/probe-bailongma-wechat-media.sh` on the server to discover
+  whether the active BaiLongma/ClawBot checkout exposes `sendImageFile`,
+  `sendFile`, `uploadAndSendImage`, or only inbound `downloadMedia`.
 - If the bridge does not support image delivery yet, it must send
   `outbound_media.text_fallback` and log `outbound_media.fallback_reason`
   instead of dropping the reply.

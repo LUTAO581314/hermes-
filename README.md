@@ -97,6 +97,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 23 Feishu Read-Only Tools Chinese Report](reports/phase-23-feishu-read-only-tools.zh-CN.md)
 - [Phase 24 Social Media Compatibility Chinese Report](reports/phase-24-social-media-compat.zh-CN.md)
 - [Phase 25 WeChat Media Send Plan Chinese Report](reports/phase-25-wechat-media-send-plan.zh-CN.md)
+- [Phase 26 WeChat Media Probe Chinese Report](reports/phase-26-wechat-media-probe.zh-CN.md)
 
 ## Repository Automation
 
@@ -147,6 +148,9 @@ not vendor full upstream applications by default.
 - Connectors can call `/media/plan-send` after an image is generated. The
   runtime returns `send_image_file`, `upload_then_send`, or `send_text_fallback`
   so WeChat bridges do not treat image paths as final text replies.
+- `scripts/probe-bailongma-wechat-media.sh` is the read-only server probe for
+  discovering whether the active BaiLongma/ClawBot checkout exposes a real
+  outbound image/file send function.
 - External runtime install notes live under [external](external/README.md).
 - If a full BaiLongma fork becomes necessary, keep this repository as the
   canonical technical-path source and preserve the upstream MIT license.
