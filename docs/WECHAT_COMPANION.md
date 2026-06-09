@@ -249,6 +249,9 @@ Compatibility rule:
 - `/social/turn` returns `outbound_media` for image/sticker routes.
 - If the active WeChat bridge supports image upload or bridge-file sending, it
   should upload/send the runtime image.
+- After an image worker produces a local image reference, the bridge should call
+  `/media/plan-send` and follow its `action` instead of sending a bare
+  `/media/image/...png` path as text.
 - If the bridge does not support image delivery yet, it must send
   `outbound_media.text_fallback` and log `outbound_media.fallback_reason`
   instead of dropping the reply.

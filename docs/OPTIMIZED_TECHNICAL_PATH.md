@@ -183,6 +183,12 @@ they must send `text_fallback` and log `fallback_reason`. This keeps WeChat and
 other personal bridges from silently dropping image replies while their concrete
 media-upload path is still being verified.
 
+After an image worker has produced a connector-local image reference, the
+connector should call `POST /media/plan-send`. The runtime then returns
+`send_image_file`, `upload_then_send`, or `send_text_fallback`, plus the
+`report_event` the connector should send to `/jobs/event`. This prevents a
+WeChat bridge from treating `/media/image/...png` as the final chat text.
+
 For the Feishu company plane, the first tool layer is read-only:
 `feishu_lookup_user` for sender/company identity and
 `feishu_bitable_list_records` for structured project/task/customer tables.

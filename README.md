@@ -96,6 +96,7 @@ Current priority: finish the stable core while continuing Feishu Phase 3 with ow
 - [Phase 22 Follow-Up Job Merge Chinese Report](reports/phase-22-follow-up-job-merge.zh-CN.md)
 - [Phase 23 Feishu Read-Only Tools Chinese Report](reports/phase-23-feishu-read-only-tools.zh-CN.md)
 - [Phase 24 Social Media Compatibility Chinese Report](reports/phase-24-social-media-compat.zh-CN.md)
+- [Phase 25 WeChat Media Send Plan Chinese Report](reports/phase-25-wechat-media-send-plan.zh-CN.md)
 
 ## Repository Automation
 
@@ -143,6 +144,9 @@ not vendor full upstream applications by default.
 - The runtime now exposes `outbound_media` for image/sticker social turns so
   frontends and WeChat/Feishu/QQ adapters can either upload-and-send media or
   fall back to text explicitly.
+- Connectors can call `/media/plan-send` after an image is generated. The
+  runtime returns `send_image_file`, `upload_then_send`, or `send_text_fallback`
+  so WeChat bridges do not treat image paths as final text replies.
 - External runtime install notes live under [external](external/README.md).
 - If a full BaiLongma fork becomes necessary, keep this repository as the
   canonical technical-path source and preserve the upstream MIT license.

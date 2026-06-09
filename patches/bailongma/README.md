@@ -61,11 +61,15 @@ checkout. It is intentionally an overlay, not a full copy of upstream source.
   `outbound_media`, upload and send when the channel supports it, or send the
   text fallback and log the reason when WeChat-style image delivery is not
   verified yet.
+- [phase-25-wechat-media-plan-send.patch](phase-25-wechat-media-plan-send.patch)
+  documents the next BaiLongma-side step for real WeChat image delivery: call
+  Hermes `/media/plan-send` after image generation, then either send the local
+  image file, upload-and-send, or text-fallback according to the runtime plan.
 
 Future patch files should be named by phase and purpose:
 
 ```text
-phase-25-feishu-readiness-ui.patch
+phase-26-feishu-readiness-ui.patch
 ```
 
 The server checkout may still contain local runtime-specific changes. Patch

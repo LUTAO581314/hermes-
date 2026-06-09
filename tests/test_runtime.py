@@ -369,6 +369,10 @@ class RuntimeTests(unittest.TestCase):
                     payload["endpoints"]["social_turn"]["response_keys"],
                 )
                 self.assertEqual(
+                    payload["endpoints"]["media_plan_send"]["path"],
+                    "/media/plan-send",
+                )
+                self.assertEqual(
                     payload["outbound_media"]["wechat_rule"],
                     "Personal WeChat bridges may lack image upload; they must gracefully fall back to text until media_id or bridge-file sending is verified.",
                 )
@@ -800,6 +804,87 @@ class RuntimeTests(unittest.TestCase):
                     event="worker_started",
                 )
                 self.assertEqual(running["job"]["status"], "running")
+
+                media_plan = client.plan_media_send(
+                    channel="wechat",
+                    target_id="user-1",
+                    outbound_media=plan["outbound_media"],
+                    source_ref="/media/image/demo.png",
+                    text_fallback=plan["outbound_media"]["text_fallback"],
+                    bridge_capabilities={
+                        "send_text": True,
+                        "send_image_file": True,
+                        "upload_then_send": False,
+                    },
+                )
+                self.assertEqual(media_plan["action"], "send_image_file")
+                self.assertEqual(media_plan["report_event"], "final_delivered")
+                self.assertEqual(media_plan["source_ref"], "/media/image/demo.png")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+                for handler in list(logger.handlers):
+                    logger.removeHandler(handler)
+                    handler.close()
+                logging.shutdown()
+
+    def test_media_plan_send_falls_back_when_wechat_cannot_send_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config = make_config(base)
+            logger = configure_logging(config.log_dir)
+            server = build_server(config, logger)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                base_url = f"http://127.0.0.1:{server.server_port}"
+                turn_body = json.dumps(
+                    {
+                        "channel": "wechat",
+                        "target_id": "user-1",
+                        "message": "发张图片测试",
+                    }
+                ).encode("utf-8")
+                turn_request = Request(
+                    base_url + "/social/turn",
+                    data=turn_body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urlopen(turn_request, timeout=2) as response:
+                    turn = json.loads(response.read().decode("utf-8"))
+
+                media_body = json.dumps(
+                    {
+                        "channel": "wechat",
+                        "target_id": "user-1",
+                        "outbound_media": turn["outbound_media"],
+                        "source_ref": "/media/image/image_2026-06-09T00-30-20_1.png",
+                        "text_fallback": "测试图生成好了，但当前桥接器只能发文字。",
+                        "bridge_capabilities": {
+                            "send_text": True,
+                            "send_image_file": False,
+                            "upload_then_send": False,
+                        },
+                    }
+                ).encode("utf-8")
+                media_request = Request(
+                    base_url + "/media/plan-send",
+                    data=media_body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urlopen(media_request, timeout=2) as response:
+                    media = json.loads(response.read().decode("utf-8"))
+
+                self.assertEqual(media["status"], "ok")
+                self.assertEqual(media["action"], "send_text_fallback")
+                self.assertEqual(media["report_event"], "failure_delivered")
+                self.assertEqual(media["source_ref"], "")
+                self.assertTrue(media["text_fallback"])
+                self.assertTrue(media["safe_log"]["source_ref_present"])
             finally:
                 server.shutdown()
                 server.server_close()

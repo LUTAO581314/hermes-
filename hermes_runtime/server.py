@@ -19,6 +19,7 @@ from .context_budget import context_payload
 from .frontend_contract import frontend_contract
 from .latency import LatencyRecorder, latency_payload
 from .logging_utils import configure_logging
+from .media_delivery import plan_media_delivery
 from .performance import performance_payload
 from .routing import route_payload
 from .server_time import utc_now
@@ -238,6 +239,10 @@ class HermesHandler(BaseHTTPRequestHandler):
             self._handle_social_turn()
             return
 
+        if parsed_url.path == "/media/plan-send":
+            self._handle_media_plan_send()
+            return
+
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": parsed_url.path})
 
     def _handle_latency_turn(self) -> None:
@@ -321,6 +326,14 @@ class HermesHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.OK, plan)
             trace.mark("final_send_ms")
             trace.finish()
+        except ValueError as error:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+
+    def _handle_media_plan_send(self) -> None:
+        try:
+            payload = self._read_json_body()
+            plan = plan_media_delivery(payload)
+            self._send_json(HTTPStatus.OK, plan)
         except ValueError as error:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
 

@@ -68,6 +68,32 @@ def frontend_contract(config: Any) -> dict[str, Any]:
                     "failure_delivered",
                 ],
             },
+            "media_plan_send": {
+                "method": "POST",
+                "path": "/media/plan-send",
+                "purpose": "Ask the runtime whether a connector should send an image file, upload first, or send text fallback.",
+                "request": {
+                    "channel": "wechat|qq|feishu|web",
+                    "target_id": "stable channel target id",
+                    "outbound_media": "object returned by /social/turn",
+                    "source_ref": "connector-local file path or runtime asset ref; never raw bytes",
+                    "bridge_capabilities": {
+                        "send_text": True,
+                        "send_image_file": False,
+                        "upload_then_send": False,
+                    },
+                },
+                "response_keys": [
+                    "action",
+                    "message_type",
+                    "text_fallback",
+                    "source_ref",
+                    "reason",
+                    "bridge_requirements",
+                    "report_event",
+                    "safe_log",
+                ],
+            },
             "latency_turn": {
                 "method": "POST",
                 "path": "/latency/turn",

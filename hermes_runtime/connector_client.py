@@ -78,6 +78,28 @@ class HermesConnectorClient:
         }
         return self._post_json("/jobs/event", body)
 
+    def plan_media_send(
+        self,
+        *,
+        channel: str,
+        target_id: str,
+        outbound_media: dict[str, Any],
+        source_ref: str = "",
+        text_fallback: str = "",
+        bridge_capabilities: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self._post_json(
+            "/media/plan-send",
+            {
+                "channel": channel,
+                "target_id": target_id,
+                "outbound_media": outbound_media,
+                "source_ref": source_ref,
+                "text_fallback": text_fallback,
+                "bridge_capabilities": bridge_capabilities or {},
+            },
+        )
+
     def _post_json(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         request = Request(
             urljoin(self.base_url, path.lstrip("/")),

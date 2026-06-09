@@ -1,0 +1,71 @@
+diff --git a/src/moxi-runtime-bridge.js b/src/moxi-runtime-bridge.js
+--- a/src/moxi-runtime-bridge.js
++++ b/src/moxi-runtime-bridge.js
+@@
++export async function planMediaSend({
++  channel,
++  targetId,
++  outboundMedia,
++  sourceRef,
++  textFallback,
++  bridgeCapabilities,
++} = {}) {
++  return runtimePostJson('/media/plan-send', {
++    channel,
++    target_id: targetId,
++    outbound_media: outboundMedia || {},
++    source_ref: sourceRef || '',
++    text_fallback: textFallback || outboundMedia?.text_fallback || '',
++    bridge_capabilities: bridgeCapabilities || {
++      send_text: true,
++      send_image_file: false,
++      upload_then_send: false,
++    },
++  })
++}
++
+diff --git a/src/social/wechat-media-delivery.js b/src/social/wechat-media-delivery.js
+--- /dev/null
++++ b/src/social/wechat-media-delivery.js
+@@
++import { planMediaSend, reportHermesJobEvent } from '../moxi-runtime-bridge.js'
++
++export async function deliverWechatMediaResult({
++  target,
++  job,
++  outboundMedia,
++  sourceRef,
++  bridge,
++} = {}) {
++  const bridgeCapabilities = {
++    send_text: typeof bridge?.sendText === 'function',
++    send_image_file: typeof bridge?.sendImageFile === 'function',
++    upload_then_send: typeof bridge?.uploadAndSendImage === 'function',
++  }
++  const mediaPlan = await planMediaSend({
++    channel: 'wechat',
++    targetId: target?.id || target,
++    outboundMedia,
++    sourceRef,
++    textFallback: outboundMedia?.text_fallback,
++    bridgeCapabilities,
++  })
++
++  if (mediaPlan.action === 'send_image_file') {
++    await bridge.sendImageFile(target, mediaPlan.source_ref)
++  } else if (mediaPlan.action === 'upload_then_send') {
++    await bridge.uploadAndSendImage(target, mediaPlan.source_ref)
++  } else if (mediaPlan.action === 'send_text_fallback') {
++    await bridge.sendText(target, mediaPlan.text_fallback)
++  } else {
++    throw new Error(mediaPlan.reason || 'media delivery rejected')
++  }
++
++  if (job?.job_id) {
++    await reportHermesJobEvent(job.job_id, mediaPlan.report_event, {
++      resultPointer: mediaPlan.action === 'send_text_fallback' ? '' : mediaPlan.source_ref,
++      errorMessage: mediaPlan.action === 'send_text_fallback' ? mediaPlan.reason : '',
++    })
++  }
++  return mediaPlan
++}

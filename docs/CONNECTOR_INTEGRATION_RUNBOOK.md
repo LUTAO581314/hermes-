@@ -37,6 +37,7 @@ The client wraps:
 
 - `POST /social/turn`
 - `POST /jobs/event`
+- `POST /media/plan-send`
 
 It does not store API keys, message bodies, media bytes, screenshots, or raw
 tool output.
@@ -52,6 +53,7 @@ platform message
   -> start worker if needed
   -> report worker_started
   -> run image/search/Feishu/company tool
+  -> if image media exists: client.plan_media_send(...)
   -> report worker_completed or worker_failed
   -> deliver final user-visible result
   -> report final_delivered or failure_delivered
@@ -106,7 +108,37 @@ if job:
         client.report_job_event(job_id=job["job_id"], event="failure_delivered")
 ```
 
-## 4. Node.js Connector Equivalent
+## 4. Media Delivery Planning
+
+When an image or sticker worker produces a connector-local image reference, do
+not send the raw path as the final chat text. Ask the runtime for a delivery
+plan first:
+
+```python
+media_plan = client.plan_media_send(
+    channel=plan["channel"],
+    target_id=plan["target_id"],
+    outbound_media=plan["outbound_media"],
+    source_ref="/media/image/image_2026-06-09T00-30-20_1.png",
+    text_fallback=plan["outbound_media"]["text_fallback"],
+    bridge_capabilities={
+        "send_text": True,
+        "send_image_file": True,
+        "upload_then_send": False,
+    },
+)
+```
+
+Connector behavior:
+
+- `send_image_file`: send the referenced local image through the active bridge.
+- `upload_then_send`: upload through the platform API and send by platform media token.
+- `send_text_fallback`: send `text_fallback` and log `reason`.
+- `reject_unsafe_request`: stop and surface an operator-visible error.
+
+Then report `media_plan["report_event"]` to `/jobs/event`.
+
+## 5. Node.js Connector Equivalent
 
 ```js
 const runtimeBaseUrl = process.env.HERMES_RUNTIME_BASE_URL ?? "http://127.0.0.1:8787";
@@ -143,7 +175,7 @@ if (plan.ack.should_send) {
 }
 ```
 
-## 5. Channel Target Rules
+## 6. Channel Target Rules
 
 Use stable target ids:
 
@@ -159,7 +191,7 @@ Use stable target ids:
 The exact platform id can stay private inside the connector. Public reports
 should not include real ids.
 
-## 6. Safety Rules
+## 7. Safety Rules
 
 - ACK is progress, not final delivery.
 - A follow-up message should not cancel a slow job unless the user explicitly
