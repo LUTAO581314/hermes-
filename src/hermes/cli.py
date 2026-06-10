@@ -16,6 +16,14 @@ from .adapters.everos import (
     search_memory,
     status as everos_status,
 )
+from .adapters.mirofish import (
+    as_payload as mirofish_payload,
+    build_backend_command,
+    build_dev_command,
+    build_frontend_command,
+    build_setup_command,
+    status as mirofish_status,
+)
 from .adapters.trendradar import (
     as_payload as trendradar_payload,
     build_doctor_command,
@@ -98,6 +106,14 @@ def build_parser() -> argparse.ArgumentParser:
     intel_mcp.add_argument("--transport", choices=["stdio", "http"], default="http")
     intel_mcp.add_argument("--host", default="127.0.0.1")
     intel_mcp.add_argument("--port", type=int, default=3333)
+
+    simulation_parser = subcommands.add_parser("simulation", help="Operate simulation runtime adapters")
+    simulation_subcommands = simulation_parser.add_subparsers(dest="simulation_command")
+    simulation_subcommands.add_parser("status", help="Inspect MiroFish source and service configuration")
+    simulation_subcommands.add_parser("setup-command", help="Print the real MiroFish dependency setup command")
+    simulation_subcommands.add_parser("backend-command", help="Print the real MiroFish backend command")
+    simulation_subcommands.add_parser("frontend-command", help="Print the real MiroFish frontend command")
+    simulation_subcommands.add_parser("dev-command", help="Print the real MiroFish full dev command")
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -247,6 +263,26 @@ def run(argv: list[str] | None = None) -> int:
             )
             return 0
         parser.error(f"unknown intel command: {intel_command}")
+        return 2
+
+    if command == "simulation":
+        simulation_command = args.simulation_command or "status"
+        if simulation_command == "status":
+            print_json({"service": "hermes", "simulation": mirofish_payload(mirofish_status(settings))})
+            return 0
+        if simulation_command == "setup-command":
+            print_json({"service": "hermes", "simulation": mirofish_payload(build_setup_command(settings))})
+            return 0
+        if simulation_command == "backend-command":
+            print_json({"service": "hermes", "simulation": mirofish_payload(build_backend_command(settings))})
+            return 0
+        if simulation_command == "frontend-command":
+            print_json({"service": "hermes", "simulation": mirofish_payload(build_frontend_command(settings))})
+            return 0
+        if simulation_command == "dev-command":
+            print_json({"service": "hermes", "simulation": mirofish_payload(build_dev_command(settings))})
+            return 0
+        parser.error(f"unknown simulation command: {simulation_command}")
         return 2
 
     if command == "job":

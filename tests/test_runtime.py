@@ -10,6 +10,7 @@ from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import database_status
 from src.hermes.adapters.everos import build_search_payload, status as everos_status
+from src.hermes.adapters.mirofish import build_dev_command, status as mirofish_status
 from src.hermes.adapters.trendradar import build_mcp_command, status as trendradar_status
 from src.hermes.license import load_license, sign_license_payload
 from src.hermes.model_gateway import build_chat_payload, complete_chat
@@ -118,6 +119,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("heartbeat", help_text)
         self.assertIn("memory", help_text)
         self.assertIn("intel", help_text)
+        self.assertIn("simulation", help_text)
 
     def test_everos_adapter_detects_source_and_license(self):
         settings = load_settings()
@@ -197,6 +199,39 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(payload["service"], "hermes")
         self.assertEqual(payload["intelligence"]["license"], "GPLv3")
         self.assertEqual(payload["intelligence"]["status"], "source_ready")
+
+    def test_mirofish_adapter_detects_source_and_agpl_boundary(self):
+        settings = load_settings()
+        state = mirofish_status(settings)
+        self.assertEqual(state.license, "AGPLv3")
+        self.assertIn("npm run backend", state.npm_contract)
+        self.assertIn("GET /health", state.api_contract)
+        self.assertIn("backend/scripts/run_parallel_simulation.py", state.simulation_scripts)
+        self.assertIn(state.status, {"source_ready", "configured"})
+
+    def test_build_mirofish_dev_command_uses_real_npm_script(self):
+        settings = load_settings()
+        plan = build_dev_command(settings)
+        self.assertEqual(plan.status, "ready")
+        self.assertEqual(plan.command, ("npm", "run", "dev"))
+        self.assertEqual(plan.cwd, str(settings.vendor_dir / "mirofish"))
+
+    def test_cli_simulation_status_prints_mirofish_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "MIROFISH_BACKEND_BASE_URL": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["simulation", "status"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["service"], "hermes")
+        self.assertEqual(payload["simulation"]["license"], "AGPLv3")
+        self.assertEqual(payload["simulation"]["status"], "source_ready")
 
     def test_cli_status_prints_runtime_status(self):
         with tempfile.TemporaryDirectory() as tmp:

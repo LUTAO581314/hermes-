@@ -28,7 +28,7 @@ reinvention.
 | --- | --- | --- | --- | --- |
 | EverOS | `vendor/runtimes/everos` | Automatic memory extraction and retrieval | Apache-2.0 | first source-level adapter |
 | TrendRadar | `vendor/runtimes/trendradar` | Trend, RSS, hot-list, and public-opinion intelligence | GPLv3 | source-level adapter |
-| MiroFish | `vendor/runtimes/mirofish` | Scenario simulation and multi-agent rehearsal | AGPLv3 | planned adapter |
+| MiroFish | `vendor/runtimes/mirofish` | Scenario simulation and multi-agent rehearsal | AGPLv3 | source-level adapter |
 | SearXNG | Docker or Linux checkout | Optional metasearch | AGPLv3 | planned HTTP service adapter |
 
 ## 3. Adapter Boundary
@@ -103,7 +103,38 @@ TrendRadar owns:
 Hermes must not copy TrendRadar internals into core code. Use the upstream CLI,
 MCP server, process boundary, or service boundary.
 
-## 6. Commercial Boundaries
+## 6. MiroFish Adapter Contract
+
+MiroFish is the scenario simulation and decision rehearsal runtime. Because it
+is AGPLv3, Hermes treats it as an isolated runtime with an explicit hosted-use
+source-delivery boundary.
+
+Hermes owns:
+
+- `src/hermes/adapters/mirofish.py`;
+- CLI commands under `python -m src.hermes simulation ...`;
+- HTTP status route under `/simulation/status`;
+- operational configuration through `MIROFISH_PROJECT_ROOT`,
+  `MIROFISH_BACKEND_BASE_URL`, `MIROFISH_FRONTEND_BASE_URL`, and
+  `MIROFISH_TIMEOUT_SECONDS`;
+- capability and commercial-boundary reporting.
+
+MiroFish owns:
+
+- Flask backend;
+- Vite frontend;
+- graph building;
+- simulation creation, preparation, start, stop, and status APIs;
+- report generation;
+- `backend/scripts/run_twitter_simulation.py`;
+- `backend/scripts/run_reddit_simulation.py`;
+- `backend/scripts/run_parallel_simulation.py`;
+- npm and uv dependency installation.
+
+Hermes must not copy MiroFish internals into core code. Use the upstream npm
+scripts, Flask API, process boundary, or service boundary.
+
+## 7. Commercial Boundaries
 
 Apache-2.0 runtimes such as EverOS are suitable for deeper productized
 integration, while preserving LICENSE, NOTICE, upstream name, and attribution.
@@ -117,7 +148,7 @@ operation, complete a license review and delivery-source checklist.
 
 This document is general engineering guidance, not legal advice.
 
-## 7. Integration Order
+## 8. Integration Order
 
 1. EverOS adapter for memory candidates and retrieval.
 2. TrendRadar adapter for intelligence input.
@@ -125,7 +156,7 @@ This document is general engineering guidance, not legal advice.
 4. SearXNG as an optional Docker-based metasearch runtime after Linux/server
    deployment.
 
-## 8. Verification Requirements
+## 9. Verification Requirements
 
 Each runtime integration must prove:
 

@@ -118,6 +118,8 @@ python -m src.hermes memory status
 python -m src.hermes memory search --query "owner preferences"
 python -m src.hermes intel status
 python -m src.hermes intel mcp-command
+python -m src.hermes simulation status
+python -m src.hermes simulation dev-command
 python -m src.hermes serve
 ```
 

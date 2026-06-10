@@ -39,6 +39,10 @@ class Settings:
     trendradar_project_root: Path | None
     trendradar_mcp_url: str
     trendradar_timeout_seconds: int
+    mirofish_project_root: Path | None
+    mirofish_backend_base_url: str
+    mirofish_frontend_base_url: str
+    mirofish_timeout_seconds: int
 
     @property
     def has_database(self) -> bool:
@@ -78,6 +82,10 @@ def load_settings() -> Settings:
         trendradar_project_root=Path(os.environ["TRENDRADAR_PROJECT_ROOT"]) if os.getenv("TRENDRADAR_PROJECT_ROOT") else None,
         trendradar_mcp_url=os.getenv("TRENDRADAR_MCP_URL", ""),
         trendradar_timeout_seconds=int(os.getenv("TRENDRADAR_TIMEOUT_SECONDS", "30")),
+        mirofish_project_root=Path(os.environ["MIROFISH_PROJECT_ROOT"]) if os.getenv("MIROFISH_PROJECT_ROOT") else None,
+        mirofish_backend_base_url=os.getenv("MIROFISH_BACKEND_BASE_URL", ""),
+        mirofish_frontend_base_url=os.getenv("MIROFISH_FRONTEND_BASE_URL", ""),
+        mirofish_timeout_seconds=int(os.getenv("MIROFISH_TIMEOUT_SECONDS", "30")),
     )
 
 

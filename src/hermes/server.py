@@ -15,6 +15,7 @@ from .adapters.everos import (
     search_memory,
     status as everos_status,
 )
+from .adapters.mirofish import as_payload as mirofish_payload, status as mirofish_status
 from .adapters.trendradar import as_payload as trendradar_payload, status as trendradar_status
 from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
@@ -89,6 +90,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/intel/status":
             self._send({"service": "hermes", "intelligence": trendradar_payload(trendradar_status(settings))})
+            return
+        if self.path == "/simulation/status":
+            self._send({"service": "hermes", "simulation": mirofish_payload(mirofish_status(settings))})
             return
 
         self._send({"error": "not_found", "path": self.path}, status=404)
