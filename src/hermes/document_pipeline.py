@@ -11,6 +11,7 @@ from .config import Settings
 from .storage import (
     DocumentArtifact,
     DocumentIndexRun,
+    DocumentIngestReport,
     DocumentIngestRun,
     DocumentMemoryCandidate,
     DocumentMemoryReview,
@@ -23,11 +24,14 @@ from .storage import (
     create_document_memory_review,
     create_source_ref,
     list_document_artifacts,
+    list_audit_events,
     list_document_ingests,
     list_document_memory_candidates,
     list_document_memory_reviews,
     list_document_index_runs,
+    list_source_refs,
     utc_now,
+    write_obsidian_document_ingest_report,
     write_obsidian_memory_review_note,
 )
 
@@ -81,6 +85,14 @@ class DocumentSourceRefResult:
     ingest: dict[str, object] | None
     source_refs: tuple[SourceRef, ...]
     skipped_count: int
+
+
+@dataclass(frozen=True)
+class DocumentIngestReportResult:
+    status: str
+    detail: str
+    ingest: dict[str, object] | None
+    report: DocumentIngestReport | None
 
 
 def run_document_ingest(data_dir: Path, ingest_id: str, *, timeout_seconds: int) -> DocumentPipelineResult:
@@ -559,6 +571,59 @@ def create_document_source_refs(settings: Settings, ingest_id: str) -> DocumentS
         payload={"source_ref_count": len(refs), "status": status},
     )
     return DocumentSourceRefResult(status=status, detail=detail, ingest=ingest, source_refs=tuple(refs), skipped_count=0)
+
+
+def create_document_ingest_report(settings: Settings, ingest_id: str) -> DocumentIngestReportResult:
+    ingest = _find_ingest(settings.data_dir, ingest_id)
+    if ingest is None:
+        return DocumentIngestReportResult(
+            status="not_found",
+            detail=f"document ingest not found: {ingest_id}",
+            ingest=None,
+            report=None,
+        )
+
+    artifacts = [artifact for artifact in list_document_artifacts(settings.data_dir, limit=1000) if artifact.get("ingest_id") == ingest_id]
+    index_runs = [run for run in list_document_index_runs(settings.data_dir, limit=1000) if run.get("ingest_id") == ingest_id]
+    candidates = [candidate for candidate in list_document_memory_candidates(settings.data_dir, limit=1000) if candidate.get("ingest_id") == ingest_id]
+    candidate_ids = {str(candidate.get("id", "")) for candidate in candidates}
+    reviews = [
+        review
+        for review in list_document_memory_reviews(settings.data_dir, limit=1000)
+        if str(review.get("candidate_id", "")) in candidate_ids
+    ]
+    source_refs = [
+        ref
+        for ref in list_source_refs_for_ingest(settings.data_dir, ingest_id)
+    ]
+    audit_events = list_audit_events(settings.data_dir, limit=1000)
+
+    report = write_obsidian_document_ingest_report(
+        settings.obsidian_vault_dir,
+        settings.data_dir,
+        ingest=ingest,
+        artifacts=artifacts,
+        index_runs=index_runs,
+        candidates=candidates,
+        reviews=reviews,
+        source_refs=source_refs,
+        audit_events=audit_events,
+    )
+    return DocumentIngestReportResult(
+        status="completed",
+        detail=f"wrote Obsidian document ingest report: {report.path}",
+        ingest=ingest,
+        report=report,
+    )
+
+
+def list_source_refs_for_ingest(data_dir: Path, ingest_id: str) -> list[dict[str, object]]:
+    refs: list[dict[str, object]] = []
+    for ref in list_source_refs(data_dir, limit=1000):
+        metadata = ref.get("metadata", {})
+        if isinstance(metadata, dict) and metadata.get("ingest_id") == ingest_id:
+            refs.append(ref)
+    return refs
 
 
 def _find_ingest(data_dir: Path, ingest_id: str) -> dict[str, object] | None:

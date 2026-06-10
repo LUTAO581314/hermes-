@@ -44,6 +44,7 @@ from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
 from .document_pipeline import (
+    create_document_ingest_report,
     create_document_source_refs,
     generate_document_memory_candidates,
     index_document_artifacts,
@@ -62,6 +63,7 @@ from .storage import (
     list_audit_events,
     list_document_artifacts,
     list_document_index_runs,
+    list_document_ingest_reports,
     list_document_ingest_runs,
     list_document_ingests,
     list_document_memory_candidates,
@@ -136,6 +138,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/document/ingest-runs":
             self._send({"service": "hermes", "document_ingest_runs": list_document_ingest_runs(settings.data_dir)})
+            return
+        if self.path == "/document/ingest-reports":
+            self._send({"service": "hermes", "document_ingest_reports": list_document_ingest_reports(settings.data_dir)})
             return
         if self.path == "/document/artifacts":
             self._send({"service": "hermes", "document_artifacts": list_document_artifacts(settings.data_dir)})
@@ -487,6 +492,18 @@ class HermesHandler(BaseHTTPRequestHandler):
             if result.status == "not_found":
                 status = 404
             self._send({"service": "hermes", "document_source_refs": asdict(result)}, status=status)
+            return
+
+        if self.path == "/document/parse/ingest-report":
+            ingest_id = str(payload.get("ingest_id", ""))
+            if not ingest_id.strip():
+                self._send({"error": "invalid_request", "message": "ingest_id is required"}, status=400)
+                return
+            result = create_document_ingest_report(settings, ingest_id)
+            status = 200 if result.status == "completed" else 503
+            if result.status == "not_found":
+                status = 404
+            self._send({"service": "hermes", "document_ingest_report": asdict(result)}, status=status)
             return
 
         if self.path == "/admin/migrate":

@@ -194,8 +194,10 @@ python -m src.hermes document parse index-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse memory-candidates --ingest-id <ingest_id>
 python -m src.hermes document parse review-memory-candidate --candidate-id <candidate_id> --decision approve
 python -m src.hermes document parse source-refs --ingest-id <ingest_id>
+python -m src.hermes document parse ingest-report --ingest-id <ingest_id>
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
+python -m src.hermes document-ingest-reports
 python -m src.hermes document-artifacts
 python -m src.hermes document-index-runs
 python -m src.hermes document-memory-candidates
@@ -253,7 +255,17 @@ table contract used by production migrations. The records connect MinerU
 artifacts, Sonic index runs, Hermes memory candidates, review status, EverOS
 promotion status, and related Obsidian note paths.
 
-The next pipeline phase is richer Obsidian report generation.
+`ingest-report` writes a graph-friendly Obsidian report under
+`05_Reports/document-ingests/` and records the output in
+`document_ingest_reports.jsonl`. The report has YAML frontmatter, tags, a
+`Document Ingest Reports.md` MOC, and internal links to
+`[[Document Ingest Reports]]`, `[[Document Memory Candidates]]`, `[[Bairui]]`,
+`[[Hermes]]`, `[[MinerU]]`, `[[Sonic]]`, `[[EverOS]]`, and `[[Obsidian]]`.
+It summarizes artifacts, Sonic index runs, memory candidates, review status,
+source references, and next actions for the ingest.
+
+The next pipeline phase is surfacing this workflow in the product UI/API as a
+document knowledge ingestion workbench.
 
 ## 8. Unified Runtime Readiness
 

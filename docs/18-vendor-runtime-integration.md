@@ -124,11 +124,14 @@ Hermes owns:
 - file-backed memory candidate records in `document_memory_candidates.jsonl`;
 - file-backed memory review records in `document_memory_reviews.jsonl`;
 - file-backed source reference records in `source_refs.jsonl`;
+- file-backed Obsidian ingest report records in
+  `document_ingest_reports.jsonl`;
 - HTTP routes under `/document/parse/status`, `/document/parse/ingest-plan`,
   `/document/parse/run-ingest`, `/document/parse/register-artifacts`,
   `/document/parse/index-artifacts`, `/document/parse/memory-candidates`,
   `/document/parse/review-memory-candidate`, `/document/parse/source-refs`,
-  `/document/ingests`, `/document/ingest-runs`, `/document/artifacts`,
+  `/document/parse/ingest-report`, `/document/ingests`,
+  `/document/ingest-runs`, `/document/ingest-reports`, `/document/artifacts`,
   `/document/index-runs`, `/document/memory-candidates`, and
   `/document/memory-reviews`, plus `/source-refs`;
 - PostgreSQL migration SQL for the production `source_refs` table and lookup
@@ -137,6 +140,11 @@ Hermes owns:
   `00-Inbox/everos-candidates/`, including YAML frontmatter, tags, a MOC note,
   and internal links to `[[Document Memory Candidates]]`, `[[Bairui]]`,
   `[[Hermes]]`, `[[EverOS]]`, and `[[Document Ingest <short-id>]]`;
+- Obsidian graph reports for complete ingestion summaries under
+  `05_Reports/document-ingests/`, including YAML frontmatter, tags, a MOC note,
+  and internal links to `[[Document Ingest Reports]]`, `[[Document Memory
+  Candidates]]`, `[[Bairui]]`, `[[Hermes]]`, `[[MinerU]]`, `[[Sonic]]`,
+  `[[EverOS]]`, and `[[Obsidian]]`;
 - operational configuration through `MINERU_PROJECT_ROOT`,
   `MINERU_OUTPUT_DIR`, `MINERU_BACKEND`, `MINERU_DEVICE`, and
   `MINERU_TIMEOUT_SECONDS`;
@@ -156,7 +164,8 @@ command and record stdout, stderr, exit code, timeout, or missing executable
 errors. Artifact registration then scans the real output directory and stores
 path, relative path, artifact type, MIME type, byte size, and sha256 for each
 produced file. Sonic indexing, EverOS memory candidates, source reference
-creation, and Obsidian report generation remain separate pipeline phases.
+creation, and Obsidian ingest report generation remain separate pipeline
+phases.
 The Sonic indexing phase only indexes registered text-like artifacts
 (Markdown, text, JSON, and HTML) and records skipped/failed artifacts
 explicitly.

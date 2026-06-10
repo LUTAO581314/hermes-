@@ -9,7 +9,7 @@ from src.hermes.capabilities import collect_capabilities
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import SCHEMA_SQL, database_status
-from src.hermes.document_pipeline import create_document_source_refs, generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, review_document_memory_candidate, run_document_ingest
+from src.hermes.document_pipeline import create_document_ingest_report, create_document_source_refs, generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, review_document_memory_candidate, run_document_ingest
 from src.hermes.adapters.everos import EverOSResult, build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
@@ -27,6 +27,7 @@ from src.hermes.storage import (
     list_audit_events,
     list_document_artifacts,
     list_document_index_runs,
+    list_document_ingest_reports,
     list_document_ingest_runs,
     list_document_ingests,
     list_document_memory_candidates,
@@ -495,6 +496,55 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(memory_ref["metadata"]["review_status"], "rejected")
         self.assertEqual(memory_ref["provider"], "hermes")
 
+    def test_create_document_ingest_report_writes_obsidian_graph_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes ingest reports should summarize artifacts, Sonic indexing, memory review, and source refs.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="Report plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "SONIC_HOST": "",
+                "SONIC_PASSWORD": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                index_document_artifacts(load_settings(), ingest.id)
+                candidate = generate_document_memory_candidates(data_dir, ingest.id).candidates[0]
+                review_document_memory_candidate(load_settings(), candidate.id, decision="reject")
+                create_document_source_refs(load_settings(), ingest.id)
+                result = create_document_ingest_report(load_settings(), ingest.id)
+            reports = list_document_ingest_reports(data_dir)
+            report_path = Path(result.report.path)
+            report_exists = report_path.exists()
+            report_text = report_path.read_text(encoding="utf-8")
+            moc_path = root / "vault" / "05_Reports" / "document-ingests" / "Document Ingest Reports.md"
+            moc_exists = moc_path.exists()
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(reports[0]["ingest_id"], ingest.id)
+        self.assertTrue(report_exists)
+        self.assertTrue(moc_exists)
+        self.assertIn("[[Document Ingest Reports]]", report_text)
+        self.assertIn("[[Document Memory Candidates]]", report_text)
+        self.assertIn("[[MinerU]]", report_text)
+        self.assertIn("[[Sonic]]", report_text)
+        self.assertIn("[[EverOS]]", report_text)
+        self.assertIn("Memory Candidates And Reviews", report_text)
+        self.assertIn("Source References", report_text)
+
     def test_write_obsidian_report_creates_markdown_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -902,6 +952,43 @@ class RuntimeFoundationTests(unittest.TestCase):
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["document_source_refs"].status, "completed")
         self.assertEqual(list_print_json.call_args.args[0]["source_refs"][0]["source_type"], "document_artifact")
+
+    def test_cli_document_ingest_report_lists_report_records(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes CLI report should create an Obsidian document ingest report.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="CLI ingest report plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "ingest-report", "--ingest-id", ingest.id])
+                with patch("src.hermes.cli.print_json") as list_print_json:
+                    list_code = run(["document-ingest-reports"])
+            report_path = Path(print_json.call_args.args[0]["document_ingest_report"].report.path)
+            report_exists = report_path.exists()
+        self.assertEqual(code, 0)
+        self.assertEqual(list_code, 0)
+        self.assertTrue(report_exists)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_ingest_report"].status, "completed")
+        self.assertEqual(list_print_json.call_args.args[0]["document_ingest_reports"][0]["ingest_id"], ingest.id)
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:

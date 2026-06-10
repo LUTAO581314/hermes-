@@ -158,6 +158,21 @@ class SourceRef:
     created_at: str
 
 
+@dataclass(frozen=True)
+class DocumentIngestReport:
+    id: str
+    ingest_id: str
+    title: str
+    path: str
+    status: str
+    artifact_count: int
+    index_run_count: int
+    candidate_count: int
+    review_count: int
+    source_ref_count: int
+    created_at: str
+
+
 def create_audit_event(
     data_dir: Path,
     action: str,
@@ -508,6 +523,57 @@ def list_source_refs(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
     return _read_jsonl(data_dir / "source_refs.jsonl", limit=limit)
 
 
+def create_document_ingest_report_record(
+    data_dir: Path,
+    *,
+    ingest_id: str,
+    title: str,
+    path: Path,
+    status: str,
+    artifact_count: int,
+    index_run_count: int,
+    candidate_count: int,
+    review_count: int,
+    source_ref_count: int,
+    created_at: str,
+) -> DocumentIngestReport:
+    report = DocumentIngestReport(
+        id=str(uuid.uuid4()),
+        ingest_id=ingest_id,
+        title=title,
+        path=str(path),
+        status=status,
+        artifact_count=artifact_count,
+        index_run_count=index_run_count,
+        candidate_count=candidate_count,
+        review_count=review_count,
+        source_ref_count=source_ref_count,
+        created_at=created_at,
+    )
+    _append_jsonl(data_dir / "document_ingest_reports.jsonl", asdict(report))
+    create_audit_event(
+        data_dir,
+        "document.ingest_report_written",
+        resource_type="document_ingest",
+        resource_ref=ingest_id,
+        payload={
+            "report_id": report.id,
+            "path": report.path,
+            "status": status,
+            "artifact_count": artifact_count,
+            "index_run_count": index_run_count,
+            "candidate_count": candidate_count,
+            "review_count": review_count,
+            "source_ref_count": source_ref_count,
+        },
+    )
+    return report
+
+
+def list_document_ingest_reports(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
+    return _read_jsonl(data_dir / "document_ingest_reports.jsonl", limit=limit)
+
+
 def _file_sha256(path: Path) -> str:
     digest = sha256()
     with path.open("rb") as handle:
@@ -636,6 +702,99 @@ def write_obsidian_memory_review_note(
     return {"path": str(path), "title": title, "created_at": now.isoformat()}
 
 
+def write_obsidian_document_ingest_report(
+    vault_dir: Path,
+    data_dir: Path,
+    *,
+    ingest: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    index_runs: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+    reviews: list[dict[str, Any]],
+    source_refs: list[dict[str, Any]],
+    audit_events: list[dict[str, Any]],
+) -> DocumentIngestReport:
+    now = datetime.now(timezone.utc)
+    folder = vault_dir / "05_Reports" / "document-ingests"
+    folder.mkdir(parents=True, exist_ok=True)
+    _ensure_document_ingest_report_moc(folder)
+
+    ingest_id = str(ingest.get("id", "unknown"))
+    title = f"Document Ingest {ingest_id[:8]} Report"
+    filename = f"{now.strftime('%Y%m%d-%H%M%S')}-{_slug(title)}.md"
+    path = folder / filename
+    review_note_paths = _memory_review_note_paths(audit_events)
+    reviews_by_candidate = {str(review.get("candidate_id", "")): review for review in reviews}
+
+    content = "\n".join(
+        [
+            "---",
+            f"title: {title}",
+            "type: document_ingest_report",
+            f"ingest_id: {ingest_id}",
+            f"created_at: {now.isoformat()}",
+            "source: hermes",
+            "tags:",
+            "  - bairui/document",
+            "  - hermes/report",
+            "  - hermes/ingest",
+            "---",
+            "",
+            f"# {title}",
+            "",
+            "Links: [[Document Ingest Reports]] [[Document Memory Candidates]] [[Bairui]] [[Hermes]] "
+            "[[MinerU]] [[Sonic]] [[EverOS]] [[Obsidian]]",
+            "",
+            "## Summary",
+            "",
+            f"- Input: `{ingest.get('input_path', '')}`",
+            f"- Output dir: `{ingest.get('output_dir', '')}`",
+            f"- Parser: {ingest.get('parser', '')}",
+            f"- Status: {ingest.get('status', '')}",
+            f"- Artifacts: {len(artifacts)}",
+            f"- Index runs: {len(index_runs)}",
+            f"- Memory candidates: {len(candidates)}",
+            f"- Memory reviews: {len(reviews)}",
+            f"- Source refs: {len(source_refs)}",
+            "",
+            "## Artifacts",
+            "",
+            *_artifact_lines(artifacts),
+            "",
+            "## Index Runs",
+            "",
+            *_index_run_lines(index_runs),
+            "",
+            "## Memory Candidates And Reviews",
+            "",
+            *_candidate_lines(candidates, reviews_by_candidate, review_note_paths),
+            "",
+            "## Source References",
+            "",
+            *_source_ref_lines(source_refs),
+            "",
+            "## Next Actions",
+            "",
+            *_next_action_lines(candidates, reviews_by_candidate, index_runs, source_refs),
+            "",
+        ]
+    )
+    path.write_text(content, encoding="utf-8")
+    return create_document_ingest_report_record(
+        data_dir,
+        ingest_id=ingest_id,
+        title=title,
+        path=path,
+        status="completed",
+        artifact_count=len(artifacts),
+        index_run_count=len(index_runs),
+        candidate_count=len(candidates),
+        review_count=len(reviews),
+        source_ref_count=len(source_refs),
+        created_at=now.isoformat(),
+    )
+
+
 def _ensure_memory_candidate_moc(folder: Path) -> None:
     moc = folder / "Document Memory Candidates.md"
     if moc.exists():
@@ -662,3 +821,139 @@ def _ensure_memory_candidate_moc(folder: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def _ensure_document_ingest_report_moc(folder: Path) -> None:
+    moc = folder / "Document Ingest Reports.md"
+    if moc.exists():
+        return
+    moc.write_text(
+        "\n".join(
+            [
+                "---",
+                "title: Document Ingest Reports",
+                "type: moc",
+                "source: hermes",
+                "tags:",
+                "  - bairui/document",
+                "  - hermes/moc",
+                "---",
+                "",
+                "# Document Ingest Reports",
+                "",
+                "Graph links: [[Bairui]] [[Hermes]] [[MinerU]] [[Sonic]] [[EverOS]] [[Obsidian]]",
+                "",
+                "This note collects Hermes document ingestion reports.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _artifact_lines(artifacts: list[dict[str, Any]]) -> list[str]:
+    if not artifacts:
+        return ["No registered artifacts yet."]
+    lines = ["| Type | Path | Size | SHA256 |", "| --- | --- | ---: | --- |"]
+    for artifact in artifacts:
+        lines.append(
+            "| "
+            f"{artifact.get('artifact_type', '')} | "
+            f"`{artifact.get('relative_path') or artifact.get('path') or ''}` | "
+            f"{artifact.get('size_bytes', 0)} | "
+            f"`{str(artifact.get('sha256', ''))[:12]}` |"
+        )
+    return lines
+
+
+def _index_run_lines(index_runs: list[dict[str, Any]]) -> list[str]:
+    if not index_runs:
+        return ["No Sonic index runs recorded yet."]
+    lines = ["| Provider | Status | Indexed | Skipped | Failed |", "| --- | --- | ---: | ---: | ---: |"]
+    for run in index_runs:
+        lines.append(
+            "| "
+            f"{run.get('provider', '')} | "
+            f"{run.get('status', '')} | "
+            f"{run.get('indexed_count', 0)} | "
+            f"{run.get('skipped_count', 0)} | "
+            f"{run.get('failed_count', 0)} |"
+        )
+    return lines
+
+
+def _candidate_lines(
+    candidates: list[dict[str, Any]],
+    reviews_by_candidate: dict[str, dict[str, Any]],
+    review_note_paths: dict[str, str],
+) -> list[str]:
+    if not candidates:
+        return ["No memory candidates generated yet."]
+    lines: list[str] = []
+    for candidate in candidates:
+        candidate_id = str(candidate.get("id", ""))
+        review = reviews_by_candidate.get(candidate_id, {})
+        review_id = str(review.get("id", ""))
+        note_path = review_note_paths.get(review_id, "")
+        lines.extend(
+            [
+                f"### Candidate `{candidate_id[:8]}`",
+                "",
+                f"- Source: `{candidate.get('source_path', '')}`",
+                f"- Review status: {review.get('status', 'pending_review')}",
+                f"- EverOS status: {review.get('everos_status', 'not_called') or 'not_called'}",
+                f"- Review note path: `{note_path}`" if note_path else "- Review note path: not written",
+                "",
+                str(candidate.get("text", "")).strip()[:600],
+                "",
+            ]
+        )
+    return lines
+
+
+def _source_ref_lines(source_refs: list[dict[str, Any]]) -> list[str]:
+    if not source_refs:
+        return ["No source references generated yet."]
+    lines = ["| Type | Provider | Confidence | Title |", "| --- | --- | --- | --- |"]
+    for ref in source_refs:
+        lines.append(
+            "| "
+            f"{ref.get('source_type', '')} | "
+            f"{ref.get('provider', '')} | "
+            f"{ref.get('confidence', '')} | "
+            f"{ref.get('title', '')} |"
+        )
+    return lines
+
+
+def _next_action_lines(
+    candidates: list[dict[str, Any]],
+    reviews_by_candidate: dict[str, dict[str, Any]],
+    index_runs: list[dict[str, Any]],
+    source_refs: list[dict[str, Any]],
+) -> list[str]:
+    actions: list[str] = []
+    pending = [candidate for candidate in candidates if str(candidate.get("id", "")) not in reviews_by_candidate]
+    if pending:
+        actions.append(f"- Review {len(pending)} pending memory candidates.")
+    if any(run.get("status") not in {"completed", "skipped"} for run in index_runs):
+        actions.append("- Inspect failed or partial Sonic index runs.")
+    if not source_refs:
+        actions.append("- Run `document parse source-refs` for provenance tracking.")
+    if not actions:
+        actions.append("- No immediate blockers recorded for this ingest.")
+    return actions
+
+
+def _memory_review_note_paths(audit_events: list[dict[str, Any]]) -> dict[str, str]:
+    paths: dict[str, str] = {}
+    for event in audit_events:
+        if event.get("action") != "obsidian.memory_review_note_written":
+            continue
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        review_id = str(payload.get("review_id", ""))
+        if review_id:
+            paths[review_id] = str(event.get("resource_ref", ""))
+    return paths

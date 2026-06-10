@@ -66,6 +66,7 @@ from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
 from .document_pipeline import (
+    create_document_ingest_report,
     create_document_source_refs,
     generate_document_memory_candidates,
     index_document_artifacts,
@@ -84,6 +85,7 @@ from .storage import (
     list_audit_events,
     list_document_artifacts,
     list_document_index_runs,
+    list_document_ingest_reports,
     list_document_ingest_runs,
     list_document_ingests,
     list_document_memory_candidates,
@@ -120,6 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("jobs", help="List recent file-backed jobs")
     subcommands.add_parser("document-ingests", help="List planned document ingestion records")
     subcommands.add_parser("document-ingest-runs", help="List document ingestion execution records")
+    subcommands.add_parser("document-ingest-reports", help="List Obsidian document ingest report records")
     subcommands.add_parser("document-artifacts", help="List registered document parser artifacts")
     subcommands.add_parser("document-index-runs", help="List document artifact indexing execution records")
     subcommands.add_parser("document-memory-candidates", help="List pending document memory candidates")
@@ -272,6 +275,8 @@ def build_parser() -> argparse.ArgumentParser:
     review_candidate.add_argument("--project-id", default="default")
     source_refs = parse_subcommands.add_parser("source-refs", help="Create source reference records for one document ingestion")
     source_refs.add_argument("--ingest-id", required=True)
+    ingest_report = parse_subcommands.add_parser("ingest-report", help="Write one Obsidian report for a document ingestion")
+    ingest_report.add_argument("--ingest-id", required=True)
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -339,6 +344,10 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "document-ingest-runs":
         print_json({"service": "hermes", "document_ingest_runs": list_document_ingest_runs(settings.data_dir)})
+        return 0
+
+    if command == "document-ingest-reports":
+        print_json({"service": "hermes", "document_ingest_reports": list_document_ingest_reports(settings.data_dir)})
         return 0
 
     if command == "document-artifacts":
@@ -658,6 +667,10 @@ def run(argv: list[str] | None = None) -> int:
             result = create_document_source_refs(settings, args.ingest_id)
             print_json({"service": "hermes", "document_source_refs": result})
             return 0 if result.status in {"completed", "skipped"} else 1
+        if parse_command == "ingest-report":
+            result = create_document_ingest_report(settings, args.ingest_id)
+            print_json({"service": "hermes", "document_ingest_report": result})
+            return 0 if result.status == "completed" else 1
         parser.error(f"unknown document parse command: {parse_command}")
         return 2
 
