@@ -74,6 +74,25 @@ Use it when:
 
 Do not use SearXNG as a trend engine. It supplements TrendRadar.
 
+Hermes integrates SearXNG as an external Docker/Linux service, not as a Windows
+worktree checkout. The SearXNG JSON API contract is:
+
+- `GET /search?q=<query>&format=json`
+- `POST /search` with `q=<query>&format=json`
+- SearXNG `settings.yml` must enable the `json` output format
+
+Current Hermes CLI surface:
+
+```bash
+python -m src.hermes search status
+python -m src.hermes search docker-command
+python -m src.hermes search query --query "bairui agent"
+```
+
+`SEARXNG_BASE_URL` enables live metasearch calls. Without it, Hermes reports
+`missing_config` and still exposes the Docker command and API contract needed
+to deploy SearXNG correctly.
+
 ## 5. Research Flow
 
 ```text

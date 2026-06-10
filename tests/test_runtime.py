@@ -11,6 +11,7 @@ from src.hermes.config import load_settings
 from src.hermes.db import database_status
 from src.hermes.adapters.everos import build_search_payload, status as everos_status
 from src.hermes.adapters.mirofish import build_dev_command, status as mirofish_status
+from src.hermes.adapters.searxng import build_docker_command as build_searxng_docker_command, build_search_payload as build_searxng_search_payload, status as searxng_status
 from src.hermes.adapters.trendradar import build_mcp_command, status as trendradar_status
 from src.hermes.license import load_license, sign_license_payload
 from src.hermes.model_gateway import build_chat_payload, complete_chat
@@ -120,6 +121,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("memory", help_text)
         self.assertIn("intel", help_text)
         self.assertIn("simulation", help_text)
+        self.assertIn("search", help_text)
 
     def test_everos_adapter_detects_source_and_license(self):
         settings = load_settings()
@@ -232,6 +234,60 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(payload["service"], "hermes")
         self.assertEqual(payload["simulation"]["license"], "AGPLv3")
         self.assertEqual(payload["simulation"]["status"], "source_ready")
+
+    def test_searxng_adapter_reports_missing_config_and_api_contract(self):
+        settings = load_settings()
+        state = searxng_status(settings)
+        self.assertEqual(state.license, "AGPLv3")
+        self.assertEqual(state.source, "https://github.com/searxng/searxng")
+        self.assertIn("GET /search?q=<query>&format=json", state.api_contract)
+        self.assertIn(state.status, {"missing_config", "configured"})
+
+    def test_build_searxng_search_payload_uses_json_format(self):
+        payload = build_searxng_search_payload(query="bairui agent", categories="general", page=2)
+        self.assertEqual(payload["q"], "bairui agent")
+        self.assertEqual(payload["format"], "json")
+        self.assertEqual(payload["categories"], "general")
+        self.assertEqual(payload["pageno"], 2)
+
+    def test_build_searxng_docker_command_uses_official_image(self):
+        settings = load_settings()
+        plan = build_searxng_docker_command(settings, host_port=8080)
+        self.assertEqual(plan.status, "ready")
+        self.assertIn("docker.io/searxng/searxng:latest", plan.command)
+        self.assertIn("8080:8080", plan.command)
+
+    def test_cli_search_status_prints_searxng_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "SEARXNG_BASE_URL": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["search", "status"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["service"], "hermes")
+        self.assertEqual(payload["search"]["license"], "AGPLv3")
+        self.assertEqual(payload["search"]["status"], "missing_config")
+
+    def test_cli_search_query_requires_searxng_base_url(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "SEARXNG_BASE_URL": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["search", "query", "--query", "hello"])
+        self.assertEqual(code, 1)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["search"]["status"], "missing_config")
 
     def test_cli_status_prints_runtime_status(self):
         with tempfile.TemporaryDirectory() as tmp:

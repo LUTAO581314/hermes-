@@ -16,6 +16,12 @@ from .adapters.everos import (
     status as everos_status,
 )
 from .adapters.mirofish import as_payload as mirofish_payload, status as mirofish_status
+from .adapters.searxng import (
+    as_payload as searxng_payload,
+    build_search_payload as build_searxng_search_payload,
+    search as searxng_search,
+    status as searxng_status,
+)
 from .adapters.trendradar import as_payload as trendradar_payload, status as trendradar_status
 from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
@@ -93,6 +99,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/simulation/status":
             self._send({"service": "hermes", "simulation": mirofish_payload(mirofish_status(settings))})
+            return
+        if self.path == "/search/status":
+            self._send({"service": "hermes", "search": searxng_payload(searxng_status(settings))})
             return
 
         self._send({"error": "not_found", "path": self.path}, status=404)
@@ -196,6 +205,26 @@ class HermesHandler(BaseHTTPRequestHandler):
                 ),
             )
             self._send({"service": "hermes", "memory": as_payload(result)}, status=200 if result.status == "completed" else 503)
+            return
+
+        if self.path == "/search/query":
+            query = str(payload.get("query", ""))
+            if not query.strip():
+                self._send({"error": "invalid_request", "message": "query is required"}, status=400)
+                return
+            result = searxng_search(
+                settings,
+                build_searxng_search_payload(
+                    query=query,
+                    categories=str(payload.get("categories", "")),
+                    engines=str(payload.get("engines", "")),
+                    language=str(payload.get("language", "")),
+                    safesearch=str(payload.get("safesearch", "")),
+                    time_range=str(payload.get("time_range", "")),
+                    page=int(payload.get("page", 1)),
+                ),
+            )
+            self._send({"service": "hermes", "search": searxng_payload(result)}, status=200 if result.status == "completed" else 503)
             return
 
         if self.path == "/admin/migrate":

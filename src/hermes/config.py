@@ -43,6 +43,9 @@ class Settings:
     mirofish_backend_base_url: str
     mirofish_frontend_base_url: str
     mirofish_timeout_seconds: int
+    searxng_base_url: str
+    searxng_public_base_url: str
+    searxng_timeout_seconds: int
 
     @property
     def has_database(self) -> bool:
@@ -86,6 +89,9 @@ def load_settings() -> Settings:
         mirofish_backend_base_url=os.getenv("MIROFISH_BACKEND_BASE_URL", ""),
         mirofish_frontend_base_url=os.getenv("MIROFISH_FRONTEND_BASE_URL", ""),
         mirofish_timeout_seconds=int(os.getenv("MIROFISH_TIMEOUT_SECONDS", "30")),
+        searxng_base_url=os.getenv("SEARXNG_BASE_URL", ""),
+        searxng_public_base_url=os.getenv("SEARXNG_PUBLIC_BASE_URL", ""),
+        searxng_timeout_seconds=int(os.getenv("SEARXNG_TIMEOUT_SECONDS", "30")),
     )
 
 

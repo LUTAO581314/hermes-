@@ -24,6 +24,13 @@ from .adapters.mirofish import (
     build_setup_command,
     status as mirofish_status,
 )
+from .adapters.searxng import (
+    as_payload as searxng_payload,
+    build_docker_command as build_searxng_docker_command,
+    build_search_payload as build_searxng_search_payload,
+    search as searxng_search,
+    status as searxng_status,
+)
 from .adapters.trendradar import (
     as_payload as trendradar_payload,
     build_doctor_command,
@@ -114,6 +121,20 @@ def build_parser() -> argparse.ArgumentParser:
     simulation_subcommands.add_parser("backend-command", help="Print the real MiroFish backend command")
     simulation_subcommands.add_parser("frontend-command", help="Print the real MiroFish frontend command")
     simulation_subcommands.add_parser("dev-command", help="Print the real MiroFish full dev command")
+
+    search_parser = subcommands.add_parser("search", help="Operate self-hosted search runtime adapters")
+    search_subcommands = search_parser.add_subparsers(dest="search_command")
+    search_subcommands.add_parser("status", help="Inspect SearXNG service configuration")
+    search_docker = search_subcommands.add_parser("docker-command", help="Print a SearXNG Docker service command")
+    search_docker.add_argument("--host-port", type=int, default=8080)
+    search_query = search_subcommands.add_parser("query", help="Run one SearXNG JSON search")
+    search_query.add_argument("--query", required=True)
+    search_query.add_argument("--categories", default="")
+    search_query.add_argument("--engines", default="")
+    search_query.add_argument("--language", default="")
+    search_query.add_argument("--safesearch", default="")
+    search_query.add_argument("--time-range", default="")
+    search_query.add_argument("--page", type=int, default=1)
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -283,6 +304,30 @@ def run(argv: list[str] | None = None) -> int:
             print_json({"service": "hermes", "simulation": mirofish_payload(build_dev_command(settings))})
             return 0
         parser.error(f"unknown simulation command: {simulation_command}")
+        return 2
+
+    if command == "search":
+        search_command = args.search_command or "status"
+        if search_command == "status":
+            print_json({"service": "hermes", "search": searxng_payload(searxng_status(settings))})
+            return 0
+        if search_command == "docker-command":
+            print_json({"service": "hermes", "search": searxng_payload(build_searxng_docker_command(settings, host_port=args.host_port))})
+            return 0
+        if search_command == "query":
+            payload = build_searxng_search_payload(
+                query=args.query,
+                categories=args.categories,
+                engines=args.engines,
+                language=args.language,
+                safesearch=args.safesearch,
+                time_range=args.time_range,
+                page=args.page,
+            )
+            result = searxng_search(settings, payload)
+            print_json({"service": "hermes", "search": searxng_payload(result)})
+            return 0 if result.status == "completed" else 1
+        parser.error(f"unknown search command: {search_command}")
         return 2
 
     if command == "job":

@@ -120,6 +120,8 @@ python -m src.hermes intel status
 python -m src.hermes intel mcp-command
 python -m src.hermes simulation status
 python -m src.hermes simulation dev-command
+python -m src.hermes search status
+python -m src.hermes search docker-command
 python -m src.hermes serve
 ```
 

@@ -29,7 +29,7 @@ reinvention.
 | EverOS | `vendor/runtimes/everos` | Automatic memory extraction and retrieval | Apache-2.0 | first source-level adapter |
 | TrendRadar | `vendor/runtimes/trendradar` | Trend, RSS, hot-list, and public-opinion intelligence | GPLv3 | source-level adapter |
 | MiroFish | `vendor/runtimes/mirofish` | Scenario simulation and multi-agent rehearsal | AGPLv3 | source-level adapter |
-| SearXNG | Docker or Linux checkout | Optional metasearch | AGPLv3 | planned HTTP service adapter |
+| SearXNG | Docker or Linux checkout | Optional metasearch | AGPLv3 | HTTP service adapter |
 
 ## 3. Adapter Boundary
 
@@ -134,7 +134,33 @@ MiroFish owns:
 Hermes must not copy MiroFish internals into core code. Use the upstream npm
 scripts, Flask API, process boundary, or service boundary.
 
-## 7. Commercial Boundaries
+## 7. SearXNG Adapter Contract
+
+SearXNG is the optional self-hosted metasearch runtime. Because the upstream
+repository has Windows-incompatible checkout paths and is AGPLv3, Hermes treats
+it as a Docker/Linux HTTP service instead of a vendored Windows source tree.
+
+Hermes owns:
+
+- `src/hermes/adapters/searxng.py`;
+- CLI commands under `python -m src.hermes search ...`;
+- HTTP routes under `/search/status` and `/search/query`;
+- operational configuration through `SEARXNG_BASE_URL`,
+  `SEARXNG_PUBLIC_BASE_URL`, and `SEARXNG_TIMEOUT_SECONDS`;
+- capability and commercial-boundary reporting.
+
+SearXNG owns:
+
+- search engines and metasearch routing;
+- the `/search` endpoint;
+- output format configuration;
+- its Docker image and settings files.
+
+The JSON API requires `format=json`, and SearXNG configuration must permit the
+`json` output format. Hermes must not pretend SearXNG is available until
+`SEARXNG_BASE_URL` is configured.
+
+## 8. Commercial Boundaries
 
 Apache-2.0 runtimes such as EverOS are suitable for deeper productized
 integration, while preserving LICENSE, NOTICE, upstream name, and attribution.
@@ -148,7 +174,7 @@ operation, complete a license review and delivery-source checklist.
 
 This document is general engineering guidance, not legal advice.
 
-## 8. Integration Order
+## 9. Integration Order
 
 1. EverOS adapter for memory candidates and retrieval.
 2. TrendRadar adapter for intelligence input.
@@ -156,7 +182,7 @@ This document is general engineering guidance, not legal advice.
 4. SearXNG as an optional Docker-based metasearch runtime after Linux/server
    deployment.
 
-## 9. Verification Requirements
+## 10. Verification Requirements
 
 Each runtime integration must prove:
 
