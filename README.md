@@ -129,9 +129,11 @@ python -m src.hermes document parse parse-command --input-path ./sample.pdf
 python -m src.hermes document parse ingest-plan --input-path ./sample.pdf --title "Sample"
 python -m src.hermes document parse run-ingest --ingest-id <ingest_id>
 python -m src.hermes document parse register-artifacts --ingest-id <ingest_id>
+python -m src.hermes document parse index-artifacts --ingest-id <ingest_id>
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
 python -m src.hermes document-artifacts
+python -m src.hermes document-index-runs
 python -m src.hermes intel status
 python -m src.hermes intel mcp-command
 python -m src.hermes simulation status

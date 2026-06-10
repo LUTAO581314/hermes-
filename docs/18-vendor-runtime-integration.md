@@ -120,9 +120,12 @@ Hermes owns:
 - file-backed planned ingestion records in `document_ingests.jsonl`;
 - file-backed execution records in `document_ingest_runs.jsonl`;
 - file-backed artifact records in `document_artifacts.jsonl`;
+- file-backed Sonic indexing records in `document_index_runs.jsonl`;
 - HTTP routes under `/document/parse/status`, `/document/parse/ingest-plan`,
   `/document/parse/run-ingest`, `/document/parse/register-artifacts`,
-  `/document/ingests`, `/document/ingest-runs`, and `/document/artifacts`;
+  `/document/parse/index-artifacts`, `/document/ingests`,
+  `/document/ingest-runs`, `/document/artifacts`, and
+  `/document/index-runs`;
 - operational configuration through `MINERU_PROJECT_ROOT`,
   `MINERU_OUTPUT_DIR`, `MINERU_BACKEND`, `MINERU_DEVICE`, and
   `MINERU_TIMEOUT_SECONDS`;
@@ -143,6 +146,9 @@ errors. Artifact registration then scans the real output directory and stores
 path, relative path, artifact type, MIME type, byte size, and sha256 for each
 produced file. Sonic indexing, EverOS memory candidates, PostgreSQL source
 references, and Obsidian report generation remain separate pipeline phases.
+The Sonic indexing phase only indexes registered text-like artifacts
+(Markdown, text, JSON, and HTML) and records skipped/failed artifacts
+explicitly.
 
 ## 7. TrendRadar Adapter Contract
 

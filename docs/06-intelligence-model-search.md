@@ -190,9 +190,11 @@ python -m src.hermes document parse parse-command --input-path ./sample.pdf
 python -m src.hermes document parse ingest-plan --input-path ./sample.pdf --title "Sample"
 python -m src.hermes document parse run-ingest --ingest-id <ingest_id>
 python -m src.hermes document parse register-artifacts --ingest-id <ingest_id>
+python -m src.hermes document parse index-artifacts --ingest-id <ingest_id>
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
 python -m src.hermes document-artifacts
+python -m src.hermes document-index-runs
 ```
 
 `ingest-plan` creates a local `document_ingests.jsonl` record with the input
@@ -216,9 +218,17 @@ artifact record stores the ingest id, absolute path, relative path, artifact
 type, MIME type, size, sha256 hash, and timestamp. Markdown, JSON, images,
 tables, HTML, and text files are classified for downstream processing.
 
-Hermes still does not claim full knowledge ingestion is complete after artifact
-registration. The next pipeline phases are Sonic indexing, EverOS memory
-candidates, PostgreSQL source references, and Obsidian report generation.
+`index-artifacts` reads registered Markdown, text, JSON, and HTML artifacts and
+pushes their text content into Sonic using the existing `index push` adapter
+contract. Image/table/formula artifacts are skipped until a dedicated extractor
+exists. Each run writes `document_index_runs.jsonl` with provider, collection,
+bucket, indexed/skipped/failed counts, per-artifact status, and any error. If
+`SONIC_HOST` or `SONIC_PASSWORD` is missing, the run is recorded as failed
+instead of reporting fake indexing success.
+
+Hermes still does not claim full knowledge ingestion is complete after Sonic
+indexing. The next pipeline phases are EverOS memory candidates, PostgreSQL
+source references, and Obsidian report generation.
 
 ## 8. Unified Runtime Readiness
 

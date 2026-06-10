@@ -9,7 +9,7 @@ from src.hermes.capabilities import collect_capabilities
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import database_status
-from src.hermes.document_pipeline import register_document_artifacts, run_document_ingest
+from src.hermes.document_pipeline import index_document_artifacts, register_document_artifacts, run_document_ingest
 from src.hermes.adapters.everos import build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
@@ -26,6 +26,7 @@ from src.hermes.storage import (
     create_job,
     list_audit_events,
     list_document_artifacts,
+    list_document_index_runs,
     list_document_ingest_runs,
     list_document_ingests,
     list_jobs,
@@ -190,6 +191,74 @@ class RuntimeFoundationTests(unittest.TestCase):
             result = register_document_artifacts(data_dir, ingest.id)
         self.assertEqual(result.status, "missing_output")
         self.assertEqual(result.artifacts, ())
+
+    def test_index_document_artifacts_records_missing_sonic_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text("# Sample\n\nSearchable text", encoding="utf-8")
+            (output_dir / "page.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            ingest = create_document_ingest(
+                data_dir,
+                title="Index plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "SONIC_HOST": "",
+                "SONIC_PASSWORD": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                result = index_document_artifacts(load_settings(), ingest.id)
+            runs = list_document_index_runs(data_dir)
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.run.failed_count, 1)
+        self.assertEqual(result.run.skipped_count, 1)
+        self.assertEqual(runs[0]["status"], "failed")
+        self.assertEqual(runs[0]["provider"], "sonic")
+        self.assertEqual(runs[0]["results"][0]["status"], "missing_config")
+
+    def test_index_document_artifacts_pushes_text_artifacts_to_sonic(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text("# Sample\n\nSearchable text", encoding="utf-8")
+            (output_dir / "metadata.json").write_text('{"title": "Sample"}', encoding="utf-8")
+            ingest = create_document_ingest(
+                data_dir,
+                title="Index success plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "SONIC_HOST": "127.0.0.1",
+                "SONIC_PASSWORD": "secret",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.document_pipeline.sonic_push") as sonic_push:
+                    sonic_push.return_value.status = "completed"
+                    sonic_push.return_value.error = ""
+                    result = index_document_artifacts(load_settings(), ingest.id, collection="bairui", bucket="docs", lang="zh")
+            runs = list_document_index_runs(data_dir)
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.run.indexed_count, 2)
+        self.assertEqual(runs[0]["collection"], "bairui")
+        self.assertEqual(runs[0]["bucket"], "docs")
+        self.assertEqual(sonic_push.call_count, 2)
 
     def test_write_obsidian_report_creates_markdown_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -459,6 +528,39 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(payload["document_artifact_registration"].status, "completed")
         self.assertEqual(payload["document_artifact_registration"].artifacts[0].artifact_type, "markdown")
         self.assertEqual(list_print_json.call_args.args[0]["document_artifacts"][0]["artifact_type"], "markdown")
+
+    def test_cli_document_index_artifacts_lists_index_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text("parsed text", encoding="utf-8")
+            ingest = create_document_ingest(
+                data_dir,
+                title="CLI index plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "SONIC_HOST": "",
+                "SONIC_PASSWORD": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "index-artifacts", "--ingest-id", ingest.id])
+                with patch("src.hermes.cli.print_json") as list_print_json:
+                    list_code = run(["document-index-runs"])
+        self.assertEqual(code, 1)
+        self.assertEqual(list_code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_index"].status, "failed")
+        self.assertEqual(list_print_json.call_args.args[0]["document_index_runs"][0]["status"], "failed")
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:

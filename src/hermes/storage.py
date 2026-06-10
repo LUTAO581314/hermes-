@@ -101,6 +101,22 @@ class DocumentArtifact:
     created_at: str
 
 
+@dataclass(frozen=True)
+class DocumentIndexRun:
+    id: str
+    ingest_id: str
+    status: str
+    provider: str
+    collection: str
+    bucket: str
+    indexed_count: int
+    skipped_count: int
+    failed_count: int
+    results: tuple[dict[str, Any], ...]
+    error: str
+    created_at: str
+
+
 def create_audit_event(
     data_dir: Path,
     action: str,
@@ -277,6 +293,59 @@ def create_document_artifact(
 
 def list_document_artifacts(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
     return _read_jsonl(data_dir / "document_artifacts.jsonl", limit=limit)
+
+
+def create_document_index_run(
+    data_dir: Path,
+    *,
+    ingest_id: str,
+    status: str,
+    provider: str,
+    collection: str,
+    bucket: str,
+    indexed_count: int,
+    skipped_count: int,
+    failed_count: int,
+    results: tuple[dict[str, Any], ...] = (),
+    error: str = "",
+) -> DocumentIndexRun:
+    run = DocumentIndexRun(
+        id=str(uuid.uuid4()),
+        ingest_id=ingest_id,
+        status=status,
+        provider=provider,
+        collection=collection,
+        bucket=bucket,
+        indexed_count=indexed_count,
+        skipped_count=skipped_count,
+        failed_count=failed_count,
+        results=results,
+        error=error,
+        created_at=utc_now(),
+    )
+    _append_jsonl(data_dir / "document_index_runs.jsonl", asdict(run))
+    create_audit_event(
+        data_dir,
+        "document.sonic_index_finished",
+        resource_type="document_ingest",
+        resource_ref=ingest_id,
+        risk_level="medium" if status not in {"completed", "skipped"} else "low",
+        payload={
+            "status": status,
+            "provider": provider,
+            "collection": collection,
+            "bucket": bucket,
+            "indexed_count": indexed_count,
+            "skipped_count": skipped_count,
+            "failed_count": failed_count,
+            "run_id": run.id,
+        },
+    )
+    return run
+
+
+def list_document_index_runs(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
+    return _read_jsonl(data_dir / "document_index_runs.jsonl", limit=limit)
 
 
 def _file_sha256(path: Path) -> str:
