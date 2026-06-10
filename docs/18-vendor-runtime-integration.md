@@ -133,7 +133,8 @@ Hermes owns:
   `/document/parse/memory-review-pending`,
   `/document/parse/memory-review-batch`, `/document/parse/source-refs`,
   `/document/parse/ingest-report`, `/document/parse/workbench-state`,
-  `/document/parse/session-summary`, `/document/parse/workbench-next`,
+  `/document/parse/session-summary`, `/document/parse/session-list`,
+  `/document/parse/workbench-next`,
   `/document/parse/workbench-run-until-blocked`, `/document/ingests`,
   `/document/ingest-runs`, `/document/ingest-reports`, `/document/artifacts`,
   `/document/index-runs`, `/document/memory-candidates`, and
@@ -162,6 +163,10 @@ action into a single response. `/document/parse/workbench-next` executes that
 next safe action and returns the refreshed state.
 `/document/parse/session-summary` is the page-ready view model for the document
 knowledge ingestion workbench.
+`/document/parse/session-list` is the compact list-page model for multiple
+document ingestion sessions. It includes the row fields a frontend needs for a
+workbench index page, while keeping full linked records behind the selected
+`/document/parse/session-summary` detail call.
 `/document/parse/workbench-run-until-blocked` repeats safe actions until the
 workflow completes or stops on `needs_review`, `failed`, `not_found`,
 `no_progress`, or `step_limit_reached`. It stops with `needs_review` for memory

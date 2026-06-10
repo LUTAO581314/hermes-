@@ -73,6 +73,7 @@ from .document_pipeline import (
     execute_document_workbench_next,
     generate_document_memory_candidates,
     index_document_artifacts,
+    list_document_ingest_session_summaries,
     list_pending_document_memory_reviews,
     register_document_artifacts,
     review_document_memory_candidate,
@@ -301,6 +302,8 @@ def build_parser() -> argparse.ArgumentParser:
     workbench_state.add_argument("--ingest-id", required=True)
     session_summary = parse_subcommands.add_parser("session-summary", help="Build a frontend-ready document ingestion session summary")
     session_summary.add_argument("--ingest-id", required=True)
+    session_list = parse_subcommands.add_parser("session-list", help="List frontend-ready document ingestion sessions")
+    session_list.add_argument("--limit", type=int, default=50)
     workbench_next = parse_subcommands.add_parser("workbench-next", help="Execute the next safe document ingestion workbench action")
     workbench_next.add_argument("--ingest-id", required=True)
     workbench_next.add_argument("--timeout-seconds", type=int, default=0)
@@ -739,6 +742,10 @@ def run(argv: list[str] | None = None) -> int:
             summary = build_document_ingest_session_summary(settings, args.ingest_id)
             print_json({"service": "hermes", "document_ingest_session": summary})
             return 0 if summary.status != "not_found" else 1
+        if parse_command == "session-list":
+            session_list = list_document_ingest_session_summaries(settings, limit=args.limit)
+            print_json({"service": "hermes", "document_ingest_sessions": session_list})
+            return 0
         if parse_command == "workbench-next":
             result = execute_document_workbench_next(
                 settings,

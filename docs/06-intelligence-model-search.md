@@ -200,6 +200,7 @@ python -m src.hermes document parse source-refs --ingest-id <ingest_id>
 python -m src.hermes document parse ingest-report --ingest-id <ingest_id>
 python -m src.hermes document parse workbench-state --ingest-id <ingest_id>
 python -m src.hermes document parse session-summary --ingest-id <ingest_id>
+python -m src.hermes document parse session-list --limit 50
 python -m src.hermes document parse workbench-next --ingest-id <ingest_id>
 python -m src.hermes document parse workbench-run-until-blocked --ingest-id <ingest_id>
 python -m src.hermes document-ingests
@@ -304,6 +305,19 @@ It returns the ingest title/source, current stage, progress percentage, stage
 list, primary action, pending review queue, latest report, blockers, warnings,
 and the underlying workbench state. It is available over HTTP at
 `POST /document/parse/session-summary`.
+
+`session-list` is the frontend list-page model for document ingestion sessions.
+It returns compact rows with ingest id, title, source, status, current stage,
+progress percentage, primary action, pending review count, blocker/warning
+counts, latest report path, and created/updated timestamps. It is available as:
+
+```bash
+python -m src.hermes document parse session-list --limit 50
+```
+
+and over HTTP at `POST /document/parse/session-list`. The list deliberately
+does not embed the full workbench state for every ingest; frontends should open
+`session-summary` for the selected detail page.
 
 `workbench-next` executes the first safe action from `next_actions` and returns
 both the action result and the refreshed workbench state. It is available as:

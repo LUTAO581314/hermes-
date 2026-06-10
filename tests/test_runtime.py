@@ -9,7 +9,7 @@ from src.hermes.capabilities import collect_capabilities
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import SCHEMA_SQL, database_status
-from src.hermes.document_pipeline import build_document_ingest_session_summary, build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, list_pending_document_memory_reviews, register_document_artifacts, review_document_memory_candidate, review_document_memory_candidates_batch, run_document_ingest, run_document_workbench_until_blocked
+from src.hermes.document_pipeline import build_document_ingest_session_summary, build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, list_document_ingest_session_summaries, list_pending_document_memory_reviews, register_document_artifacts, review_document_memory_candidate, review_document_memory_candidates_batch, run_document_ingest, run_document_workbench_until_blocked
 from src.hermes.adapters.everos import EverOSResult, build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
@@ -690,6 +690,44 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(summary.report["ingest_id"], ingest.id)
         self.assertEqual(summary.stages[-1]["id"], "obsidian_report")
 
+    def test_document_ingest_session_list_is_frontend_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            planned = create_document_ingest(
+                data_dir,
+                title="Planned list row",
+                input_path="planned.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "planned.pdf", "-o", str(output_dir)),
+            )
+            parsed = create_document_ingest(
+                data_dir,
+                title="Parsed list row",
+                input_path="parsed.pdf",
+                output_dir=str(output_dir),
+                parser_command=("python", "-c", "print('parsed list row')"),
+            )
+            run_document_ingest(data_dir, parsed.id, timeout_seconds=10)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                sessions = list_document_ingest_session_summaries(load_settings(), limit=10)
+        self.assertEqual(sessions.status, "completed")
+        self.assertEqual(sessions.count, 2)
+        self.assertEqual(sessions.sessions[0].ingest_id, planned.id)
+        self.assertEqual(sessions.sessions[0].current_stage, "parse")
+        self.assertEqual(sessions.sessions[0].primary_action["command"], "run-ingest")
+        self.assertEqual(sessions.sessions[1].ingest_id, parsed.id)
+        self.assertEqual(sessions.sessions[1].current_stage, "artifact_registration")
+        self.assertEqual(sessions.sessions[1].primary_action["command"], "register-artifacts")
+        self.assertEqual(sessions.sessions[1].pending_reviews, 0)
+
     def test_document_workbench_next_executes_parser_step(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1333,6 +1371,33 @@ class RuntimeFoundationTests(unittest.TestCase):
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["document_ingest_session"].current_stage, "parse")
         self.assertEqual(payload["document_ingest_session"].primary_action["command"], "run-ingest")
+
+    def test_cli_document_ingest_session_list_prints_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            create_document_ingest(
+                data_dir,
+                title="CLI session list row",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "session-list", "--limit", "10"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_ingest_sessions"].count, 1)
+        self.assertEqual(payload["document_ingest_sessions"].sessions[0].current_stage, "parse")
+        self.assertEqual(payload["document_ingest_sessions"].sessions[0].primary_action["command"], "run-ingest")
 
     def test_cli_document_workbench_next_executes_next_action(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -51,6 +51,7 @@ from .document_pipeline import (
     execute_document_workbench_next,
     generate_document_memory_candidates,
     index_document_artifacts,
+    list_document_ingest_session_summaries,
     list_pending_document_memory_reviews,
     register_document_artifacts,
     review_document_memory_candidate,
@@ -565,6 +566,11 @@ class HermesHandler(BaseHTTPRequestHandler):
             summary = build_document_ingest_session_summary(settings, ingest_id)
             status = 200 if summary.status != "not_found" else 404
             self._send({"service": "hermes", "document_ingest_session": asdict(summary)}, status=status)
+            return
+
+        if self.path == "/document/parse/session-list":
+            result = list_document_ingest_session_summaries(settings, limit=int(payload.get("limit", 50)))
+            self._send({"service": "hermes", "document_ingest_sessions": asdict(result)})
             return
 
         if self.path == "/document/parse/workbench-next":

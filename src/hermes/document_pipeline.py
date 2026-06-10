@@ -174,6 +174,31 @@ class DocumentIngestSessionSummary:
     workbench: DocumentWorkbenchState
 
 
+@dataclass(frozen=True)
+class DocumentIngestSessionListItem:
+    ingest_id: str
+    title: str
+    source: str
+    status: str
+    current_stage: str
+    progress_percent: int
+    primary_action: dict[str, str] | None
+    pending_reviews: int
+    blocker_count: int
+    warning_count: int
+    report_path: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class DocumentIngestSessionList:
+    status: str
+    detail: str
+    count: int
+    sessions: tuple[DocumentIngestSessionListItem, ...]
+
+
 def run_document_ingest(data_dir: Path, ingest_id: str, *, timeout_seconds: int) -> DocumentPipelineResult:
     ingest = _find_ingest(data_dir, ingest_id)
     if ingest is None:
@@ -933,6 +958,21 @@ def build_document_ingest_session_summary(settings: Settings, ingest_id: str) ->
     )
 
 
+def list_document_ingest_session_summaries(settings: Settings, limit: int = 50) -> DocumentIngestSessionList:
+    normalized_limit = max(1, min(limit, 500))
+    sessions = tuple(
+        _session_list_item(build_document_ingest_session_summary(settings, str(ingest.get("id", ""))))
+        for ingest in list_document_ingests(settings.data_dir, limit=normalized_limit)
+        if str(ingest.get("id", "")).strip()
+    )
+    return DocumentIngestSessionList(
+        status="completed",
+        detail="document ingest session list",
+        count=len(sessions),
+        sessions=sessions,
+    )
+
+
 def execute_document_workbench_next(
     settings: Settings,
     ingest_id: str,
@@ -1126,6 +1166,28 @@ def _session_stage(stage_id: str, label: str, status: str) -> dict[str, object]:
         "complete": status in {"completed", "skipped"},
         "blocked": status in {"failed", "timeout", "missing"},
     }
+
+
+def _session_list_item(summary: DocumentIngestSessionSummary) -> DocumentIngestSessionListItem:
+    ingest = summary.workbench.ingest or {}
+    report_path = ""
+    if summary.report is not None:
+        report_path = str(summary.report.get("path", ""))
+    return DocumentIngestSessionListItem(
+        ingest_id=summary.ingest_id,
+        title=summary.title,
+        source=summary.source,
+        status=summary.status,
+        current_stage=summary.current_stage,
+        progress_percent=summary.progress_percent,
+        primary_action=summary.primary_action,
+        pending_reviews=summary.review_queue.pending_count if summary.review_queue is not None else 0,
+        blocker_count=len(summary.blockers),
+        warning_count=len(summary.warnings),
+        report_path=report_path,
+        created_at=str(ingest.get("created_at", "")),
+        updated_at=str(ingest.get("updated_at", "")),
+    )
 
 
 def _workbench_pipeline(
