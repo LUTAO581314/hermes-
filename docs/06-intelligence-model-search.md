@@ -192,11 +192,13 @@ python -m src.hermes document parse run-ingest --ingest-id <ingest_id>
 python -m src.hermes document parse register-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse index-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse memory-candidates --ingest-id <ingest_id>
+python -m src.hermes document parse review-memory-candidate --candidate-id <candidate_id> --decision approve
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
 python -m src.hermes document-artifacts
 python -m src.hermes document-index-runs
 python -m src.hermes document-memory-candidates
+python -m src.hermes document-memory-reviews
 ```
 
 `ingest-plan` creates a local `document_ingests.jsonl` record with the input
@@ -233,11 +235,18 @@ indexing.
 
 `memory-candidates` reads registered text-like artifacts and creates
 `document_memory_candidates.jsonl` records with `pending_review` status. These
-records are memory candidates only: they are not pushed into EverOS, not
-promoted into Obsidian, and not treated as owner-approved long-term memory.
+records are memory candidates only: they are not pushed into EverOS and not
+treated as owner-approved long-term memory.
 
-The next pipeline phases are reviewed EverOS promotion, PostgreSQL source
-references, and Obsidian report generation.
+`review-memory-candidate` is the governed handoff. Approvals attempt EverOS
+`/add`, rejections do not call EverOS, and both decisions write
+`document_memory_reviews.jsonl` plus an Obsidian graph note under
+`00-Inbox/everos-candidates/` with frontmatter, tags, and internal links to
+`[[Document Memory Candidates]]`, `[[Bairui]]`, `[[Hermes]]`, `[[EverOS]]`, and
+the source `[[Document Ingest <short-id>]]`.
+
+The next pipeline phases are PostgreSQL source references and richer Obsidian
+report generation.
 
 ## 8. Unified Runtime Readiness
 

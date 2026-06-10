@@ -69,6 +69,7 @@ from .document_pipeline import (
     generate_document_memory_candidates,
     index_document_artifacts,
     register_document_artifacts,
+    review_document_memory_candidate,
     run_document_ingest,
 )
 from .license import load_license
@@ -85,6 +86,7 @@ from .storage import (
     list_document_ingest_runs,
     list_document_ingests,
     list_document_memory_candidates,
+    list_document_memory_reviews,
     list_jobs,
     write_obsidian_report,
 )
@@ -119,6 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("document-artifacts", help="List registered document parser artifacts")
     subcommands.add_parser("document-index-runs", help="List document artifact indexing execution records")
     subcommands.add_parser("document-memory-candidates", help="List pending document memory candidates")
+    subcommands.add_parser("document-memory-reviews", help="List reviewed document memory candidates")
     subcommands.add_parser("audit", help="List recent audit events")
     subcommands.add_parser("migrate", help="Run PostgreSQL schema migrations")
     subcommands.add_parser("heartbeat", help="Print the platform heartbeat payload")
@@ -255,6 +258,15 @@ def build_parser() -> argparse.ArgumentParser:
     memory_candidates = parse_subcommands.add_parser("memory-candidates", help="Generate pending memory candidates from document artifacts")
     memory_candidates.add_argument("--ingest-id", required=True)
     memory_candidates.add_argument("--max-candidates", type=int, default=20)
+    review_candidate = parse_subcommands.add_parser("review-memory-candidate", help="Approve or reject one pending document memory candidate")
+    review_candidate.add_argument("--candidate-id", required=True)
+    review_candidate.add_argument("--decision", choices=["approve", "reject"], required=True)
+    review_candidate.add_argument("--reviewer-ref", default="owner")
+    review_candidate.add_argument("--note", default="")
+    review_candidate.add_argument("--user-id", default="owner")
+    review_candidate.add_argument("--session-id", default="")
+    review_candidate.add_argument("--app-id", default="default")
+    review_candidate.add_argument("--project-id", default="default")
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -334,6 +346,10 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "document-memory-candidates":
         print_json({"service": "hermes", "document_memory_candidates": list_document_memory_candidates(settings.data_dir)})
+        return 0
+
+    if command == "document-memory-reviews":
+        print_json({"service": "hermes", "document_memory_reviews": list_document_memory_reviews(settings.data_dir)})
         return 0
 
     if command == "audit":
@@ -615,6 +631,20 @@ def run(argv: list[str] | None = None) -> int:
             )
             print_json({"service": "hermes", "document_memory_candidate_generation": result})
             return 0 if result.status in {"completed", "skipped"} else 1
+        if parse_command == "review-memory-candidate":
+            result = review_document_memory_candidate(
+                settings,
+                args.candidate_id,
+                decision=args.decision,
+                reviewer_ref=args.reviewer_ref,
+                note=args.note,
+                user_id=args.user_id,
+                session_id=args.session_id,
+                app_id=args.app_id,
+                project_id=args.project_id,
+            )
+            print_json({"service": "hermes", "document_memory_review": result})
+            return 0 if result.status in {"approved", "rejected"} else 1
         parser.error(f"unknown document parse command: {parse_command}")
         return 2
 

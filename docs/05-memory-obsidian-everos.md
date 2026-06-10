@@ -57,7 +57,10 @@ python -m src.hermes memory ingest --text "Owner prefers concise reports" --user
 python -m src.hermes memory flush --session-id owner-setup
 python -m src.hermes memory search --query "report preference" --user-id owner
 python -m src.hermes document parse memory-candidates --ingest-id <ingest_id>
+python -m src.hermes document parse review-memory-candidate --candidate-id <candidate_id> --decision approve
+python -m src.hermes document parse review-memory-candidate --candidate-id <candidate_id> --decision reject
 python -m src.hermes document-memory-candidates
+python -m src.hermes document-memory-reviews
 ```
 
 `EVEROS_BASE_URL` enables live calls. Without it, Hermes reports
@@ -67,9 +70,24 @@ Apache-2.0 EverOS source under `vendor/runtimes/everos`.
 Document-derived memory currently stops at a governed candidate stage.
 `document parse memory-candidates` reads registered document text artifacts and
 writes `document_memory_candidates.jsonl` records with `pending_review` status.
-This stage does not call EverOS `/add`, does not write Obsidian notes, and does
-not promote anything to durable memory. Promotion remains a separate owner or
-platform review action.
+This stage does not call EverOS `/add` and does not promote anything to durable
+memory.
+
+Promotion is now a separate owner or platform review action:
+
+- `review-memory-candidate --decision approve` attempts EverOS `/add` and writes
+  `document_memory_reviews.jsonl`;
+- `review-memory-candidate --decision reject` records the rejection without
+  calling EverOS;
+- both decisions write an Obsidian Markdown review note under
+  `00-Inbox/everos-candidates/`.
+
+The Obsidian note is graph-first storage, not just a loose file dump. It has
+YAML frontmatter, `bairui/memory` and `hermes/review` tags, and internal links
+such as `[[Document Memory Candidates]]`, `[[Bairui]]`, `[[Hermes]]`,
+`[[EverOS]]`, and `[[Document Ingest <short-id>]]`. The folder also contains a
+`Document Memory Candidates.md` MOC note so Obsidian Graph and Local Graph can
+show candidate review relationships through backlinks.
 
 ## 4. Memory Flow
 

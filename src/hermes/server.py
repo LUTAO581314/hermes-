@@ -47,6 +47,7 @@ from .document_pipeline import (
     generate_document_memory_candidates,
     index_document_artifacts,
     register_document_artifacts,
+    review_document_memory_candidate,
     run_document_ingest,
 )
 from .license import load_license
@@ -63,6 +64,7 @@ from .storage import (
     list_document_ingest_runs,
     list_document_ingests,
     list_document_memory_candidates,
+    list_document_memory_reviews,
     list_jobs,
     write_obsidian_report,
 )
@@ -141,6 +143,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/document/memory-candidates":
             self._send({"service": "hermes", "document_memory_candidates": list_document_memory_candidates(settings.data_dir)})
+            return
+        if self.path == "/document/memory-reviews":
+            self._send({"service": "hermes", "document_memory_reviews": list_document_memory_reviews(settings.data_dir)})
             return
         if self.path == "/audit":
             self._send({"service": "hermes", "audit": list_audit_events(settings.data_dir)})
@@ -435,6 +440,36 @@ class HermesHandler(BaseHTTPRequestHandler):
             if result.status == "not_found":
                 status = 404
             self._send({"service": "hermes", "document_memory_candidate_generation": asdict(result)}, status=status)
+            return
+
+        if self.path == "/document/parse/review-memory-candidate":
+            candidate_id = str(payload.get("candidate_id", ""))
+            decision = str(payload.get("decision", ""))
+            if not candidate_id.strip():
+                self._send({"error": "invalid_request", "message": "candidate_id is required"}, status=400)
+                return
+            if not decision.strip():
+                self._send({"error": "invalid_request", "message": "decision is required"}, status=400)
+                return
+            result = review_document_memory_candidate(
+                settings,
+                candidate_id,
+                decision=decision,
+                reviewer_ref=str(payload.get("reviewer_ref", "owner")),
+                note=str(payload.get("note", "")),
+                user_id=str(payload.get("user_id", "owner")),
+                session_id=str(payload.get("session_id", "")),
+                app_id=str(payload.get("app_id", "default")),
+                project_id=str(payload.get("project_id", "default")),
+            )
+            status = 200 if result.status in {"approved", "rejected"} else 503
+            if result.status == "not_found":
+                status = 404
+            if result.status == "invalid_decision":
+                status = 400
+            if result.status == "already_reviewed":
+                status = 409
+            self._send({"service": "hermes", "document_memory_review": asdict(result)}, status=status)
             return
 
         if self.path == "/admin/migrate":

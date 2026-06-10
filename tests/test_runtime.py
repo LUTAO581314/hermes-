@@ -9,8 +9,8 @@ from src.hermes.capabilities import collect_capabilities
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import database_status
-from src.hermes.document_pipeline import generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, run_document_ingest
-from src.hermes.adapters.everos import build_search_payload, status as everos_status
+from src.hermes.document_pipeline import generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, review_document_memory_candidate, run_document_ingest
+from src.hermes.adapters.everos import EverOSResult, build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
 from src.hermes.adapters.mirofish import build_dev_command, status as mirofish_status
@@ -30,6 +30,7 @@ from src.hermes.storage import (
     list_document_ingest_runs,
     list_document_ingests,
     list_document_memory_candidates,
+    list_document_memory_reviews,
     list_jobs,
     write_obsidian_report,
 )
@@ -310,6 +311,148 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(result.status, "skipped")
         self.assertEqual(result.candidates, ())
         self.assertEqual(result.skipped_count, 1)
+
+    def test_review_document_memory_candidate_rejects_and_writes_obsidian_graph_note(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes document memory candidates must be reviewed before EverOS promotion.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="Review plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            candidate = generate_document_memory_candidates(data_dir, ingest.id).candidates[0]
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "EVEROS_BASE_URL": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                result = review_document_memory_candidate(load_settings(), candidate.id, decision="reject", note="not durable")
+            reviews = list_document_memory_reviews(data_dir)
+            note_path = Path(result.obsidian_note["path"])
+            note_exists = note_path.exists()
+            note_text = note_path.read_text(encoding="utf-8")
+            moc_path = root / "vault" / "00-Inbox" / "everos-candidates" / "Document Memory Candidates.md"
+            moc_exists = moc_path.exists()
+        self.assertEqual(result.status, "rejected")
+        self.assertEqual(result.review.status, "rejected")
+        self.assertEqual(reviews[0]["decision"], "reject")
+        self.assertTrue(note_exists)
+        self.assertTrue(moc_exists)
+        self.assertIn("[[Document Memory Candidates]]", note_text)
+        self.assertIn("[[Bairui]]", note_text)
+        self.assertIn("[[Hermes]]", note_text)
+        self.assertIn("[[EverOS]]", note_text)
+        self.assertIn("Bairui Hermes document memory candidates", note_text)
+
+    def test_review_document_memory_candidate_approve_records_missing_everos_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes keeps reviewed project requirements in EverOS after owner approval.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="Missing EverOS plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            candidate = generate_document_memory_candidates(data_dir, ingest.id).candidates[0]
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "EVEROS_BASE_URL": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                result = review_document_memory_candidate(load_settings(), candidate.id, decision="approve")
+            note_text = Path(result.obsidian_note["path"]).read_text(encoding="utf-8")
+        self.assertEqual(result.status, "promotion_failed")
+        self.assertEqual(result.review.everos_status, "missing_config")
+        self.assertIn("promotion_failed", note_text)
+        self.assertIn("[[EverOS]]", note_text)
+
+    def test_review_document_memory_candidate_approve_promotes_to_everos(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes product memory should persist approved commercial requirements.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="Approve plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            candidate = generate_document_memory_candidates(data_dir, ingest.id).candidates[0]
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "EVEROS_BASE_URL": "http://127.0.0.1:9999",
+            }
+            everos_result = EverOSResult(status="completed", endpoint="/api/v1/memory/add", payload={}, response={"ok": True})
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.document_pipeline.everos_add_memory", return_value=everos_result) as add_memory:
+                    result = review_document_memory_candidate(load_settings(), candidate.id, decision="approve", user_id="owner")
+            payload = add_memory.call_args.args[1]
+        self.assertEqual(result.status, "approved")
+        self.assertEqual(result.review.everos_status, "completed")
+        self.assertEqual(add_memory.call_count, 1)
+        self.assertIn("approved commercial requirements", payload["messages"][0]["content"])
+
+    def test_review_document_memory_candidate_blocks_duplicate_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes owner rules become memory only after review.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="Duplicate review plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            candidate = generate_document_memory_candidates(data_dir, ingest.id).candidates[0]
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                first = review_document_memory_candidate(load_settings(), candidate.id, decision="reject")
+                second = review_document_memory_candidate(load_settings(), candidate.id, decision="reject")
+        self.assertEqual(first.status, "rejected")
+        self.assertEqual(second.status, "already_reviewed")
 
     def test_write_obsidian_report_creates_markdown_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -643,6 +786,41 @@ class RuntimeFoundationTests(unittest.TestCase):
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["document_memory_candidate_generation"].status, "completed")
         self.assertEqual(list_print_json.call_args.args[0]["document_memory_candidates"][0]["status"], "pending_review")
+
+    def test_cli_document_memory_review_lists_review_records(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes document memory review writes Obsidian graph links before customer use.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="CLI memory review plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            candidate = generate_document_memory_candidates(data_dir, ingest.id).candidates[0]
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "review-memory-candidate", "--candidate-id", candidate.id, "--decision", "reject"])
+                with patch("src.hermes.cli.print_json") as list_print_json:
+                    list_code = run(["document-memory-reviews"])
+        self.assertEqual(code, 0)
+        self.assertEqual(list_code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_memory_review"].status, "rejected")
+        self.assertEqual(list_print_json.call_args.args[0]["document_memory_reviews"][0]["status"], "rejected")
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:

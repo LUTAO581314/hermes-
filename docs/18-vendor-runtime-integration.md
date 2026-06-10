@@ -122,11 +122,18 @@ Hermes owns:
 - file-backed artifact records in `document_artifacts.jsonl`;
 - file-backed Sonic indexing records in `document_index_runs.jsonl`;
 - file-backed memory candidate records in `document_memory_candidates.jsonl`;
+- file-backed memory review records in `document_memory_reviews.jsonl`;
 - HTTP routes under `/document/parse/status`, `/document/parse/ingest-plan`,
   `/document/parse/run-ingest`, `/document/parse/register-artifacts`,
   `/document/parse/index-artifacts`, `/document/parse/memory-candidates`,
+  `/document/parse/review-memory-candidate`,
   `/document/ingests`, `/document/ingest-runs`, `/document/artifacts`,
-  `/document/index-runs`, and `/document/memory-candidates`;
+  `/document/index-runs`, `/document/memory-candidates`, and
+  `/document/memory-reviews`;
+- Obsidian graph notes for reviewed candidates under
+  `00-Inbox/everos-candidates/`, including YAML frontmatter, tags, a MOC note,
+  and internal links to `[[Document Memory Candidates]]`, `[[Bairui]]`,
+  `[[Hermes]]`, `[[EverOS]]`, and `[[Document Ingest <short-id>]]`;
 - operational configuration through `MINERU_PROJECT_ROOT`,
   `MINERU_OUTPUT_DIR`, `MINERU_BACKEND`, `MINERU_DEVICE`, and
   `MINERU_TIMEOUT_SECONDS`;

@@ -131,6 +131,20 @@ class DocumentMemoryCandidate:
     created_at: str
 
 
+@dataclass(frozen=True)
+class DocumentMemoryReview:
+    id: str
+    candidate_id: str
+    decision: str
+    status: str
+    reviewer_ref: str
+    note: str
+    everos_status: str
+    everos_endpoint: str
+    everos_error: str
+    created_at: str
+
+
 def create_audit_event(
     data_dir: Path,
     action: str,
@@ -393,6 +407,52 @@ def list_document_memory_candidates(data_dir: Path, limit: int = 50) -> list[dic
     return _read_jsonl(data_dir / "document_memory_candidates.jsonl", limit=limit)
 
 
+def create_document_memory_review(
+    data_dir: Path,
+    *,
+    candidate_id: str,
+    decision: str,
+    status: str,
+    reviewer_ref: str,
+    note: str = "",
+    everos_status: str = "",
+    everos_endpoint: str = "",
+    everos_error: str = "",
+) -> DocumentMemoryReview:
+    review = DocumentMemoryReview(
+        id=str(uuid.uuid4()),
+        candidate_id=candidate_id,
+        decision=decision,
+        status=status,
+        reviewer_ref=reviewer_ref,
+        note=note,
+        everos_status=everos_status,
+        everos_endpoint=everos_endpoint,
+        everos_error=everos_error,
+        created_at=utc_now(),
+    )
+    _append_jsonl(data_dir / "document_memory_reviews.jsonl", asdict(review))
+    create_audit_event(
+        data_dir,
+        "document.memory_candidate_reviewed",
+        resource_type="document_memory_candidate",
+        resource_ref=candidate_id,
+        risk_level="medium" if status == "promotion_failed" else "low",
+        payload={
+            "decision": decision,
+            "status": status,
+            "reviewer_ref": reviewer_ref,
+            "everos_status": everos_status,
+            "review_id": review.id,
+        },
+    )
+    return review
+
+
+def list_document_memory_reviews(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
+    return _read_jsonl(data_dir / "document_memory_reviews.jsonl", limit=limit)
+
+
 def _file_sha256(path: Path) -> str:
     digest = sha256()
     with path.open("rb") as handle:
@@ -452,3 +512,98 @@ def write_obsidian_report(vault_dir: Path, data_dir: Path, title: str, body: str
         payload={"title": title},
     )
     return {"path": str(path), "title": title, "created_at": now.isoformat()}
+
+
+def write_obsidian_memory_review_note(
+    vault_dir: Path,
+    data_dir: Path,
+    *,
+    candidate: dict[str, Any],
+    review: DocumentMemoryReview,
+) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    folder = vault_dir / "00-Inbox" / "everos-candidates"
+    folder.mkdir(parents=True, exist_ok=True)
+    _ensure_memory_candidate_moc(folder)
+    title = f"Document Memory Review {review.id[:8]}"
+    filename = f"{now.strftime('%Y%m%d-%H%M%S')}-{_slug(title)}.md"
+    path = folder / filename
+    ingest_link = f"Document Ingest {str(candidate.get('ingest_id', 'unknown'))[:8]}"
+    source_path = str(candidate.get("source_path", ""))
+    content = "\n".join(
+        [
+            "---",
+            f"title: {title}",
+            "type: document_memory_review",
+            f"status: {review.status}",
+            f"decision: {review.decision}",
+            f"candidate_id: {review.candidate_id}",
+            f"review_id: {review.id}",
+            f"created_at: {now.isoformat()}",
+            "source: hermes",
+            "tags:",
+            "  - bairui/memory",
+            "  - bairui/document",
+            "  - hermes/review",
+            "---",
+            "",
+            f"# {title}",
+            "",
+            "Links: [[Document Memory Candidates]] [[Bairui]] [[Hermes]] [[EverOS]] "
+            f"[[{ingest_link}]]",
+            "",
+            "## Review",
+            "",
+            f"- Decision: {review.decision}",
+            f"- Status: {review.status}",
+            f"- Reviewer: {review.reviewer_ref}",
+            f"- EverOS status: {review.everos_status or 'not_called'}",
+            f"- Source path: `{source_path}`",
+            "",
+            "## Candidate",
+            "",
+            str(candidate.get("text", "")).strip(),
+            "",
+            "## Note",
+            "",
+            review.note.strip(),
+            "",
+        ]
+    )
+    path.write_text(content, encoding="utf-8")
+    create_audit_event(
+        data_dir,
+        "obsidian.memory_review_note_written",
+        resource_type="obsidian_memory_review",
+        resource_ref=str(path),
+        payload={"candidate_id": review.candidate_id, "review_id": review.id, "status": review.status},
+    )
+    return {"path": str(path), "title": title, "created_at": now.isoformat()}
+
+
+def _ensure_memory_candidate_moc(folder: Path) -> None:
+    moc = folder / "Document Memory Candidates.md"
+    if moc.exists():
+        return
+    moc.write_text(
+        "\n".join(
+            [
+                "---",
+                "title: Document Memory Candidates",
+                "type: moc",
+                "source: hermes",
+                "tags:",
+                "  - bairui/memory",
+                "  - hermes/moc",
+                "---",
+                "",
+                "# Document Memory Candidates",
+                "",
+                "Graph links: [[Bairui]] [[Hermes]] [[EverOS]] [[Obsidian]]",
+                "",
+                "This note collects reviewed document memory candidates generated by Hermes.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )

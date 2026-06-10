@@ -5,6 +5,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from .adapters.everos import add_memory as everos_add_memory, build_add_payload as build_everos_add_payload
 from .adapters.sonic import SonicResult, build_push_payload as build_sonic_push_payload, push as sonic_push
 from .config import Settings
 from .storage import (
@@ -12,14 +13,19 @@ from .storage import (
     DocumentIndexRun,
     DocumentIngestRun,
     DocumentMemoryCandidate,
+    DocumentMemoryReview,
     create_audit_event,
     create_document_artifact,
     create_document_index_run,
     create_document_ingest_run,
     create_document_memory_candidate,
+    create_document_memory_review,
     list_document_artifacts,
     list_document_ingests,
+    list_document_memory_candidates,
+    list_document_memory_reviews,
     utc_now,
+    write_obsidian_memory_review_note,
 )
 
 
@@ -54,6 +60,15 @@ class DocumentMemoryCandidateResult:
     ingest: dict[str, object] | None
     candidates: tuple[DocumentMemoryCandidate, ...]
     skipped_count: int
+
+
+@dataclass(frozen=True)
+class DocumentMemoryReviewResult:
+    status: str
+    detail: str
+    candidate: dict[str, object] | None
+    review: DocumentMemoryReview | None
+    obsidian_note: dict[str, object] | None
 
 
 def run_document_ingest(data_dir: Path, ingest_id: str, *, timeout_seconds: int) -> DocumentPipelineResult:
@@ -342,6 +357,104 @@ def generate_document_memory_candidates(
     )
 
 
+def review_document_memory_candidate(
+    settings: Settings,
+    candidate_id: str,
+    *,
+    decision: str,
+    reviewer_ref: str = "owner",
+    note: str = "",
+    user_id: str = "owner",
+    session_id: str = "",
+    app_id: str = "default",
+    project_id: str = "default",
+) -> DocumentMemoryReviewResult:
+    candidate = _find_memory_candidate(settings.data_dir, candidate_id)
+    if candidate is None:
+        return DocumentMemoryReviewResult(
+            status="not_found",
+            detail=f"document memory candidate not found: {candidate_id}",
+            candidate=None,
+            review=None,
+            obsidian_note=None,
+        )
+    if _latest_memory_review(settings.data_dir, candidate_id) is not None:
+        return DocumentMemoryReviewResult(
+            status="already_reviewed",
+            detail=f"document memory candidate already reviewed: {candidate_id}",
+            candidate=candidate,
+            review=None,
+            obsidian_note=None,
+        )
+
+    normalized_decision = decision.strip().lower()
+    if normalized_decision not in {"approve", "reject"}:
+        return DocumentMemoryReviewResult(
+            status="invalid_decision",
+            detail="decision must be approve or reject",
+            candidate=candidate,
+            review=None,
+            obsidian_note=None,
+        )
+
+    if normalized_decision == "reject":
+        review = create_document_memory_review(
+            settings.data_dir,
+            candidate_id=candidate_id,
+            decision="reject",
+            status="rejected",
+            reviewer_ref=reviewer_ref,
+            note=note,
+        )
+        obsidian_note = write_obsidian_memory_review_note(
+            settings.obsidian_vault_dir,
+            settings.data_dir,
+            candidate=candidate,
+            review=review,
+        )
+        return DocumentMemoryReviewResult(
+            status="rejected",
+            detail="document memory candidate rejected",
+            candidate=candidate,
+            review=review,
+            obsidian_note=obsidian_note,
+        )
+
+    everos_result = everos_add_memory(
+        settings,
+        build_everos_add_payload(
+            user_id=user_id,
+            session_id=session_id or f"document-memory-{candidate_id}",
+            text=str(candidate.get("text", "")),
+            app_id=app_id,
+            project_id=project_id,
+            sender_name="Hermes Document Memory Review",
+        ),
+    )
+    status = "approved" if everos_result.status == "completed" else "promotion_failed"
+    review = create_document_memory_review(
+        settings.data_dir,
+        candidate_id=candidate_id,
+        decision="approve",
+        status=status,
+        reviewer_ref=reviewer_ref,
+        note=note,
+        everos_status=everos_result.status,
+        everos_endpoint=everos_result.endpoint,
+        everos_error=everos_result.error,
+    )
+    detail = "document memory candidate approved and sent to EverOS"
+    if status == "promotion_failed":
+        detail = "document memory candidate approval could not be promoted to EverOS"
+    obsidian_note = write_obsidian_memory_review_note(
+        settings.obsidian_vault_dir,
+        settings.data_dir,
+        candidate=candidate,
+        review=review,
+    )
+    return DocumentMemoryReviewResult(status=status, detail=detail, candidate=candidate, review=review, obsidian_note=obsidian_note)
+
+
 def _find_ingest(data_dir: Path, ingest_id: str) -> dict[str, object] | None:
     for ingest in reversed(list_document_ingests(data_dir, limit=1000)):
         if ingest.get("id") == ingest_id:
@@ -413,3 +526,17 @@ def _looks_like_memory_candidate(text: str) -> bool:
         "mineru",
     )
     return any(marker in lowered or marker in text for marker in durable_markers)
+
+
+def _find_memory_candidate(data_dir: Path, candidate_id: str) -> dict[str, object] | None:
+    for candidate in reversed(list_document_memory_candidates(data_dir, limit=1000)):
+        if candidate.get("id") == candidate_id:
+            return candidate
+    return None
+
+
+def _latest_memory_review(data_dir: Path, candidate_id: str) -> dict[str, object] | None:
+    for review in reversed(list_document_memory_reviews(data_dir, limit=1000)):
+        if review.get("candidate_id") == candidate_id:
+            return review
+    return None
