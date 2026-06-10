@@ -66,6 +66,7 @@ from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
 from .document_pipeline import (
+    create_document_source_refs,
     generate_document_memory_candidates,
     index_document_artifacts,
     register_document_artifacts,
@@ -88,6 +89,7 @@ from .storage import (
     list_document_memory_candidates,
     list_document_memory_reviews,
     list_jobs,
+    list_source_refs,
     write_obsidian_report,
 )
 
@@ -122,6 +124,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("document-index-runs", help="List document artifact indexing execution records")
     subcommands.add_parser("document-memory-candidates", help="List pending document memory candidates")
     subcommands.add_parser("document-memory-reviews", help="List reviewed document memory candidates")
+    subcommands.add_parser("source-refs", help="List structured source reference records")
     subcommands.add_parser("audit", help="List recent audit events")
     subcommands.add_parser("migrate", help="Run PostgreSQL schema migrations")
     subcommands.add_parser("heartbeat", help="Print the platform heartbeat payload")
@@ -267,6 +270,8 @@ def build_parser() -> argparse.ArgumentParser:
     review_candidate.add_argument("--session-id", default="")
     review_candidate.add_argument("--app-id", default="default")
     review_candidate.add_argument("--project-id", default="default")
+    source_refs = parse_subcommands.add_parser("source-refs", help="Create source reference records for one document ingestion")
+    source_refs.add_argument("--ingest-id", required=True)
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -350,6 +355,10 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "document-memory-reviews":
         print_json({"service": "hermes", "document_memory_reviews": list_document_memory_reviews(settings.data_dir)})
+        return 0
+
+    if command == "source-refs":
+        print_json({"service": "hermes", "source_refs": list_source_refs(settings.data_dir)})
         return 0
 
     if command == "audit":
@@ -645,6 +654,10 @@ def run(argv: list[str] | None = None) -> int:
             )
             print_json({"service": "hermes", "document_memory_review": result})
             return 0 if result.status in {"approved", "rejected"} else 1
+        if parse_command == "source-refs":
+            result = create_document_source_refs(settings, args.ingest_id)
+            print_json({"service": "hermes", "document_source_refs": result})
+            return 0 if result.status in {"completed", "skipped"} else 1
         parser.error(f"unknown document parse command: {parse_command}")
         return 2
 

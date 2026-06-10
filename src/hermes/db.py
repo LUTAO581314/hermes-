@@ -36,6 +36,21 @@ create table if not exists obsidian_writes (
     path text not null,
     created_at timestamptz not null
 );
+
+create table if not exists source_refs (
+    id text primary key,
+    source_type text not null,
+    source_ref text not null,
+    provider text not null,
+    title text not null,
+    url text not null default '',
+    confidence text not null,
+    metadata jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null
+);
+
+create index if not exists idx_source_refs_source on source_refs (source_type, source_ref);
+create index if not exists idx_source_refs_provider on source_refs (provider);
 """
 
 

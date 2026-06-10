@@ -193,12 +193,14 @@ python -m src.hermes document parse register-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse index-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse memory-candidates --ingest-id <ingest_id>
 python -m src.hermes document parse review-memory-candidate --candidate-id <candidate_id> --decision approve
+python -m src.hermes document parse source-refs --ingest-id <ingest_id>
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
 python -m src.hermes document-artifacts
 python -m src.hermes document-index-runs
 python -m src.hermes document-memory-candidates
 python -m src.hermes document-memory-reviews
+python -m src.hermes source-refs
 ```
 
 `ingest-plan` creates a local `document_ingests.jsonl` record with the input
@@ -245,8 +247,13 @@ treated as owner-approved long-term memory.
 `[[Document Memory Candidates]]`, `[[Bairui]]`, `[[Hermes]]`, `[[EverOS]]`, and
 the source `[[Document Ingest <short-id>]]`.
 
-The next pipeline phases are PostgreSQL source references and richer Obsidian
-report generation.
+`source-refs` creates structured provenance records for the same pipeline. It
+writes `source_refs.jsonl` locally and matches the PostgreSQL `source_refs`
+table contract used by production migrations. The records connect MinerU
+artifacts, Sonic index runs, Hermes memory candidates, review status, EverOS
+promotion status, and related Obsidian note paths.
+
+The next pipeline phase is richer Obsidian report generation.
 
 ## 8. Unified Runtime Readiness
 

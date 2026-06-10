@@ -145,6 +145,19 @@ class DocumentMemoryReview:
     created_at: str
 
 
+@dataclass(frozen=True)
+class SourceRef:
+    id: str
+    source_type: str
+    source_ref: str
+    provider: str
+    title: str
+    url: str
+    confidence: str
+    metadata: dict[str, Any]
+    created_at: str
+
+
 def create_audit_event(
     data_dir: Path,
     action: str,
@@ -451,6 +464,48 @@ def create_document_memory_review(
 
 def list_document_memory_reviews(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
     return _read_jsonl(data_dir / "document_memory_reviews.jsonl", limit=limit)
+
+
+def create_source_ref(
+    data_dir: Path,
+    *,
+    source_type: str,
+    source_ref: str,
+    provider: str,
+    title: str,
+    url: str = "",
+    confidence: str = "medium",
+    metadata: dict[str, Any] | None = None,
+) -> SourceRef:
+    ref = SourceRef(
+        id=str(uuid.uuid4()),
+        source_type=source_type,
+        source_ref=source_ref,
+        provider=provider,
+        title=title.strip() or source_ref,
+        url=url,
+        confidence=confidence,
+        metadata=metadata or {},
+        created_at=utc_now(),
+    )
+    _append_jsonl(data_dir / "source_refs.jsonl", asdict(ref))
+    create_audit_event(
+        data_dir,
+        "source_ref.created",
+        resource_type="source_ref",
+        resource_ref=ref.id,
+        payload={
+            "source_type": ref.source_type,
+            "source_ref": ref.source_ref,
+            "provider": ref.provider,
+            "title": ref.title,
+        },
+    )
+    return ref
+
+
+def list_source_refs(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
+    return _read_jsonl(data_dir / "source_refs.jsonl", limit=limit)
 
 
 def _file_sha256(path: Path) -> str:

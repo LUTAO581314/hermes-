@@ -14,16 +14,19 @@ from .storage import (
     DocumentIngestRun,
     DocumentMemoryCandidate,
     DocumentMemoryReview,
+    SourceRef,
     create_audit_event,
     create_document_artifact,
     create_document_index_run,
     create_document_ingest_run,
     create_document_memory_candidate,
     create_document_memory_review,
+    create_source_ref,
     list_document_artifacts,
     list_document_ingests,
     list_document_memory_candidates,
     list_document_memory_reviews,
+    list_document_index_runs,
     utc_now,
     write_obsidian_memory_review_note,
 )
@@ -69,6 +72,15 @@ class DocumentMemoryReviewResult:
     candidate: dict[str, object] | None
     review: DocumentMemoryReview | None
     obsidian_note: dict[str, object] | None
+
+
+@dataclass(frozen=True)
+class DocumentSourceRefResult:
+    status: str
+    detail: str
+    ingest: dict[str, object] | None
+    source_refs: tuple[SourceRef, ...]
+    skipped_count: int
 
 
 def run_document_ingest(data_dir: Path, ingest_id: str, *, timeout_seconds: int) -> DocumentPipelineResult:
@@ -453,6 +465,100 @@ def review_document_memory_candidate(
         review=review,
     )
     return DocumentMemoryReviewResult(status=status, detail=detail, candidate=candidate, review=review, obsidian_note=obsidian_note)
+
+
+def create_document_source_refs(settings: Settings, ingest_id: str) -> DocumentSourceRefResult:
+    ingest = _find_ingest(settings.data_dir, ingest_id)
+    if ingest is None:
+        return DocumentSourceRefResult(
+            status="not_found",
+            detail=f"document ingest not found: {ingest_id}",
+            ingest=None,
+            source_refs=(),
+            skipped_count=0,
+        )
+
+    artifacts = [artifact for artifact in list_document_artifacts(settings.data_dir, limit=1000) if artifact.get("ingest_id") == ingest_id]
+    index_runs = [run for run in list_document_index_runs(settings.data_dir, limit=1000) if run.get("ingest_id") == ingest_id]
+    candidates = [candidate for candidate in list_document_memory_candidates(settings.data_dir, limit=1000) if candidate.get("ingest_id") == ingest_id]
+    reviews = list_document_memory_reviews(settings.data_dir, limit=1000)
+    reviews_by_candidate = {str(review.get("candidate_id", "")): review for review in reviews}
+
+    refs: list[SourceRef] = []
+    for artifact in artifacts:
+        refs.append(
+            create_source_ref(
+                settings.data_dir,
+                source_type="document_artifact",
+                source_ref=str(artifact.get("id", "")),
+                provider="mineru",
+                title=str(artifact.get("relative_path") or artifact.get("path") or "Document artifact"),
+                url=str(artifact.get("path", "")),
+                confidence="high",
+                metadata={
+                    "ingest_id": ingest_id,
+                    "artifact_type": artifact.get("artifact_type", ""),
+                    "mime_type": artifact.get("mime_type", ""),
+                    "sha256": artifact.get("sha256", ""),
+                    "size_bytes": artifact.get("size_bytes", 0),
+                },
+            )
+        )
+
+    for run in index_runs:
+        refs.append(
+            create_source_ref(
+                settings.data_dir,
+                source_type="document_index_run",
+                source_ref=str(run.get("id", "")),
+                provider=str(run.get("provider", "sonic")),
+                title=f"Sonic index run for {ingest_id[:8]}",
+                confidence="medium" if run.get("status") not in {"completed", "skipped"} else "high",
+                metadata={
+                    "ingest_id": ingest_id,
+                    "status": run.get("status", ""),
+                    "collection": run.get("collection", ""),
+                    "bucket": run.get("bucket", ""),
+                    "indexed_count": run.get("indexed_count", 0),
+                    "skipped_count": run.get("skipped_count", 0),
+                    "failed_count": run.get("failed_count", 0),
+                },
+            )
+        )
+
+    for candidate in candidates:
+        review = reviews_by_candidate.get(str(candidate.get("id", "")))
+        refs.append(
+            create_source_ref(
+                settings.data_dir,
+                source_type="document_memory_candidate",
+                source_ref=str(candidate.get("id", "")),
+                provider="hermes",
+                title=f"Memory candidate from {candidate.get('source_path', 'document')}",
+                confidence="medium",
+                metadata={
+                    "ingest_id": ingest_id,
+                    "artifact_id": candidate.get("artifact_id", ""),
+                    "candidate_status": candidate.get("status", ""),
+                    "review_status": review.get("status", "pending_review") if review else "pending_review",
+                    "review_id": review.get("id", "") if review else "",
+                    "everos_status": review.get("everos_status", "") if review else "",
+                },
+            )
+        )
+
+    status = "completed" if refs else "skipped"
+    detail = f"created {len(refs)} source references"
+    if not refs:
+        detail = "no document artifacts, index runs, or memory candidates found for source refs"
+    create_audit_event(
+        settings.data_dir,
+        "document.source_refs_created",
+        resource_type="document_ingest",
+        resource_ref=ingest_id,
+        payload={"source_ref_count": len(refs), "status": status},
+    )
+    return DocumentSourceRefResult(status=status, detail=detail, ingest=ingest, source_refs=tuple(refs), skipped_count=0)
 
 
 def _find_ingest(data_dir: Path, ingest_id: str) -> dict[str, object] | None:

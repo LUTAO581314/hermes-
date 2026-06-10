@@ -160,15 +160,28 @@ Stores memory candidates before Obsidian promotion.
 
 ### source_refs
 
-Stores citations and external source metadata.
+Stores citations, external source metadata, and document pipeline provenance.
+Hermes currently writes the same contract to `source_refs.jsonl` for local
+operation; production migrations create the PostgreSQL `source_refs` table with
+matching fields.
 
 - `id uuid primary key`
+- `source_type text`
+- `source_ref text`
 - `provider text`
-- `url text`
 - `title text`
-- `retrieved_at timestamptz`
+- `url text`
 - `confidence text`
 - `metadata jsonb`
+- `created_at timestamptz`
+
+Document ingestion uses source refs to connect:
+
+- MinerU document artifacts;
+- Sonic indexing runs;
+- Hermes memory candidates and owner review status;
+- EverOS promotion status when a candidate was approved;
+- Obsidian graph note path when a review created one.
 
 ### simulation_runs
 
@@ -207,4 +220,3 @@ Back up:
 - audit export.
 
 Never back up plaintext secrets into shared folders.
-

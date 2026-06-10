@@ -123,13 +123,16 @@ Hermes owns:
 - file-backed Sonic indexing records in `document_index_runs.jsonl`;
 - file-backed memory candidate records in `document_memory_candidates.jsonl`;
 - file-backed memory review records in `document_memory_reviews.jsonl`;
+- file-backed source reference records in `source_refs.jsonl`;
 - HTTP routes under `/document/parse/status`, `/document/parse/ingest-plan`,
   `/document/parse/run-ingest`, `/document/parse/register-artifacts`,
   `/document/parse/index-artifacts`, `/document/parse/memory-candidates`,
-  `/document/parse/review-memory-candidate`,
+  `/document/parse/review-memory-candidate`, `/document/parse/source-refs`,
   `/document/ingests`, `/document/ingest-runs`, `/document/artifacts`,
   `/document/index-runs`, `/document/memory-candidates`, and
-  `/document/memory-reviews`;
+  `/document/memory-reviews`, plus `/source-refs`;
+- PostgreSQL migration SQL for the production `source_refs` table and lookup
+  indexes;
 - Obsidian graph notes for reviewed candidates under
   `00-Inbox/everos-candidates/`, including YAML frontmatter, tags, a MOC note,
   and internal links to `[[Document Memory Candidates]]`, `[[Bairui]]`,
@@ -152,8 +155,8 @@ not a parsed result. The supervised worker may then execute the stored MinerU
 command and record stdout, stderr, exit code, timeout, or missing executable
 errors. Artifact registration then scans the real output directory and stores
 path, relative path, artifact type, MIME type, byte size, and sha256 for each
-produced file. Sonic indexing, EverOS memory candidates, PostgreSQL source
-references, and Obsidian report generation remain separate pipeline phases.
+produced file. Sonic indexing, EverOS memory candidates, source reference
+creation, and Obsidian report generation remain separate pipeline phases.
 The Sonic indexing phase only indexes registered text-like artifacts
 (Markdown, text, JSON, and HTML) and records skipped/failed artifacts
 explicitly.

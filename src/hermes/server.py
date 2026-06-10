@@ -44,6 +44,7 @@ from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
 from .document_pipeline import (
+    create_document_source_refs,
     generate_document_memory_candidates,
     index_document_artifacts,
     register_document_artifacts,
@@ -66,6 +67,7 @@ from .storage import (
     list_document_memory_candidates,
     list_document_memory_reviews,
     list_jobs,
+    list_source_refs,
     write_obsidian_report,
 )
 
@@ -146,6 +148,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/document/memory-reviews":
             self._send({"service": "hermes", "document_memory_reviews": list_document_memory_reviews(settings.data_dir)})
+            return
+        if self.path == "/source-refs":
+            self._send({"service": "hermes", "source_refs": list_source_refs(settings.data_dir)})
             return
         if self.path == "/audit":
             self._send({"service": "hermes", "audit": list_audit_events(settings.data_dir)})
@@ -470,6 +475,18 @@ class HermesHandler(BaseHTTPRequestHandler):
             if result.status == "already_reviewed":
                 status = 409
             self._send({"service": "hermes", "document_memory_review": asdict(result)}, status=status)
+            return
+
+        if self.path == "/document/parse/source-refs":
+            ingest_id = str(payload.get("ingest_id", ""))
+            if not ingest_id.strip():
+                self._send({"error": "invalid_request", "message": "ingest_id is required"}, status=400)
+                return
+            result = create_document_source_refs(settings, ingest_id)
+            status = 200 if result.status in {"completed", "skipped"} else 503
+            if result.status == "not_found":
+                status = 404
+            self._send({"service": "hermes", "document_source_refs": asdict(result)}, status=status)
             return
 
         if self.path == "/admin/migrate":

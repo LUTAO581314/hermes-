@@ -132,12 +132,14 @@ python -m src.hermes document parse register-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse index-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse memory-candidates --ingest-id <ingest_id>
 python -m src.hermes document parse review-memory-candidate --candidate-id <candidate_id> --decision approve
+python -m src.hermes document parse source-refs --ingest-id <ingest_id>
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
 python -m src.hermes document-artifacts
 python -m src.hermes document-index-runs
 python -m src.hermes document-memory-candidates
 python -m src.hermes document-memory-reviews
+python -m src.hermes source-refs
 python -m src.hermes intel status
 python -m src.hermes intel mcp-command
 python -m src.hermes simulation status

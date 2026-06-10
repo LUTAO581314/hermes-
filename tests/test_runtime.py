@@ -8,8 +8,8 @@ from unittest.mock import patch
 from src.hermes.capabilities import collect_capabilities
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
-from src.hermes.db import database_status
-from src.hermes.document_pipeline import generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, review_document_memory_candidate, run_document_ingest
+from src.hermes.db import SCHEMA_SQL, database_status
+from src.hermes.document_pipeline import create_document_source_refs, generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, review_document_memory_candidate, run_document_ingest
 from src.hermes.adapters.everos import EverOSResult, build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
@@ -32,6 +32,7 @@ from src.hermes.storage import (
     list_document_memory_candidates,
     list_document_memory_reviews,
     list_jobs,
+    list_source_refs,
     write_obsidian_report,
 )
 
@@ -454,6 +455,46 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(first.status, "rejected")
         self.assertEqual(second.status, "already_reviewed")
 
+    def test_create_document_source_refs_links_artifacts_index_and_memory_reviews(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes source references connect document artifacts, Sonic index runs, and EverOS reviews.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="Source refs plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "SONIC_HOST": "",
+                "SONIC_PASSWORD": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                index_document_artifacts(load_settings(), ingest.id)
+                candidate = generate_document_memory_candidates(data_dir, ingest.id).candidates[0]
+                review_document_memory_candidate(load_settings(), candidate.id, decision="reject")
+                result = create_document_source_refs(load_settings(), ingest.id)
+            refs = list_source_refs(data_dir, limit=20)
+            source_types = {ref["source_type"] for ref in refs}
+        self.assertEqual(result.status, "completed")
+        self.assertIn("document_artifact", source_types)
+        self.assertIn("document_index_run", source_types)
+        self.assertIn("document_memory_candidate", source_types)
+        memory_ref = next(ref for ref in refs if ref["source_type"] == "document_memory_candidate")
+        self.assertEqual(memory_ref["metadata"]["review_status"], "rejected")
+        self.assertEqual(memory_ref["provider"], "hermes")
+
     def test_write_obsidian_report_creates_markdown_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -477,6 +518,12 @@ class RuntimeFoundationTests(unittest.TestCase):
     def test_database_status_without_url_is_missing_config(self):
         settings = load_settings()
         self.assertEqual(database_status(settings).status, "missing_config")
+
+    def test_postgresql_schema_includes_source_refs(self):
+        self.assertIn("create table if not exists source_refs", SCHEMA_SQL)
+        self.assertIn("source_type text not null", SCHEMA_SQL)
+        self.assertIn("metadata jsonb not null", SCHEMA_SQL)
+        self.assertIn("idx_source_refs_source", SCHEMA_SQL)
 
     def test_platform_heartbeat_uses_operational_metadata_only(self):
         settings = load_settings()
@@ -821,6 +868,40 @@ class RuntimeFoundationTests(unittest.TestCase):
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["document_memory_review"].status, "rejected")
         self.assertEqual(list_print_json.call_args.args[0]["document_memory_reviews"][0]["status"], "rejected")
+
+    def test_cli_document_source_refs_lists_source_refs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Bairui Hermes source references make document ingestion traceable.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="CLI source refs plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "source-refs", "--ingest-id", ingest.id])
+                with patch("src.hermes.cli.print_json") as list_print_json:
+                    list_code = run(["source-refs"])
+        self.assertEqual(code, 0)
+        self.assertEqual(list_code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_source_refs"].status, "completed")
+        self.assertEqual(list_print_json.call_args.args[0]["source_refs"][0]["source_type"], "document_artifact")
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:
