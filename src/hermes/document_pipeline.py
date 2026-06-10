@@ -79,6 +79,28 @@ class DocumentMemoryReviewResult:
 
 
 @dataclass(frozen=True)
+class DocumentMemoryReviewQueue:
+    status: str
+    detail: str
+    ingest_id: str
+    candidates: tuple[dict[str, object], ...]
+    reviewed_count: int
+    pending_count: int
+
+
+@dataclass(frozen=True)
+class DocumentMemoryReviewBatchResult:
+    status: str
+    detail: str
+    decision: str
+    requested_count: int
+    reviewed_count: int
+    skipped_count: int
+    results: tuple[DocumentMemoryReviewResult, ...]
+    state: DocumentWorkbenchState | None
+
+
+@dataclass(frozen=True)
 class DocumentSourceRefResult:
     status: str
     detail: str
@@ -514,6 +536,105 @@ def review_document_memory_candidate(
         review=review,
     )
     return DocumentMemoryReviewResult(status=status, detail=detail, candidate=candidate, review=review, obsidian_note=obsidian_note)
+
+
+def list_pending_document_memory_reviews(
+    settings: Settings,
+    ingest_id: str = "",
+) -> DocumentMemoryReviewQueue:
+    candidates = tuple(
+        candidate
+        for candidate in list_document_memory_candidates(settings.data_dir, limit=1000)
+        if not ingest_id or candidate.get("ingest_id") == ingest_id
+    )
+    if ingest_id and _find_ingest(settings.data_dir, ingest_id) is None:
+        return DocumentMemoryReviewQueue(
+            status="not_found",
+            detail=f"document ingest not found: {ingest_id}",
+            ingest_id=ingest_id,
+            candidates=(),
+            reviewed_count=0,
+            pending_count=0,
+        )
+    candidate_ids = {str(candidate.get("id", "")) for candidate in candidates}
+    reviews = tuple(
+        review
+        for review in list_document_memory_reviews(settings.data_dir, limit=1000)
+        if str(review.get("candidate_id", "")) in candidate_ids
+    )
+    pending = _pending_memory_candidates(candidates, reviews)
+    return DocumentMemoryReviewQueue(
+        status="ready",
+        detail=f"{len(pending)} document memory candidates pending review",
+        ingest_id=ingest_id,
+        candidates=pending,
+        reviewed_count=len(reviews),
+        pending_count=len(pending),
+    )
+
+
+def review_document_memory_candidates_batch(
+    settings: Settings,
+    candidate_ids: tuple[str, ...],
+    *,
+    decision: str,
+    reviewer_ref: str = "owner",
+    note: str = "",
+    user_id: str = "owner",
+    session_id: str = "",
+    app_id: str = "default",
+    project_id: str = "default",
+) -> DocumentMemoryReviewBatchResult:
+    normalized_decision = decision.strip().lower()
+    if normalized_decision not in {"approve", "reject"}:
+        return DocumentMemoryReviewBatchResult(
+            status="invalid_decision",
+            detail="decision must be approve or reject",
+            decision=normalized_decision,
+            requested_count=len(candidate_ids),
+            reviewed_count=0,
+            skipped_count=len(candidate_ids),
+            results=(),
+            state=None,
+        )
+
+    unique_candidate_ids = tuple(dict.fromkeys(candidate_id.strip() for candidate_id in candidate_ids if candidate_id.strip()))
+    results = tuple(
+        review_document_memory_candidate(
+            settings,
+            candidate_id,
+            decision=normalized_decision,
+            reviewer_ref=reviewer_ref,
+            note=note,
+            user_id=user_id,
+            session_id=session_id,
+            app_id=app_id,
+            project_id=project_id,
+        )
+        for candidate_id in unique_candidate_ids
+    )
+    reviewed_statuses = {"approved", "rejected", "promotion_failed"}
+    reviewed_count = sum(1 for result in results if result.status in reviewed_statuses)
+    skipped_count = len(unique_candidate_ids) - reviewed_count
+    status = "completed" if reviewed_count == len(unique_candidate_ids) else "partial"
+    if not unique_candidate_ids:
+        status = "empty"
+    ingest_ids = {
+        str(result.candidate.get("ingest_id", ""))
+        for result in results
+        if result.candidate is not None and result.candidate.get("ingest_id")
+    }
+    state = build_document_workbench_state(settings, next(iter(ingest_ids))) if len(ingest_ids) == 1 else None
+    return DocumentMemoryReviewBatchResult(
+        status=status,
+        detail=f"reviewed {reviewed_count} document memory candidates",
+        decision=normalized_decision,
+        requested_count=len(unique_candidate_ids),
+        reviewed_count=reviewed_count,
+        skipped_count=skipped_count,
+        results=results,
+        state=state,
+    )
 
 
 def create_document_source_refs(settings: Settings, ingest_id: str) -> DocumentSourceRefResult:

@@ -193,6 +193,8 @@ python -m src.hermes document parse register-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse index-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse memory-candidates --ingest-id <ingest_id>
 python -m src.hermes document parse review-memory-candidate --candidate-id <candidate_id> --decision approve
+python -m src.hermes document parse memory-review-pending --ingest-id <ingest_id>
+python -m src.hermes document parse memory-review-batch --candidate-id <candidate_id> --decision reject
 python -m src.hermes document parse source-refs --ingest-id <ingest_id>
 python -m src.hermes document parse ingest-report --ingest-id <ingest_id>
 python -m src.hermes document parse workbench-state --ingest-id <ingest_id>
@@ -251,6 +253,12 @@ treated as owner-approved long-term memory.
 `00-Inbox/everos-candidates/` with frontmatter, tags, and internal links to
 `[[Document Memory Candidates]]`, `[[Bairui]]`, `[[Hermes]]`, `[[EverOS]]`, and
 the source `[[Document Ingest <short-id>]]`.
+
+`memory-review-pending` returns the current pending review queue for one ingest
+or for all document memory candidates. `memory-review-batch` applies the same
+decision to multiple candidate ids, while still calling the single-candidate
+review path for each item. This preserves EverOS promotion behavior, Obsidian
+graph notes, duplicate-review protection, and audit records.
 
 `source-refs` creates structured provenance records for the same pipeline. It
 writes `source_refs.jsonl` locally and matches the PostgreSQL `source_refs`

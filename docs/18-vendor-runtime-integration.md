@@ -129,7 +129,9 @@ Hermes owns:
 - HTTP routes under `/document/parse/status`, `/document/parse/ingest-plan`,
   `/document/parse/run-ingest`, `/document/parse/register-artifacts`,
   `/document/parse/index-artifacts`, `/document/parse/memory-candidates`,
-  `/document/parse/review-memory-candidate`, `/document/parse/source-refs`,
+  `/document/parse/review-memory-candidate`,
+  `/document/parse/memory-review-pending`,
+  `/document/parse/memory-review-batch`, `/document/parse/source-refs`,
   `/document/parse/ingest-report`, `/document/parse/workbench-state`,
   `/document/parse/workbench-next`,
   `/document/parse/workbench-run-until-blocked`, `/document/ingests`,
@@ -164,6 +166,12 @@ workflow completes or stops on `needs_review`, `failed`, `not_found`,
 candidate review so owner authorization remains explicit. Missing runtime
 configuration is surfaced as a warning or blocker instead of being hidden
 behind fake success.
+
+`/document/parse/memory-review-pending` and
+`/document/parse/memory-review-batch` are the product workbench review
+contracts. Batch review reuses the single-candidate review path so EverOS
+promotion, duplicate protection, audit events, and Obsidian graph notes remain
+consistent.
 
 MinerU owns:
 

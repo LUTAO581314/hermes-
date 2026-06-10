@@ -50,8 +50,10 @@ from .document_pipeline import (
     execute_document_workbench_next,
     generate_document_memory_candidates,
     index_document_artifacts,
+    list_pending_document_memory_reviews,
     register_document_artifacts,
     review_document_memory_candidate,
+    review_document_memory_candidates_batch,
     run_document_workbench_until_blocked,
     run_document_ingest,
 )
@@ -483,6 +485,38 @@ class HermesHandler(BaseHTTPRequestHandler):
             if result.status == "already_reviewed":
                 status = 409
             self._send({"service": "hermes", "document_memory_review": asdict(result)}, status=status)
+            return
+
+        if self.path == "/document/parse/memory-review-pending":
+            result = list_pending_document_memory_reviews(settings, ingest_id=str(payload.get("ingest_id", "")))
+            status = 200 if result.status != "not_found" else 404
+            self._send({"service": "hermes", "document_memory_review_queue": asdict(result)}, status=status)
+            return
+
+        if self.path == "/document/parse/memory-review-batch":
+            candidate_ids = payload.get("candidate_ids", ())
+            if not isinstance(candidate_ids, list):
+                self._send({"error": "invalid_request", "message": "candidate_ids must be a list"}, status=400)
+                return
+            decision = str(payload.get("decision", ""))
+            if not decision.strip():
+                self._send({"error": "invalid_request", "message": "decision is required"}, status=400)
+                return
+            result = review_document_memory_candidates_batch(
+                settings,
+                tuple(str(candidate_id) for candidate_id in candidate_ids),
+                decision=decision,
+                reviewer_ref=str(payload.get("reviewer_ref", "owner")),
+                note=str(payload.get("note", "")),
+                user_id=str(payload.get("user_id", "owner")),
+                session_id=str(payload.get("session_id", "")),
+                app_id=str(payload.get("app_id", "default")),
+                project_id=str(payload.get("project_id", "default")),
+            )
+            status = 200 if result.status in {"completed", "partial", "empty"} else 503
+            if result.status == "invalid_decision":
+                status = 400
+            self._send({"service": "hermes", "document_memory_review_batch": asdict(result)}, status=status)
             return
 
         if self.path == "/document/parse/source-refs":

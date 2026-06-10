@@ -72,8 +72,10 @@ from .document_pipeline import (
     execute_document_workbench_next,
     generate_document_memory_candidates,
     index_document_artifacts,
+    list_pending_document_memory_reviews,
     register_document_artifacts,
     review_document_memory_candidate,
+    review_document_memory_candidates_batch,
     run_document_workbench_until_blocked,
     run_document_ingest,
 )
@@ -276,6 +278,17 @@ def build_parser() -> argparse.ArgumentParser:
     review_candidate.add_argument("--session-id", default="")
     review_candidate.add_argument("--app-id", default="default")
     review_candidate.add_argument("--project-id", default="default")
+    review_pending = parse_subcommands.add_parser("memory-review-pending", help="List pending document memory candidates for review")
+    review_pending.add_argument("--ingest-id", default="")
+    review_batch = parse_subcommands.add_parser("memory-review-batch", help="Approve or reject multiple document memory candidates")
+    review_batch.add_argument("--candidate-id", action="append", default=[])
+    review_batch.add_argument("--decision", choices=["approve", "reject"], required=True)
+    review_batch.add_argument("--reviewer-ref", default="owner")
+    review_batch.add_argument("--note", default="")
+    review_batch.add_argument("--user-id", default="owner")
+    review_batch.add_argument("--session-id", default="")
+    review_batch.add_argument("--app-id", default="default")
+    review_batch.add_argument("--project-id", default="default")
     source_refs = parse_subcommands.add_parser("source-refs", help="Create source reference records for one document ingestion")
     source_refs.add_argument("--ingest-id", required=True)
     ingest_report = parse_subcommands.add_parser("ingest-report", help="Write one Obsidian report for a document ingestion")
@@ -683,6 +696,24 @@ def run(argv: list[str] | None = None) -> int:
             )
             print_json({"service": "hermes", "document_memory_review": result})
             return 0 if result.status in {"approved", "rejected"} else 1
+        if parse_command == "memory-review-pending":
+            result = list_pending_document_memory_reviews(settings, ingest_id=args.ingest_id)
+            print_json({"service": "hermes", "document_memory_review_queue": result})
+            return 0 if result.status != "not_found" else 1
+        if parse_command == "memory-review-batch":
+            result = review_document_memory_candidates_batch(
+                settings,
+                tuple(args.candidate_id),
+                decision=args.decision,
+                reviewer_ref=args.reviewer_ref,
+                note=args.note,
+                user_id=args.user_id,
+                session_id=args.session_id,
+                app_id=args.app_id,
+                project_id=args.project_id,
+            )
+            print_json({"service": "hermes", "document_memory_review_batch": result})
+            return 0 if result.status in {"completed", "partial", "empty"} else 1
         if parse_command == "source-refs":
             result = create_document_source_refs(settings, args.ingest_id)
             print_json({"service": "hermes", "document_source_refs": result})

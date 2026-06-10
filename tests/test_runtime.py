@@ -9,7 +9,7 @@ from src.hermes.capabilities import collect_capabilities
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import SCHEMA_SQL, database_status
-from src.hermes.document_pipeline import build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, review_document_memory_candidate, run_document_ingest, run_document_workbench_until_blocked
+from src.hermes.document_pipeline import build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, list_pending_document_memory_reviews, register_document_artifacts, review_document_memory_candidate, review_document_memory_candidates_batch, run_document_ingest, run_document_workbench_until_blocked
 from src.hermes.adapters.everos import EverOSResult, build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
@@ -455,6 +455,53 @@ class RuntimeFoundationTests(unittest.TestCase):
                 second = review_document_memory_candidate(load_settings(), candidate.id, decision="reject")
         self.assertEqual(first.status, "rejected")
         self.assertEqual(second.status, "already_reviewed")
+
+    def test_document_memory_review_queue_and_batch_reject_pending_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Owner preference: Hermes should keep durable requirements only after explicit review.\n\n"
+                "Bairui Hermes project rule: batch review must still write Obsidian graph notes.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="Batch review plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            generate_document_memory_candidates(data_dir, ingest.id, max_candidates=2)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                queue = list_pending_document_memory_reviews(load_settings(), ingest_id=ingest.id)
+                result = review_document_memory_candidates_batch(
+                    load_settings(),
+                    tuple(candidate["id"] for candidate in queue.candidates),
+                    decision="reject",
+                    note="batch reviewed",
+                )
+                refreshed = list_pending_document_memory_reviews(load_settings(), ingest_id=ingest.id)
+            notes_dir = root / "vault" / "00-Inbox" / "everos-candidates"
+            note_count = len(list(notes_dir.glob("*.md"))) - 1
+        self.assertEqual(queue.status, "ready")
+        self.assertEqual(queue.pending_count, 2)
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.reviewed_count, 2)
+        self.assertEqual(result.skipped_count, 0)
+        self.assertIsNotNone(result.state)
+        self.assertEqual(result.state.pipeline["memory_reviews"], "completed")
+        self.assertEqual(refreshed.pending_count, 0)
+        self.assertEqual(refreshed.reviewed_count, 2)
+        self.assertEqual(note_count, 2)
 
     def test_create_document_source_refs_links_artifacts_index_and_memory_reviews(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1051,6 +1098,46 @@ class RuntimeFoundationTests(unittest.TestCase):
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["document_memory_review"].status, "rejected")
         self.assertEqual(list_print_json.call_args.args[0]["document_memory_reviews"][0]["status"], "rejected")
+
+    def test_cli_document_memory_review_pending_and_batch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "Owner preference: CLI pending review should show this candidate.\n\n"
+                "Bairui Hermes project rule: CLI batch reject must write review records.",
+                encoding="utf-8",
+            )
+            ingest = create_document_ingest(
+                data_dir,
+                title="CLI batch review plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            candidates = generate_document_memory_candidates(data_dir, ingest.id, max_candidates=2).candidates
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as queue_print_json:
+                    queue_code = run(["document", "parse", "memory-review-pending", "--ingest-id", ingest.id])
+                batch_args = ["document", "parse", "memory-review-batch", "--decision", "reject", "--note", "cli batch"]
+                for candidate in candidates:
+                    batch_args.extend(["--candidate-id", candidate.id])
+                with patch("src.hermes.cli.print_json") as batch_print_json:
+                    batch_code = run(batch_args)
+        self.assertEqual(queue_code, 0)
+        self.assertEqual(batch_code, 0)
+        self.assertEqual(queue_print_json.call_args.args[0]["document_memory_review_queue"].pending_count, 2)
+        payload = batch_print_json.call_args.args[0]
+        self.assertEqual(payload["document_memory_review_batch"].status, "completed")
+        self.assertEqual(payload["document_memory_review_batch"].reviewed_count, 2)
 
     def test_cli_document_source_refs_lists_source_refs(self):
         with tempfile.TemporaryDirectory() as tmp:
