@@ -1,29 +1,54 @@
-# Frontend: MOXI / Brain UI
+# Frontend: bairui UI
 
-## 1. Frontend Decision
+## 1. Brand Rule
 
-MOXI / Brain UI is the primary frontend surface.
+Customer-facing UI must expose only the `bairui` brand.
 
-The frontend calls Hermes directly. It does not call any legacy external
-frontend backend as a long-term authority, and new product UI should be
-source-owned under MOXI.
+Historical project names, third-party runtime names, upstream repository names,
+and internal adapter names must not appear in navigation, activation screens,
+empty states, report viewers, setup copy, or customer-facing API contracts.
 
-## 2. Product Requirements
+## 2. UI Base Strategy
 
-The UI must provide:
+The frontend should use the owner-approved open-source UI base as the source
+foundation, then customize it into a bairui product. Internally, the owner may
+refer to this same GitHub project as Xiaobailong or Bailongma; those names are
+engineering references only and must not reach customer-facing UI or
+`/frontend/contract`.
 
-- chat-first command surface;
-- capability dashboard;
-- runtime settings;
-- memory review inbox;
-- task and job progress;
-- approval queue;
-- source-backed report viewer;
-- simulation reports;
-- social connector status;
-- admin and deployment status.
+Internal source reference:
 
-## 3. Contract-First UI
+- Repository: `https://github.com/xiaoyuanda666-ship-it/BaiLongma`
+- License: MIT
+- Primary scope: frontend interaction, component behavior, layout rhythm,
+  activation page, voice panel, media panel, and realtime UI patterns.
+- Backend scope: supplemental only. Extract useful connector/media/event ideas
+  into owned bairui contracts instead of replacing the existing backend.
+
+- keep the preferred component density, workbench layout, drawers, tables, and
+  interaction patterns;
+- replace every public brand field, route label, page title, loading state, and
+  empty state with `bairui`;
+- expose third-party runtime details only as neutral capability states such as
+  `configured`, `missing_config`, `blocked`, or `needs_review`;
+- never bundle runtime secrets into frontend JavaScript.
+
+## 3. Core Screens
+
+The frontend must connect these product screens to real backend contracts:
+
+- Activation: complete setup checklist, not a single button;
+- Dashboard: health, readiness, runtime blockers, platform heartbeat, jobs,
+  and audit visibility;
+- Command: chat action and missing configuration state;
+- Documents: ingest session list, session detail, next action, and run until
+  blocked;
+- Memory Review: pending queue, approve/reject, batch review, and continue
+  workflow;
+- Reports: generated reports and source references;
+- Settings: runtime status grouped by capability, with honest blockers.
+
+## 4. Contract-First UI
 
 The frontend reads:
 
@@ -32,6 +57,7 @@ The frontend reads:
 - `/jobs`;
 - `/runtime/readiness`;
 - `/platform/heartbeat`;
+- `/audit`;
 - `/document/parse/session-list`;
 - `/document/parse/session-summary`;
 - `/document/parse/workbench-next`;
@@ -41,81 +67,60 @@ The frontend reads:
 - `/document/ingest-reports`;
 - `/source-refs`.
 
-The frontend must not hard-code capability readiness.
-
-`/frontend/contract` is now implemented by Hermes and is also available from
-the CLI:
+The CLI equivalent is:
 
 ```bash
 python -m src.hermes frontend-contract
 ```
 
-It returns the product brand fields, supported UI screens, stable API groups,
-status sources, user actions, and state values such as `ready`, `partial`,
-`blocked`, `missing_config`, and `needs_review`. Planned endpoints must stay
-outside the ready screen/action lists until the backend implements them.
+`/frontend/contract` returns:
 
-## 4. Framework Path
+- `brand`: public `bairui` brand fields;
+- `visibility_policy`: customer-visible brand restrictions;
+- `ui_base`: source-based customization strategy;
+- `design_system`: premium sci-fi operations-console tokens;
+- `activation_flow`: complete activation steps;
+- `screens`: core UI surfaces;
+- `forms`: renderable form schemas for actions;
+- `api_groups`: stable backend contracts;
+- `state_values`: status values the UI must render.
 
-Short term:
+## 5. Activation Flow
 
-- preserve useful Brain UI assets and interaction patterns;
-- serve static frontend behind Nginx;
-- use Hermes APIs only.
+Activation must show the full process:
 
-Medium term:
+1. Brand Lock: verify the contract exposes only `bairui`.
+2. Runtime Health: load `/health`, `/ready`, and `/runtime/readiness`.
+3. License And Platform: show license, server id, database, and platform status.
+4. Model Gateway: run or block the chat probe with exact missing configuration.
+5. Document Runtime: show parser status and render the ingest-plan form.
+6. Memory Review: show pending queue and require explicit owner decisions.
+7. Reports And Sources: show generated reports/source refs or actionable empty
+   states.
 
-- extract to Vite + React + TypeScript;
-- define typed API client;
-- add component tests;
-- add role-aware admin views.
+Blocking steps must prevent the misleading final "ready" state. Optional steps
+may be marked incomplete but visible.
 
-## 5. Node Package Manager Support
+## 6. Design Direction
 
-The current repository does not require a Node package manager because the
-usable deployment target is the Hermes backend plus existing static assets.
+The visual direction is a premium sci-fi operations console:
 
-When MOXI / Brain UI is extracted into a real frontend application, the standard
-layout is:
+- dense, useful, enterprise workbench layout;
+- dark canvas with teal and blue operational accents;
+- crisp panels, split views, detail drawers, and status rails;
+- compact typography with tabular mono only for ids/status/timestamps;
+- no marketing hero as the app first screen;
+- no oversized decorative cards inside tool surfaces;
+- reduced-motion mode must preserve all information.
 
-```text
-frontend/
-  package.json
-  package-lock.json
-  src/
-  public/
-  dist/
-```
+## 7. QA Rules
 
-Deployment scripts must detect `frontend/package.json` and run:
+Before customer use, test:
 
-```text
-npm ci && npm run build
-```
-
-The supported package managers are:
-
-| Lockfile | Package manager | Install command | Build command |
-| --- | --- | --- | --- |
-| `package-lock.json` | npm | `npm ci` | `npm run build` |
-| `pnpm-lock.yaml` | pnpm | `pnpm install --frozen-lockfile` | `pnpm run build` |
-| `yarn.lock` | yarn | `yarn install --frozen-lockfile` | `yarn run build` |
-| `bun.lockb` or `bun.lock` | bun | `bun install --frozen-lockfile` | `bun run build` |
-
-If no lockfile exists, scripts may run npm install for early development, but
-commercial releases must use one lockfile for reproducible builds.
-
-The backend should serve built frontend files or let Nginx serve them directly.
-Runtime secrets must never be bundled into frontend JavaScript.
-
-## 6. UX Rules
-
-The UI should show:
-
-- what is running;
-- what is waiting for owner approval;
-- what data source was used;
-- whether a capability is missing configuration;
-- whether a reply is from memory, latest search, or simulation.
-
-No UI should pretend a planned backend feature is already available.
+- no customer-visible text contains historical or upstream project brands;
+- activation flow renders all seven steps;
+- every core screen has real read endpoints and honest empty states;
+- action buttons are disabled when required fields or blockers are missing;
+- desktop, tablet, and mobile layouts have no text overlap or horizontal scroll;
+- console has no uncaught errors;
+- runtime secrets are absent from built frontend assets.

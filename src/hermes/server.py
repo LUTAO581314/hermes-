@@ -130,7 +130,7 @@ class HermesHandler(BaseHTTPRequestHandler):
             self._send({"service": "hermes", "capabilities": collect_capabilities(settings)})
             return
         if self.path == "/frontend/contract":
-            self._send({"service": "hermes", "frontend_contract": build_frontend_contract(settings, __version__)})
+            self._send({"service": "bairui", "frontend_contract": build_frontend_contract(settings, __version__)})
             return
         if self.path == "/runtime/readiness":
             self._send({"service": "hermes", "runtime_readiness": collect_runtime_readiness(settings)})

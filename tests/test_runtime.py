@@ -91,10 +91,42 @@ class RuntimeFoundationTests(unittest.TestCase):
         screens = {screen["id"]: screen for screen in contract["screens"]}
         api_groups = {group["id"]: group for group in contract["api_groups"]}
         document_paths = {endpoint["path"] for endpoint in api_groups["document_workbench"]["endpoints"]}
+        operation_paths = {endpoint["path"] for endpoint in api_groups["operations"]["endpoints"]}
+        serialized = json.dumps(contract, ensure_ascii=False)
+        forbidden = (
+            "Hermes",
+            "hermes",
+            "MOXI",
+            "Moxi",
+            "Brain UI",
+            "EverOS",
+            "MinerU",
+            "Sonic",
+            "SearXNG",
+            "FunASR",
+            "MiroFish",
+            "TrendRadar",
+            "Xiaobailong",
+            "Bailongma",
+            "小白龙",
+            "白龙马",
+        )
+        for brand in forbidden:
+            self.assertNotIn(brand, serialized)
+        self.assertEqual(contract["service"], "bairui")
         self.assertEqual(contract["product"]["brand_key"], "bairui")
-        self.assertIn("document_ingest_sessions", screens)
-        self.assertIn("/document/parse/session-list", screens["document_ingest_sessions"]["read"])
-        self.assertIn("/document/parse/session-summary", screens["document_ingest_sessions"]["read"])
+        self.assertEqual(contract["visibility_policy"]["public_brand"], "bairui")
+        self.assertIn("activation", screens)
+        self.assertIn("/jobs", screens["dashboard"]["read"])
+        self.assertIn("/audit", screens["dashboard"]["read"])
+        self.assertIn("document_ingest", screens)
+        self.assertIn("/document/parse/session-list", screens["document_ingest"]["read"])
+        self.assertIn("/document/parse/session-summary", screens["document_ingest"]["read"])
+        self.assertIn("document_ingest_plan", contract["forms"])
+        self.assertIn("job_create", contract["forms"])
+        self.assertGreaterEqual(len(contract["activation_flow"]), 7)
+        self.assertIn("/jobs", operation_paths)
+        self.assertIn("/audit", operation_paths)
         self.assertIn("/document/parse/workbench-next", document_paths)
         self.assertIn("needs_review", contract["state_values"])
 
@@ -894,10 +926,13 @@ class RuntimeFoundationTests(unittest.TestCase):
             code = run(["frontend-contract"])
         self.assertEqual(code, 0)
         payload = print_json.call_args.args[0]
+        self.assertEqual(payload["service"], "bairui")
         contract = payload["frontend_contract"]
         screens = {screen["id"] for screen in contract["screens"]}
+        self.assertEqual(contract["service"], "bairui")
         self.assertEqual(contract["product"]["brand_key"], "bairui")
-        self.assertIn("document_ingest_sessions", screens)
+        self.assertIn("activation", screens)
+        self.assertIn("document_ingest", screens)
         self.assertIn("runtime_settings", screens)
 
     def test_deploy_scripts_poll_readiness_and_write_json(self):

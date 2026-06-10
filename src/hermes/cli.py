@@ -126,7 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("serve", help="Start the Hermes HTTP server")
     subcommands.add_parser("status", help="Print health, readiness, license, and database status")
     subcommands.add_parser("capabilities", help="List runtime and vendor capabilities")
-    subcommands.add_parser("frontend-contract", help="Print the frontend API contract for MOXI / Brain UI")
+    subcommands.add_parser("frontend-contract", help="Print the bairui frontend API contract")
     subcommands.add_parser("license", help="Inspect the configured license file")
     subcommands.add_parser("jobs", help="List recent file-backed jobs")
     subcommands.add_parser("document-ingests", help="List planned document ingestion records")
@@ -375,7 +375,7 @@ def run(argv: list[str] | None = None) -> int:
         return 0
 
     if command == "frontend-contract":
-        print_json({"service": "hermes", "frontend_contract": build_frontend_contract(settings, __version__)})
+        print_json({"service": "bairui", "frontend_contract": build_frontend_contract(settings, __version__)})
         return 0
 
     if command == "license":
