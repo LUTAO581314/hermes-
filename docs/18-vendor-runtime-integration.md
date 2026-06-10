@@ -30,6 +30,7 @@ reinvention.
 | TrendRadar | `vendor/runtimes/trendradar` | Trend, RSS, hot-list, and public-opinion intelligence | GPLv3 | source-level adapter |
 | MiroFish | `vendor/runtimes/mirofish` | Scenario simulation and multi-agent rehearsal | AGPLv3 | source-level adapter |
 | SearXNG | Docker or Linux checkout | Optional metasearch | AGPLv3 | HTTP service adapter |
+| Sonic | Docker/Linux service | Local internal search index | MPL-2.0 | TCP service adapter |
 
 ## 3. Adapter Boundary
 
@@ -160,7 +161,45 @@ The JSON API requires `format=json`, and SearXNG configuration must permit the
 `json` output format. Hermes must not pretend SearXNG is available until
 `SEARXNG_BASE_URL` is configured.
 
-## 8. Commercial Boundaries
+## 8. Sonic Adapter Contract
+
+Sonic is the local internal search index runtime. It is not a public web search
+tool and does not replace SearXNG.
+
+Hermes owns:
+
+- `src/hermes/adapters/sonic.py`;
+- CLI commands under `python -m src.hermes index ...`;
+- HTTP routes under `/index/status`, `/index/ping`, `/index/push`, and
+  `/index/query`;
+- operational configuration through `SONIC_HOST`, `SONIC_PORT`,
+  `SONIC_PASSWORD`, and `SONIC_TIMEOUT_SECONDS`;
+- `infra/sonic/config.cfg` for Docker-based local service deployment;
+- capability and commercial-boundary reporting.
+
+Sonic owns:
+
+- token indexing;
+- local object lookup;
+- the TCP channel protocol;
+- persistence under its own store directory;
+- its Docker image and upstream Rust implementation.
+
+Hermes talks to Sonic through the upstream channel protocol instead of copying
+Rust internals into Hermes core.
+
+## 9. Unified Runtime Readiness
+
+Hermes exposes runtime orchestration readiness through:
+
+- `python -m src.hermes runtime-readiness`
+- `GET /runtime/readiness`
+
+This is the machine-readable bridge between adapters and deployment
+orchestration. Scripts and the Bairui platform should consume readiness
+blockers and warnings instead of scraping logs.
+
+## 10. Commercial Boundaries
 
 Apache-2.0 runtimes such as EverOS are suitable for deeper productized
 integration, while preserving LICENSE, NOTICE, upstream name, and attribution.
@@ -172,17 +211,23 @@ AGPLv3 runtimes such as MiroFish and SearXNG require special care for hosted
 network service use. Before formal sale, distribution, or customer-hosted
 operation, complete a license review and delivery-source checklist.
 
+MPL-2.0 runtimes such as Sonic can be operated as external services while
+preserving license notices and any modified-file obligations if the upstream
+source is changed.
+
 This document is general engineering guidance, not legal advice.
 
-## 9. Integration Order
+## 11. Integration Order
 
 1. EverOS adapter for memory candidates and retrieval.
 2. TrendRadar adapter for intelligence input.
 3. MiroFish adapter for simulation briefs and reports.
 4. SearXNG as an optional Docker-based metasearch runtime after Linux/server
    deployment.
+5. Sonic as a Docker-based local index for Bairui-owned notes, logs, documents,
+   and task records.
 
-## 10. Verification Requirements
+## 12. Verification Requirements
 
 Each runtime integration must prove:
 

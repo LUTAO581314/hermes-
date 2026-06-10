@@ -46,12 +46,17 @@ $envContent = Get-Content -LiteralPath ".env" -Raw
 if ($envContent -match "(?m)^POSTGRES_PASSWORD=\s*$" -or $envContent -notmatch "(?m)^POSTGRES_PASSWORD=") {
     Ensure-EnvValue "POSTGRES_PASSWORD" (New-Secret)
 }
+if ($envContent -match "(?m)^SONIC_PASSWORD=\s*$" -or $envContent -notmatch "(?m)^SONIC_PASSWORD=") {
+    Ensure-EnvValue "SONIC_PASSWORD" (New-Secret)
+}
 
 Ensure-EnvValue "HERMES_ENV" "production"
 Ensure-EnvValue "HERMES_HOST" "127.0.0.1"
 Ensure-EnvValue "HERMES_PORT" "8787"
+Ensure-EnvValue "SONIC_HOST" "sonic"
+Ensure-EnvValue "SONIC_PORT" "1491"
 
-New-Item -ItemType Directory -Force -Path "src", "tests", "data/postgres", "logs", "obsidian-vault" | Out-Null
+New-Item -ItemType Directory -Force -Path "src", "tests", "data/postgres", "data/sonic", "logs", "obsidian-vault" | Out-Null
 
 if ($Mode -eq "domain" -and [string]::IsNullOrWhiteSpace($Domain)) {
     throw "Domain mode requires -Domain, for example: -Mode domain -Domain moxi.example.com"
@@ -65,3 +70,4 @@ Write-Step "Deployment started"
 Write-Host "Hermes health:       http://127.0.0.1:8787/health"
 Write-Host "Hermes ready:        http://127.0.0.1:8787/ready"
 Write-Host "Hermes capabilities: http://127.0.0.1:8787/capabilities"
+Write-Host "Runtime readiness:   http://127.0.0.1:8787/runtime/readiness"

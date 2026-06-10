@@ -67,6 +67,8 @@ The system is built around these permanent boundaries:
 - EverOS is the automatic memory extraction and retrieval engine.
 - TrendRadar is the first external trend and public-opinion runtime.
 - SearXNG is an optional self-hosted metasearch supplement.
+- Sonic is the optional local internal search index for our own documents,
+  notes, logs, and task records.
 - MiroFish is the scenario simulation and decision rehearsal lab.
 - Feishu is the company operation surface.
 - WeChat and QQ are personal or social channels with strict risk boundaries.
@@ -122,6 +124,9 @@ python -m src.hermes simulation status
 python -m src.hermes simulation dev-command
 python -m src.hermes search status
 python -m src.hermes search docker-command
+python -m src.hermes index status
+python -m src.hermes index docker-command
+python -m src.hermes runtime-readiness
 python -m src.hermes serve
 ```
 

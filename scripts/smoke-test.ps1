@@ -9,6 +9,8 @@ $required = @(
     "src/hermes/storage.py",
     "src/hermes/model_gateway.py",
     "src/hermes/db.py",
+    "src/hermes/runtime_readiness.py",
+    "src/hermes/adapters/sonic.py",
     "requirements.txt",
     "tests/test_runtime.py",
     "Dockerfile",
@@ -16,7 +18,8 @@ $required = @(
     ".env.example",
     "infra/hermes/env.example",
     "infra/hermes/systemd/bairui-hermes.service",
-    "infra/hermes/scripts/deploy-hermes.sh"
+    "infra/hermes/scripts/deploy-hermes.sh",
+    "infra/sonic/config.cfg"
 )
 
 foreach ($path in $required) {

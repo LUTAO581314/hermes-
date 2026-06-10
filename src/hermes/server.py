@@ -22,6 +22,15 @@ from .adapters.searxng import (
     search as searxng_search,
     status as searxng_status,
 )
+from .adapters.sonic import (
+    as_payload as sonic_payload,
+    build_push_payload as build_sonic_push_payload,
+    build_query_payload as build_sonic_query_payload,
+    ping as sonic_ping,
+    push as sonic_push,
+    query as sonic_query,
+    status as sonic_status,
+)
 from .adapters.trendradar import as_payload as trendradar_payload, status as trendradar_status
 from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
@@ -29,6 +38,7 @@ from .db import database_status, run_migrations
 from .license import load_license
 from .model_gateway import complete_chat
 from .platform import build_platform_heartbeat
+from .runtime_readiness import collect_runtime_readiness
 from .storage import create_audit_event, create_job, list_audit_events, list_jobs, write_obsidian_report
 
 
@@ -79,6 +89,9 @@ class HermesHandler(BaseHTTPRequestHandler):
         if self.path == "/capabilities":
             self._send({"service": "hermes", "capabilities": collect_capabilities(settings)})
             return
+        if self.path == "/runtime/readiness":
+            self._send({"service": "hermes", "runtime_readiness": collect_runtime_readiness(settings)})
+            return
         if self.path == "/platform/heartbeat":
             self._send({"service": "hermes", "heartbeat": build_platform_heartbeat(settings)})
             return
@@ -102,6 +115,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/search/status":
             self._send({"service": "hermes", "search": searxng_payload(searxng_status(settings))})
+            return
+        if self.path == "/index/status":
+            self._send({"service": "hermes", "index": sonic_payload(sonic_status(settings))})
             return
 
         self._send({"error": "not_found", "path": self.path}, status=404)
@@ -225,6 +241,48 @@ class HermesHandler(BaseHTTPRequestHandler):
                 ),
             )
             self._send({"service": "hermes", "search": searxng_payload(result)}, status=200 if result.status == "completed" else 503)
+            return
+
+        if self.path == "/index/ping":
+            result = sonic_ping(settings)
+            self._send({"service": "hermes", "index": sonic_payload(result)}, status=200 if result.status == "completed" else 503)
+            return
+
+        if self.path == "/index/push":
+            required = ("collection", "bucket", "object_id", "text")
+            if any(not str(payload.get(name, "")).strip() for name in required):
+                self._send({"error": "invalid_request", "message": "collection, bucket, object_id, and text are required"}, status=400)
+                return
+            result = sonic_push(
+                settings,
+                build_sonic_push_payload(
+                    collection=str(payload["collection"]),
+                    bucket=str(payload["bucket"]),
+                    object_id=str(payload["object_id"]),
+                    text=str(payload["text"]),
+                    lang=str(payload.get("lang", "")),
+                ),
+            )
+            self._send({"service": "hermes", "index": sonic_payload(result)}, status=200 if result.status == "completed" else 503)
+            return
+
+        if self.path == "/index/query":
+            required = ("collection", "bucket", "query")
+            if any(not str(payload.get(name, "")).strip() for name in required):
+                self._send({"error": "invalid_request", "message": "collection, bucket, and query are required"}, status=400)
+                return
+            result = sonic_query(
+                settings,
+                build_sonic_query_payload(
+                    collection=str(payload["collection"]),
+                    bucket=str(payload["bucket"]),
+                    query=str(payload["query"]),
+                    limit=int(payload.get("limit", 10)),
+                    offset=int(payload.get("offset", 0)),
+                    lang=str(payload.get("lang", "")),
+                ),
+            )
+            self._send({"service": "hermes", "index": sonic_payload(result)}, status=200 if result.status == "completed" else 503)
             return
 
         if self.path == "/admin/migrate":

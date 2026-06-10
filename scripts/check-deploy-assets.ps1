@@ -4,6 +4,7 @@ $required = @(
     "infra/hermes/env.example",
     "infra/hermes/systemd/bairui-hermes.service",
     "infra/hermes/scripts/deploy-hermes.sh",
+    "infra/sonic/config.cfg",
     "scripts/deploy-usable.ps1",
     "scripts/deploy-usable.sh",
     "docker-compose.production.yml",

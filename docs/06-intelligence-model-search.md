@@ -10,6 +10,8 @@ Use:
 - OpenAI-compatible model gateway for model calls;
 - TrendRadar for trends, RSS, hot lists, and public-opinion inputs;
 - SearXNG as optional self-hosted metasearch;
+- Sonic as optional local internal search for our own documents, notes, logs,
+  and task records;
 - Firecrawl or equivalent API for page extraction when needed;
 - OCR or multimodal APIs for image/document understanding;
 - local Whisper only as a transitional lightweight ASR path.
@@ -93,7 +95,65 @@ python -m src.hermes search query --query "bairui agent"
 `missing_config` and still exposes the Docker command and API contract needed
 to deploy SearXNG correctly.
 
-## 5. Research Flow
+## 5. Sonic
+
+Sonic is optional and does not replace SearXNG.
+
+Use Sonic when:
+
+- Hermes needs to search Bairui-owned text such as notes, report titles, logs,
+  job IDs, task records, and lightweight document indexes;
+- we want a small local search backend without putting this data into a public
+  metasearch engine;
+- we need fast exact or fuzzy lookup before heavier memory retrieval.
+
+Do not use Sonic for public web search. SearXNG searches the outside web;
+Sonic searches our own indexed objects.
+
+Hermes integrates Sonic as an external TCP service using the upstream channel
+protocol:
+
+- `START search|ingest|control <password>`
+- `PING`
+- `PUSH <collection> <bucket> <object> "<text>"`
+- `QUERY <collection> <bucket> "<terms>" LIMIT(<n>)`
+
+Current Hermes CLI surface:
+
+```bash
+python -m src.hermes index status
+python -m src.hermes index docker-command
+python -m src.hermes index ping
+python -m src.hermes index push --collection bairui --bucket docs --object-id doc-1 --text "Hermes runtime readiness"
+python -m src.hermes index query --collection bairui --bucket docs --query "readiness"
+```
+
+`SONIC_HOST` and `SONIC_PASSWORD` enable live index calls. Without them, Hermes
+reports `missing_config` and still exposes the Docker command and protocol
+contract needed to deploy Sonic correctly.
+
+## 6. Unified Runtime Readiness
+
+Hermes now exposes a machine-readable readiness summary for vendor runtimes:
+
+```bash
+python -m src.hermes runtime-readiness
+curl http://127.0.0.1:8787/runtime/readiness
+```
+
+The readiness contract separates:
+
+- blockers: required runtime pieces that prevent a usable deployment;
+- warnings: optional runtimes that are not yet configured;
+- source_ready: upstream source is present but the live service endpoint is not
+  configured yet;
+- configured: adapter has enough configuration to attempt live calls.
+
+This is the bridge from adapter visibility to one-click orchestration. Platform
+and deployment scripts should consume this endpoint instead of guessing from
+free-form logs.
+
+## 7. Research Flow
 
 ```text
 owner question
@@ -106,7 +166,7 @@ owner question
   -> short owner summary
 ```
 
-## 6. Source Rules
+## 8. Source Rules
 
 Research outputs must:
 

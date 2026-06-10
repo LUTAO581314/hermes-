@@ -6,6 +6,7 @@ from pathlib import Path
 from .adapters.everos import status as everos_status
 from .adapters.mirofish import status as mirofish_status
 from .adapters.searxng import status as searxng_status
+from .adapters.sonic import status as sonic_status
 from .adapters.trendradar import status as trendradar_status
 from .config import Settings
 from .db import database_status
@@ -35,6 +36,7 @@ def collect_capabilities(settings: Settings) -> list[dict[str, str]]:
     trendradar = trendradar_status(settings)
     mirofish = mirofish_status(settings)
     searxng = searxng_status(settings)
+    sonic = sonic_status(settings)
     caps = [
         Capability("health_api", "ready", "HTTP health endpoint is available"),
         Capability("readiness_api", "ready", "HTTP readiness endpoint is available"),
@@ -73,6 +75,13 @@ def collect_capabilities(settings: Settings) -> list[dict[str, str]]:
             searxng.detail,
             source=searxng.source,
             license=searxng.license,
+        ),
+        Capability(
+            "sonic_local_index",
+            sonic.status,
+            sonic.detail,
+            source=sonic.source,
+            license=sonic.license,
         ),
     ]
     return [asdict(cap) for cap in caps]

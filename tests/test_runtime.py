@@ -12,10 +12,12 @@ from src.hermes.db import database_status
 from src.hermes.adapters.everos import build_search_payload, status as everos_status
 from src.hermes.adapters.mirofish import build_dev_command, status as mirofish_status
 from src.hermes.adapters.searxng import build_docker_command as build_searxng_docker_command, build_search_payload as build_searxng_search_payload, status as searxng_status
+from src.hermes.adapters.sonic import build_docker_command as build_sonic_docker_command, build_query_payload as build_sonic_query_payload, status as sonic_status
 from src.hermes.adapters.trendradar import build_mcp_command, status as trendradar_status
 from src.hermes.license import load_license, sign_license_payload
 from src.hermes.model_gateway import build_chat_payload, complete_chat
 from src.hermes.platform import HEARTBEAT_PROTOCOL_VERSION, build_platform_heartbeat
+from src.hermes.runtime_readiness import collect_runtime_readiness
 from src.hermes.storage import create_job, list_audit_events, list_jobs, write_obsidian_report
 
 
@@ -122,6 +124,8 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("intel", help_text)
         self.assertIn("simulation", help_text)
         self.assertIn("search", help_text)
+        self.assertIn("index", help_text)
+        self.assertIn("runtime-readiness", help_text)
 
     def test_everos_adapter_detects_source_and_license(self):
         settings = load_settings()
@@ -288,6 +292,83 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(code, 1)
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["search"]["status"], "missing_config")
+
+    def test_sonic_adapter_reports_missing_config_and_protocol_contract(self):
+        settings = load_settings()
+        state = sonic_status(settings)
+        self.assertEqual(state.license, "MPL-2.0")
+        self.assertEqual(state.source, "https://github.com/valeriansaliou/sonic")
+        self.assertIn("TCP channel protocol on port 1491", state.protocol_contract)
+        self.assertIn(state.status, {"missing_config", "configured"})
+
+    def test_build_sonic_query_payload(self):
+        payload = build_sonic_query_payload(collection="bairui", bucket="docs", query="agent memory", limit=7, lang="zh")
+        self.assertEqual(payload["collection"], "bairui")
+        self.assertEqual(payload["bucket"], "docs")
+        self.assertEqual(payload["query"], "agent memory")
+        self.assertEqual(payload["limit"], 7)
+        self.assertEqual(payload["lang"], "zh")
+
+    def test_build_sonic_docker_command_mounts_config(self):
+        settings = load_settings()
+        plan = build_sonic_docker_command(settings, host_port=1491)
+        self.assertEqual(plan.status, "ready")
+        self.assertIn("valeriansaliou/sonic:latest", plan.command)
+        self.assertIn("$(pwd)/infra/sonic/config.cfg:/etc/sonic.cfg", plan.command)
+        self.assertIn("127.0.0.1:1491:1491", plan.command)
+
+    def test_cli_index_status_prints_sonic_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "SONIC_HOST": "",
+                "SONIC_PASSWORD": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["index", "status"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["service"], "hermes")
+        self.assertEqual(payload["index"]["license"], "MPL-2.0")
+        self.assertEqual(payload["index"]["status"], "missing_config")
+
+    def test_cli_index_query_requires_sonic_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "SONIC_HOST": "",
+                "SONIC_PASSWORD": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["index", "query", "--collection", "bairui", "--bucket", "docs", "--query", "hello"])
+        self.assertEqual(code, 1)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["index"]["status"], "missing_config")
+
+    def test_runtime_readiness_reports_required_blockers_and_optional_warnings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "EVEROS_BASE_URL": "",
+                "SEARXNG_BASE_URL": "",
+                "SONIC_HOST": "",
+                "SONIC_PASSWORD": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                readiness = collect_runtime_readiness(load_settings())
+        self.assertIn(readiness["status"], {"partial", "blocked"})
+        names = {item["name"] for item in readiness["items"]}
+        self.assertIn("everos_memory", names)
+        self.assertIn("sonic_local_index", names)
+        self.assertTrue(any("sonic_local_index" in warning for warning in readiness["warnings"]))
 
     def test_cli_status_prints_runtime_status(self):
         with tempfile.TemporaryDirectory() as tmp:

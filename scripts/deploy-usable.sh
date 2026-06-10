@@ -46,11 +46,17 @@ if ! grep -qE '^POSTGRES_PASSWORD=.+$' .env; then
   ensure_env_value "POSTGRES_PASSWORD" "$(new_secret)"
 fi
 
+if ! grep -qE '^SONIC_PASSWORD=.+$' .env; then
+  ensure_env_value "SONIC_PASSWORD" "$(new_secret)"
+fi
+
 ensure_env_value "HERMES_ENV" "production"
 ensure_env_value "HERMES_HOST" "127.0.0.1"
 ensure_env_value "HERMES_PORT" "8787"
+ensure_env_value "SONIC_HOST" "sonic"
+ensure_env_value "SONIC_PORT" "1491"
 
-mkdir -p src tests data/postgres logs obsidian-vault
+mkdir -p src tests data/postgres data/sonic logs obsidian-vault
 
 if [[ "$MODE" == "domain" && -z "$DOMAIN" ]]; then
   echo "Domain mode requires DOMAIN, for example: MODE=domain DOMAIN=moxi.example.com scripts/deploy-usable.sh" >&2
@@ -71,3 +77,4 @@ step "Deployment started"
 printf 'Hermes health:       http://127.0.0.1:8787/health\n'
 printf 'Hermes ready:        http://127.0.0.1:8787/ready\n'
 printf 'Hermes capabilities: http://127.0.0.1:8787/capabilities\n'
+printf 'Runtime readiness:   http://127.0.0.1:8787/runtime/readiness\n'

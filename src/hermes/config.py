@@ -46,6 +46,10 @@ class Settings:
     searxng_base_url: str
     searxng_public_base_url: str
     searxng_timeout_seconds: int
+    sonic_host: str
+    sonic_port: int
+    sonic_password: str
+    sonic_timeout_seconds: int
 
     @property
     def has_database(self) -> bool:
@@ -92,6 +96,10 @@ def load_settings() -> Settings:
         searxng_base_url=os.getenv("SEARXNG_BASE_URL", ""),
         searxng_public_base_url=os.getenv("SEARXNG_PUBLIC_BASE_URL", ""),
         searxng_timeout_seconds=int(os.getenv("SEARXNG_TIMEOUT_SECONDS", "30")),
+        sonic_host=os.getenv("SONIC_HOST", ""),
+        sonic_port=int(os.getenv("SONIC_PORT", "1491")),
+        sonic_password=os.getenv("SONIC_PASSWORD", ""),
+        sonic_timeout_seconds=int(os.getenv("SONIC_TIMEOUT_SECONDS", "10")),
     )
 
 

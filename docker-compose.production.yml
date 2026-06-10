@@ -32,8 +32,24 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      sonic:
+        condition: service_started
     volumes:
       - ./data/hermes:/app/data/hermes
       - ./logs/hermes:/app/logs/hermes
       - ./obsidian-vault:/opt/hermes-system/obsidian-vault
+    restart: unless-stopped
+
+  sonic:
+    image: valeriansaliou/sonic:latest
+    container_name: bairui-sonic
+    env_file:
+      - .env
+    environment:
+      SONIC_CHANNEL__AUTH_PASSWORD: ${SONIC_PASSWORD:?SONIC_PASSWORD must be set in .env}
+    ports:
+      - "127.0.0.1:${SONIC_PORT:-1491}:1491"
+    volumes:
+      - ./data/sonic:/var/lib/sonic/store
+      - ./infra/sonic/config.cfg:/etc/sonic.cfg:ro
     restart: unless-stopped

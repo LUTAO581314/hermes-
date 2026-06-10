@@ -31,6 +31,16 @@ from .adapters.searxng import (
     search as searxng_search,
     status as searxng_status,
 )
+from .adapters.sonic import (
+    as_payload as sonic_payload,
+    build_docker_command as build_sonic_docker_command,
+    build_push_payload as build_sonic_push_payload,
+    build_query_payload as build_sonic_query_payload,
+    ping as sonic_ping,
+    push as sonic_push,
+    query as sonic_query,
+    status as sonic_status,
+)
 from .adapters.trendradar import (
     as_payload as trendradar_payload,
     build_doctor_command,
@@ -44,6 +54,7 @@ from .db import database_status, run_migrations
 from .license import load_license
 from .model_gateway import complete_chat
 from .platform import build_platform_heartbeat
+from .runtime_readiness import collect_runtime_readiness
 from .server import serve
 from .storage import create_job, list_audit_events, list_jobs, write_obsidian_report
 
@@ -76,6 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("migrate", help="Run PostgreSQL schema migrations")
     subcommands.add_parser("heartbeat", help="Print the platform heartbeat payload")
     subcommands.add_parser("paths", help="Print runtime paths and key configuration")
+    subcommands.add_parser("runtime-readiness", help="Print unified vendor runtime readiness")
 
     memory_parser = subcommands.add_parser("memory", help="Operate the EverOS-backed memory adapter")
     memory_subcommands = memory_parser.add_subparsers(dest="memory_command")
@@ -135,6 +147,26 @@ def build_parser() -> argparse.ArgumentParser:
     search_query.add_argument("--safesearch", default="")
     search_query.add_argument("--time-range", default="")
     search_query.add_argument("--page", type=int, default=1)
+
+    index_parser = subcommands.add_parser("index", help="Operate Sonic local internal search index")
+    index_subcommands = index_parser.add_subparsers(dest="index_command")
+    index_subcommands.add_parser("status", help="Inspect Sonic local index service configuration")
+    index_docker = index_subcommands.add_parser("docker-command", help="Print a Sonic Docker service command")
+    index_docker.add_argument("--host-port", type=int, default=1491)
+    index_subcommands.add_parser("ping", help="Ping Sonic control channel")
+    index_push = index_subcommands.add_parser("push", help="Push one object into Sonic ingest channel")
+    index_push.add_argument("--collection", required=True)
+    index_push.add_argument("--bucket", required=True)
+    index_push.add_argument("--object-id", required=True)
+    index_push.add_argument("--text", required=True)
+    index_push.add_argument("--lang", default="")
+    index_query = index_subcommands.add_parser("query", help="Query Sonic search channel")
+    index_query.add_argument("--collection", required=True)
+    index_query.add_argument("--bucket", required=True)
+    index_query.add_argument("--query", required=True)
+    index_query.add_argument("--limit", type=int, default=10)
+    index_query.add_argument("--offset", type=int, default=0)
+    index_query.add_argument("--lang", default="")
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -221,6 +253,10 @@ def run(argv: list[str] | None = None) -> int:
                 "everos_memory_root": str(settings.everos_memory_root),
             }
         )
+        return 0
+
+    if command == "runtime-readiness":
+        print_json({"service": "hermes", "runtime_readiness": collect_runtime_readiness(settings)})
         return 0
 
     if command == "memory":
@@ -328,6 +364,44 @@ def run(argv: list[str] | None = None) -> int:
             print_json({"service": "hermes", "search": searxng_payload(result)})
             return 0 if result.status == "completed" else 1
         parser.error(f"unknown search command: {search_command}")
+        return 2
+
+    if command == "index":
+        index_command = args.index_command or "status"
+        if index_command == "status":
+            print_json({"service": "hermes", "index": sonic_payload(sonic_status(settings))})
+            return 0
+        if index_command == "docker-command":
+            print_json({"service": "hermes", "index": sonic_payload(build_sonic_docker_command(settings, host_port=args.host_port))})
+            return 0
+        if index_command == "ping":
+            result = sonic_ping(settings)
+            print_json({"service": "hermes", "index": sonic_payload(result)})
+            return 0 if result.status == "completed" else 1
+        if index_command == "push":
+            payload = build_sonic_push_payload(
+                collection=args.collection,
+                bucket=args.bucket,
+                object_id=args.object_id,
+                text=args.text,
+                lang=args.lang,
+            )
+            result = sonic_push(settings, payload)
+            print_json({"service": "hermes", "index": sonic_payload(result)})
+            return 0 if result.status == "completed" else 1
+        if index_command == "query":
+            payload = build_sonic_query_payload(
+                collection=args.collection,
+                bucket=args.bucket,
+                query=args.query,
+                limit=args.limit,
+                offset=args.offset,
+                lang=args.lang,
+            )
+            result = sonic_query(settings, payload)
+            print_json({"service": "hermes", "index": sonic_payload(result)})
+            return 0 if result.status == "completed" else 1
+        parser.error(f"unknown index command: {index_command}")
         return 2
 
     if command == "job":
