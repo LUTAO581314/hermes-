@@ -31,6 +31,33 @@ MOXI Industrial Agent OS provides one controlled backend, one primary user
 experience, governed long-term memory, company workflow automation, trend and
 research intelligence, simulation, and owner-approved execution.
 
+## Productization Decision
+
+The commercialization requirement is a quality bar, not a command to build
+everything from a blank file. The runtime should prioritize mature, working
+source code as product substrate whenever the license and architecture fit.
+
+For Hermes, "source-owned" means we control the source tree, deployment,
+configuration, brand fields, adapters, tests, and operational contract. It does
+not mean every agent, memory, search, or workflow component must be invented
+from scratch.
+
+The preferred path is:
+
+- use mature open-source runtime code directly when it is useful;
+- keep original licenses, notices, source names, and attribution;
+- put third-party runtime code under `vendor/runtimes/` or another explicit
+  boundary;
+- build bairui product behavior, configuration, deployment, license,
+  readiness, and platform contracts around those runtimes;
+- avoid AI-only blank-slate rewrites for complex agent internals unless a
+  small owned component is clearly safer than integrating an existing one.
+
+The target is still industrial product quality: repeatable deployment,
+observable operation, tests, clear boundaries, and future commercial-grade
+handoff. Public/open-source use is acceptable when a selected upstream license
+requires it.
+
 The system is built around these permanent boundaries:
 
 - Hermes is the planned single backend authority.

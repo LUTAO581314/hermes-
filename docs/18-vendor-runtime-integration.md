@@ -1,5 +1,27 @@
 # Vendor Runtime Integration
 
+## Corrected Productization Decision
+
+The product direction is mature-source-first, not blank-slate AI rewriting.
+Hermes may directly use mature open-source runtime code when it helps the
+product become more reliable and deployable.
+
+The commercialization requirement is a quality bar:
+
+- the product must be deployable, testable, observable, and maintainable;
+- brand and customer-facing fields must default to `bairui`;
+- licenses, notices, upstream names, and attribution must remain visible;
+- GPL/AGPL runtimes can be used when the project accepts the corresponding
+  public-source obligations or keeps them isolated as services;
+- third-party runtime source belongs under `vendor/runtimes/` or an equally
+  explicit boundary;
+- our added value is productization: adapters, platform contract, deployment,
+  license flow, readiness checks, audit, operations, and support workflow.
+
+Do not replace mature working internals with AI-written blank-slate code just
+to claim self-development. Prefer source-level control over source-level
+reinvention.
+
 本文档定义 Hermes 如何直接集成外部项目源码，同时保持商业产品边界。
 
 ## 1. 决策

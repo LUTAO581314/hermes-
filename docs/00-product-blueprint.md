@@ -24,6 +24,30 @@ The system should support:
 
 ## 2. Product Principles
 
+### Mature Source First
+
+Commercialization is a product-quality target. It does not require a
+blank-slate AI rewrite of every subsystem.
+
+Hermes should prefer mature, working source code as the product substrate for
+complex agent capabilities when the license, architecture, and operational
+boundary are acceptable. This is especially important for memory, agent
+runtime, workflow, search, connectors, and simulation, where hidden edge cases
+are expensive.
+
+Our product work is to own the source tree and product contract:
+
+- brand and customer-facing fields default to `bairui`;
+- deployment, readiness, logging, license, and verification are ours;
+- adapters define the boundary between Hermes and external runtimes;
+- upstream names, licenses, notices, and attribution remain intact;
+- GPL/AGPL components can be used when we accept the related public-source
+  obligations for that component or keep them isolated as services.
+
+Do not treat "source-owned" as "invent everything from zero." Treat it as:
+we can read, build, modify, deploy, test, replace, and explain the source we
+ship.
+
 ### Source Ownership
 
 Core behavior belongs to our codebase. External projects can accelerate the
@@ -108,4 +132,3 @@ Commercial readiness requires:
 - dependency license review;
 - stable API contracts;
 - deployment and operations manual.
-

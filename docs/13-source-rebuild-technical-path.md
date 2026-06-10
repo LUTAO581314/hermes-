@@ -2,15 +2,31 @@
 
 ## 1. Decision
 
-MOXI Industrial Agent OS will be rebuilt from our own source code.
+MOXI Industrial Agent OS will be rebuilt as a source-owned product, but this
+does not mean every subsystem must be written from a blank file.
+
+The corrected decision is mature-source-first productization:
+
+- use existing mature source code directly when it reduces product risk;
+- keep licenses, notices, upstream names, and attribution;
+- make the bairui/Hermes product boundary, deployment, configuration, tests,
+  readiness, and platform contract ours;
+- avoid AI-only blank-slate rewrites for complex agent internals unless the
+  owned rewrite is clearly smaller and safer than integration.
+
+The phrase "commercialization" is a quality standard: durable code, repeatable
+deployment, observable operations, safe configuration, test coverage, and clear
+handoff. It is not a requirement to close-source every component or hide public
+upstream origins.
 
 External projects are allowed only as:
 
-- research references;
+- product substrate under `vendor/runtimes/`;
 - isolated runtime dependencies;
 - adapter targets;
+- reference implementations;
 - temporary migration aids;
-- license-reviewed optional integrations.
+- license-reviewed integrations.
 
 They must not define the product architecture, backend authority, memory truth,
 deployment model, or commercial user experience.
