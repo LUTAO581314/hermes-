@@ -9,6 +9,7 @@ Use:
 
 - OpenAI-compatible model gateway for model calls;
 - TrendRadar for trends, RSS, hot lists, and public-opinion inputs;
+- FunASR as optional ASR for audio transcription and voice-command input;
 - SearXNG as optional self-hosted metasearch;
 - Sonic as optional local internal search for our own documents, notes, logs,
   and task records;
@@ -132,7 +133,37 @@ python -m src.hermes index query --collection bairui --bucket docs --query "read
 reports `missing_config` and still exposes the Docker command and protocol
 contract needed to deploy Sonic correctly.
 
-## 6. Unified Runtime Readiness
+## 6. FunASR Voice ASR
+
+FunASR is the first voice-input runtime.
+
+Use it for:
+
+- meeting recording transcription;
+- short voice commands;
+- customer service call analysis;
+- audio-to-text ingestion before memory extraction or report generation.
+
+Hermes integrates FunASR through its OpenAI-compatible ASR API:
+
+- `GET /health`
+- `POST /v1/audio/transcriptions`
+- multipart field `file`
+- multipart field `model`
+
+Current Hermes CLI surface:
+
+```bash
+python -m src.hermes voice asr status
+python -m src.hermes voice asr server-command --device cuda
+python -m src.hermes voice asr transcribe --audio-path ./sample.wav
+```
+
+`FUNASR_BASE_URL` enables live transcription calls. Without it, Hermes reports
+`missing_config` and still exposes the upstream server command and API contract
+needed to deploy FunASR correctly.
+
+## 7. Unified Runtime Readiness
 
 Hermes now exposes a machine-readable readiness summary for vendor runtimes:
 
@@ -153,7 +184,7 @@ This is the bridge from adapter visibility to one-click orchestration. Platform
 and deployment scripts should consume this endpoint instead of guessing from
 free-form logs.
 
-## 7. Research Flow
+## 8. Research Flow
 
 ```text
 owner question
@@ -166,7 +197,7 @@ owner question
   -> short owner summary
 ```
 
-## 8. Source Rules
+## 9. Source Rules
 
 Research outputs must:
 

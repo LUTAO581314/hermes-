@@ -10,6 +10,7 @@ from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import database_status
 from src.hermes.adapters.everos import build_search_payload, status as everos_status
+from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mirofish import build_dev_command, status as mirofish_status
 from src.hermes.adapters.searxng import build_docker_command as build_searxng_docker_command, build_search_payload as build_searxng_search_payload, status as searxng_status
 from src.hermes.adapters.sonic import build_docker_command as build_sonic_docker_command, build_query_payload as build_sonic_query_payload, status as sonic_status
@@ -121,6 +122,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("capabilities", help_text)
         self.assertIn("heartbeat", help_text)
         self.assertIn("memory", help_text)
+        self.assertIn("voice", help_text)
         self.assertIn("intel", help_text)
         self.assertIn("simulation", help_text)
         self.assertIn("search", help_text)
@@ -156,6 +158,61 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(payload["user_id"], "owner")
         self.assertEqual(payload["method"], "hybrid")
         self.assertEqual(payload["top_k"], 5)
+
+    def test_funasr_adapter_reports_missing_config_and_openai_contract(self):
+        settings = load_settings()
+        state = funasr_status(settings)
+        self.assertEqual(state.license, "MIT")
+        self.assertEqual(state.source, "https://github.com/modelscope/FunASR")
+        self.assertIn("POST /v1/audio/transcriptions", state.api_contract)
+        self.assertIn("funasr-server --device cuda", state.cli_contract)
+        self.assertIn(state.status, {"missing_config", "configured"})
+
+    def test_build_funasr_server_command_uses_upstream_entrypoint(self):
+        settings = load_settings()
+        plan = build_funasr_server_command(settings, device="cpu", model="sensevoice")
+        self.assertEqual(plan.status, "ready")
+        self.assertEqual(plan.command, ("funasr-server", "--model", "sensevoice", "--device", "cpu"))
+
+    def test_build_funasr_transcription_payload(self):
+        payload = build_funasr_transcription_payload(audio_path="sample.wav", model="sensevoice", language="zh")
+        self.assertEqual(payload["audio_path"], "sample.wav")
+        self.assertEqual(payload["model"], "sensevoice")
+        self.assertEqual(payload["language"], "zh")
+        self.assertEqual(payload["response_format"], "json")
+
+    def test_cli_voice_asr_status_prints_funasr_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "FUNASR_BASE_URL": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["voice", "asr", "status"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["service"], "hermes")
+        self.assertEqual(payload["voice_asr"]["license"], "MIT")
+        self.assertEqual(payload["voice_asr"]["status"], "missing_config")
+
+    def test_cli_voice_asr_transcribe_requires_funasr_base_url_first(self):
+        with tempfile.NamedTemporaryFile(suffix=".wav") as audio:
+            with tempfile.TemporaryDirectory() as tmp:
+                env = {
+                    "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                    "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                    "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                    "FUNASR_BASE_URL": "",
+                }
+                with patch.dict(os.environ, env, clear=False):
+                    with patch("src.hermes.cli.print_json") as print_json:
+                        code = run(["voice", "asr", "transcribe", "--audio-path", audio.name])
+        self.assertEqual(code, 1)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["voice_asr"]["status"], "missing_config")
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -384,7 +441,9 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(readiness["status"], {"partial", "blocked"})
         names = {item["name"] for item in readiness["items"]}
         self.assertIn("everos_memory", names)
+        self.assertIn("funasr_voice_asr", names)
         self.assertIn("sonic_local_index", names)
+        self.assertTrue(any("funasr_voice_asr" in warning for warning in readiness["warnings"]))
         self.assertTrue(any("sonic_local_index" in warning for warning in readiness["warnings"]))
 
     def test_cli_status_prints_runtime_status(self):

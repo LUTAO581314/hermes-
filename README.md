@@ -65,6 +65,8 @@ The system is built around these permanent boundaries:
 - PostgreSQL is the production system database.
 - Obsidian is the owner-readable long-term memory and decision record.
 - EverOS is the automatic memory extraction and retrieval engine.
+- FunASR is the optional voice ASR runtime for transcription, voice commands,
+  meeting notes, and call analysis.
 - TrendRadar is the first external trend and public-opinion runtime.
 - SearXNG is an optional self-hosted metasearch supplement.
 - Sonic is the optional local internal search index for our own documents,
@@ -118,6 +120,8 @@ python -m src.hermes status
 python -m src.hermes capabilities
 python -m src.hermes memory status
 python -m src.hermes memory search --query "owner preferences"
+python -m src.hermes voice asr status
+python -m src.hermes voice asr server-command
 python -m src.hermes intel status
 python -m src.hermes intel mcp-command
 python -m src.hermes simulation status

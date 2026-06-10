@@ -16,6 +16,14 @@ from .adapters.everos import (
     search_memory,
     status as everos_status,
 )
+from .adapters.funasr import (
+    as_payload as funasr_payload,
+    build_docker_command as build_funasr_docker_command,
+    build_server_command as build_funasr_server_command,
+    build_transcription_payload as build_funasr_transcription_payload,
+    status as funasr_status,
+    transcribe as funasr_transcribe,
+)
 from .adapters.mirofish import (
     as_payload as mirofish_payload,
     build_backend_command,
@@ -167,6 +175,23 @@ def build_parser() -> argparse.ArgumentParser:
     index_query.add_argument("--limit", type=int, default=10)
     index_query.add_argument("--offset", type=int, default=0)
     index_query.add_argument("--lang", default="")
+
+    voice_parser = subcommands.add_parser("voice", help="Operate voice runtime adapters")
+    voice_subcommands = voice_parser.add_subparsers(dest="voice_command")
+    asr_parser = voice_subcommands.add_parser("asr", help="Operate FunASR speech-to-text runtime")
+    asr_subcommands = asr_parser.add_subparsers(dest="asr_command")
+    asr_subcommands.add_parser("status", help="Inspect FunASR ASR service configuration")
+    asr_server = asr_subcommands.add_parser("server-command", help="Print the upstream FunASR server command")
+    asr_server.add_argument("--device", default="cuda")
+    asr_server.add_argument("--model", default="")
+    asr_docker = asr_subcommands.add_parser("docker-command", help="Print a FunASR Docker service command plan")
+    asr_docker.add_argument("--host-port", type=int, default=8899)
+    asr_transcribe = asr_subcommands.add_parser("transcribe", help="Transcribe one local audio file through FunASR")
+    asr_transcribe.add_argument("--audio-path", required=True)
+    asr_transcribe.add_argument("--model", default="")
+    asr_transcribe.add_argument("--language", default="")
+    asr_transcribe.add_argument("--prompt", default="")
+    asr_transcribe.add_argument("--response-format", default="json")
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -402,6 +427,35 @@ def run(argv: list[str] | None = None) -> int:
             print_json({"service": "hermes", "index": sonic_payload(result)})
             return 0 if result.status == "completed" else 1
         parser.error(f"unknown index command: {index_command}")
+        return 2
+
+    if command == "voice":
+        voice_command = args.voice_command or "asr"
+        if voice_command != "asr":
+            parser.error(f"unknown voice command: {voice_command}")
+            return 2
+        asr_command = args.asr_command or "status"
+        if asr_command == "status":
+            print_json({"service": "hermes", "voice_asr": funasr_payload(funasr_status(settings))})
+            return 0
+        if asr_command == "server-command":
+            print_json({"service": "hermes", "voice_asr": funasr_payload(build_funasr_server_command(settings, device=args.device, model=args.model))})
+            return 0
+        if asr_command == "docker-command":
+            print_json({"service": "hermes", "voice_asr": funasr_payload(build_funasr_docker_command(settings, host_port=args.host_port))})
+            return 0
+        if asr_command == "transcribe":
+            payload = build_funasr_transcription_payload(
+                audio_path=args.audio_path,
+                model=args.model,
+                language=args.language,
+                prompt=args.prompt,
+                response_format=args.response_format,
+            )
+            result = funasr_transcribe(settings, payload)
+            print_json({"service": "hermes", "voice_asr": funasr_payload(result)})
+            return 0 if result.status == "completed" else 1
+        parser.error(f"unknown voice asr command: {asr_command}")
         return 2
 
     if command == "job":

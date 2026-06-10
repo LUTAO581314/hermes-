@@ -50,6 +50,11 @@ class Settings:
     sonic_port: int
     sonic_password: str
     sonic_timeout_seconds: int
+    funasr_project_root: Path | None
+    funasr_base_url: str
+    funasr_public_base_url: str
+    funasr_model: str
+    funasr_timeout_seconds: int
 
     @property
     def has_database(self) -> bool:
@@ -100,6 +105,11 @@ def load_settings() -> Settings:
         sonic_port=int(os.getenv("SONIC_PORT", "1491")),
         sonic_password=os.getenv("SONIC_PASSWORD", ""),
         sonic_timeout_seconds=int(os.getenv("SONIC_TIMEOUT_SECONDS", "10")),
+        funasr_project_root=Path(os.environ["FUNASR_PROJECT_ROOT"]) if os.getenv("FUNASR_PROJECT_ROOT") else None,
+        funasr_base_url=os.getenv("FUNASR_BASE_URL", ""),
+        funasr_public_base_url=os.getenv("FUNASR_PUBLIC_BASE_URL", ""),
+        funasr_model=os.getenv("FUNASR_MODEL", "fun-asr-nano"),
+        funasr_timeout_seconds=int(os.getenv("FUNASR_TIMEOUT_SECONDS", "120")),
     )
 
 

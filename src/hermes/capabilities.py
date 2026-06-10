@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .adapters.everos import status as everos_status
+from .adapters.funasr import status as funasr_status
 from .adapters.mirofish import status as mirofish_status
 from .adapters.searxng import status as searxng_status
 from .adapters.sonic import status as sonic_status
@@ -33,6 +34,7 @@ def collect_capabilities(settings: Settings) -> list[dict[str, str]]:
     db_status = database_status(settings)
     license_status = load_license(settings.license_file, settings.license_secret)
     everos = everos_status(settings)
+    funasr = funasr_status(settings)
     trendradar = trendradar_status(settings)
     mirofish = mirofish_status(settings)
     searxng = searxng_status(settings)
@@ -54,6 +56,13 @@ def collect_capabilities(settings: Settings) -> list[dict[str, str]]:
             everos.detail,
             source=everos.source_path,
             license=everos.license,
+        ),
+        Capability(
+            "funasr_voice_asr",
+            funasr.status,
+            funasr.detail,
+            source=funasr.source,
+            license=funasr.license,
         ),
         Capability(
             "trendradar_intelligence",

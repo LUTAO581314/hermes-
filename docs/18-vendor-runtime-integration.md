@@ -27,6 +27,7 @@ reinvention.
 | Runtime | Path | Purpose | License | Integration status |
 | --- | --- | --- | --- | --- |
 | EverOS | `vendor/runtimes/everos` | Automatic memory extraction and retrieval | Apache-2.0 | first source-level adapter |
+| FunASR | Docker/Linux service or `vendor/runtimes/funasr` | Voice ASR and OpenAI-compatible transcription | MIT | HTTP service adapter |
 | TrendRadar | `vendor/runtimes/trendradar` | Trend, RSS, hot-list, and public-opinion intelligence | GPLv3 | source-level adapter |
 | MiroFish | `vendor/runtimes/mirofish` | Scenario simulation and multi-agent rehearsal | AGPLv3 | source-level adapter |
 | SearXNG | Docker or Linux checkout | Optional metasearch | AGPLv3 | HTTP service adapter |
@@ -77,7 +78,34 @@ This keeps the product honest: Bairui productizes, operates, brands, deploys,
 tests, and supports the memory runtime while preserving the mature upstream
 source boundary.
 
-## 5. TrendRadar Adapter Contract
+## 5. FunASR Adapter Contract
+
+FunASR is the voice ASR runtime for transcription, voice commands, meeting
+notes, and customer service call analysis. Hermes treats it as an isolated
+service behind an OpenAI-compatible transcription API.
+
+Hermes owns:
+
+- `src/hermes/adapters/funasr.py`;
+- CLI commands under `python -m src.hermes voice asr ...`;
+- HTTP routes under `/voice/asr/status` and `/voice/asr/transcribe`;
+- operational configuration through `FUNASR_PROJECT_ROOT`, `FUNASR_BASE_URL`,
+  `FUNASR_PUBLIC_BASE_URL`, `FUNASR_MODEL`, and `FUNASR_TIMEOUT_SECONDS`;
+- capability and commercial-boundary reporting.
+
+FunASR owns:
+
+- acoustic models;
+- streaming and batch ASR internals;
+- speaker, emotion, and multilingual ASR capabilities where configured;
+- the upstream server process;
+- `/v1/audio/transcriptions`.
+
+Hermes must not pretend ASR is available until `FUNASR_BASE_URL` is configured.
+The first integration surface is OpenAI-compatible file transcription; streaming
+ASR and diarization controls can be added after the server contract is proven.
+
+## 6. TrendRadar Adapter Contract
 
 TrendRadar is the first intelligence runtime integration. Because it is GPLv3,
 Hermes treats it as an isolated runtime with an explicit source and license
@@ -104,7 +132,7 @@ TrendRadar owns:
 Hermes must not copy TrendRadar internals into core code. Use the upstream CLI,
 MCP server, process boundary, or service boundary.
 
-## 6. MiroFish Adapter Contract
+## 7. MiroFish Adapter Contract
 
 MiroFish is the scenario simulation and decision rehearsal runtime. Because it
 is AGPLv3, Hermes treats it as an isolated runtime with an explicit hosted-use
@@ -135,7 +163,7 @@ MiroFish owns:
 Hermes must not copy MiroFish internals into core code. Use the upstream npm
 scripts, Flask API, process boundary, or service boundary.
 
-## 7. SearXNG Adapter Contract
+## 8. SearXNG Adapter Contract
 
 SearXNG is the optional self-hosted metasearch runtime. Because the upstream
 repository has Windows-incompatible checkout paths and is AGPLv3, Hermes treats
@@ -161,7 +189,7 @@ The JSON API requires `format=json`, and SearXNG configuration must permit the
 `json` output format. Hermes must not pretend SearXNG is available until
 `SEARXNG_BASE_URL` is configured.
 
-## 8. Sonic Adapter Contract
+## 9. Sonic Adapter Contract
 
 Sonic is the local internal search index runtime. It is not a public web search
 tool and does not replace SearXNG.
@@ -188,7 +216,7 @@ Sonic owns:
 Hermes talks to Sonic through the upstream channel protocol instead of copying
 Rust internals into Hermes core.
 
-## 9. Unified Runtime Readiness
+## 10. Unified Runtime Readiness
 
 Hermes exposes runtime orchestration readiness through:
 
@@ -199,10 +227,13 @@ This is the machine-readable bridge between adapters and deployment
 orchestration. Scripts and the Bairui platform should consume readiness
 blockers and warnings instead of scraping logs.
 
-## 10. Commercial Boundaries
+## 11. Commercial Boundaries
 
 Apache-2.0 runtimes such as EverOS are suitable for deeper productized
 integration, while preserving LICENSE, NOTICE, upstream name, and attribution.
+
+MIT runtimes such as FunASR are suitable for productized ASR integration, while
+preserving LICENSE, upstream name, and attribution.
 
 GPLv3 runtimes such as TrendRadar require source-code availability obligations
 when distributed as part of the product package.
@@ -217,17 +248,18 @@ source is changed.
 
 This document is general engineering guidance, not legal advice.
 
-## 11. Integration Order
+## 12. Integration Order
 
 1. EverOS adapter for memory candidates and retrieval.
-2. TrendRadar adapter for intelligence input.
-3. MiroFish adapter for simulation briefs and reports.
-4. SearXNG as an optional Docker-based metasearch runtime after Linux/server
+2. FunASR adapter for voice ASR and audio-to-text ingestion.
+3. TrendRadar adapter for intelligence input.
+4. MiroFish adapter for simulation briefs and reports.
+5. SearXNG as an optional Docker-based metasearch runtime after Linux/server
    deployment.
-5. Sonic as a Docker-based local index for Bairui-owned notes, logs, documents,
+6. Sonic as a Docker-based local index for Bairui-owned notes, logs, documents,
    and task records.
 
-## 12. Verification Requirements
+## 13. Verification Requirements
 
 Each runtime integration must prove:
 

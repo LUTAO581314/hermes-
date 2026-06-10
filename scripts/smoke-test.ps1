@@ -10,6 +10,7 @@ $required = @(
     "src/hermes/model_gateway.py",
     "src/hermes/db.py",
     "src/hermes/runtime_readiness.py",
+    "src/hermes/adapters/funasr.py",
     "src/hermes/adapters/sonic.py",
     "requirements.txt",
     "tests/test_runtime.py",

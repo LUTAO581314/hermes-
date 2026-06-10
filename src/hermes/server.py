@@ -15,6 +15,12 @@ from .adapters.everos import (
     search_memory,
     status as everos_status,
 )
+from .adapters.funasr import (
+    as_payload as funasr_payload,
+    build_transcription_payload as build_funasr_transcription_payload,
+    status as funasr_status,
+    transcribe as funasr_transcribe,
+)
 from .adapters.mirofish import as_payload as mirofish_payload, status as mirofish_status
 from .adapters.searxng import (
     as_payload as searxng_payload,
@@ -106,6 +112,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/memory/status":
             self._send({"service": "hermes", "memory": as_payload(everos_status(settings))})
+            return
+        if self.path == "/voice/asr/status":
+            self._send({"service": "hermes", "voice_asr": funasr_payload(funasr_status(settings))})
             return
         if self.path == "/intel/status":
             self._send({"service": "hermes", "intelligence": trendradar_payload(trendradar_status(settings))})
@@ -283,6 +292,24 @@ class HermesHandler(BaseHTTPRequestHandler):
                 ),
             )
             self._send({"service": "hermes", "index": sonic_payload(result)}, status=200 if result.status == "completed" else 503)
+            return
+
+        if self.path == "/voice/asr/transcribe":
+            audio_path = str(payload.get("audio_path", ""))
+            if not audio_path.strip():
+                self._send({"error": "invalid_request", "message": "audio_path is required"}, status=400)
+                return
+            result = funasr_transcribe(
+                settings,
+                build_funasr_transcription_payload(
+                    audio_path=audio_path,
+                    model=str(payload.get("model", "")),
+                    language=str(payload.get("language", "")),
+                    prompt=str(payload.get("prompt", "")),
+                    response_format=str(payload.get("response_format", "json")),
+                ),
+            )
+            self._send({"service": "hermes", "voice_asr": funasr_payload(result)}, status=200 if result.status == "completed" else 503)
             return
 
         if self.path == "/admin/migrate":
