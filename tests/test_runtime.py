@@ -10,6 +10,7 @@ from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import SCHEMA_SQL, database_status
 from src.hermes.document_pipeline import build_document_ingest_session_summary, build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, list_document_ingest_session_summaries, list_pending_document_memory_reviews, register_document_artifacts, review_document_memory_candidate, review_document_memory_candidates_batch, run_document_ingest, run_document_workbench_until_blocked
+from src.hermes.frontend_contract import build_frontend_contract
 from src.hermes.adapters.everos import EverOSResult, build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
@@ -84,6 +85,18 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("mirofish_simulation", names)
         self.assertIn("jobs_api", names)
         self.assertIn("model_gateway", names)
+
+    def test_frontend_contract_lists_stable_product_surfaces(self):
+        contract = build_frontend_contract(load_settings(), "test-version")
+        screens = {screen["id"]: screen for screen in contract["screens"]}
+        api_groups = {group["id"]: group for group in contract["api_groups"]}
+        document_paths = {endpoint["path"] for endpoint in api_groups["document_workbench"]["endpoints"]}
+        self.assertEqual(contract["product"]["brand_key"], "bairui")
+        self.assertIn("document_ingest_sessions", screens)
+        self.assertIn("/document/parse/session-list", screens["document_ingest_sessions"]["read"])
+        self.assertIn("/document/parse/session-summary", screens["document_ingest_sessions"]["read"])
+        self.assertIn("/document/parse/workbench-next", document_paths)
+        self.assertIn("needs_review", contract["state_values"])
 
     def test_create_job_writes_job_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -865,6 +878,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("serve", help_text)
         self.assertIn("status", help_text)
         self.assertIn("capabilities", help_text)
+        self.assertIn("frontend-contract", help_text)
         self.assertIn("heartbeat", help_text)
         self.assertIn("memory", help_text)
         self.assertIn("voice", help_text)
@@ -874,6 +888,17 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("search", help_text)
         self.assertIn("index", help_text)
         self.assertIn("runtime-readiness", help_text)
+
+    def test_cli_frontend_contract_prints_product_contract(self):
+        with patch("src.hermes.cli.print_json") as print_json:
+            code = run(["frontend-contract"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        contract = payload["frontend_contract"]
+        screens = {screen["id"] for screen in contract["screens"]}
+        self.assertEqual(contract["product"]["brand_key"], "bairui")
+        self.assertIn("document_ingest_sessions", screens)
+        self.assertIn("runtime_settings", screens)
 
     def test_deploy_scripts_poll_readiness_and_write_json(self):
         bash_script = Path("scripts/deploy-usable.sh").read_text(encoding="utf-8")

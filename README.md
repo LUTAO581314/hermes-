@@ -120,6 +120,7 @@ CLI entrypoint:
 python -m src.hermes --help
 python -m src.hermes status
 python -m src.hermes capabilities
+python -m src.hermes frontend-contract
 python -m src.hermes memory status
 python -m src.hermes memory search --query "owner preferences"
 python -m src.hermes voice asr status
@@ -161,6 +162,16 @@ python -m src.hermes index docker-command
 python -m src.hermes runtime-readiness
 python -m src.hermes serve
 ```
+
+Frontend contract:
+
+- `GET /frontend/contract`
+- `python -m src.hermes frontend-contract`
+
+The contract lists the stable MOXI / Brain UI product surfaces, including
+dashboard, chat, document ingest sessions, memory review, source-backed
+reports, and runtime settings. Frontends should read this contract before
+rendering product screens and must not hard-code runtime readiness.
 
 Local usable deployment remains:
 

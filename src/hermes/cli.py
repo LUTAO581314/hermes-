@@ -81,6 +81,7 @@ from .document_pipeline import (
     run_document_workbench_until_blocked,
     run_document_ingest,
 )
+from .frontend_contract import build_frontend_contract
 from .license import load_license
 from .model_gateway import complete_chat
 from .platform import build_platform_heartbeat
@@ -125,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("serve", help="Start the Hermes HTTP server")
     subcommands.add_parser("status", help="Print health, readiness, license, and database status")
     subcommands.add_parser("capabilities", help="List runtime and vendor capabilities")
+    subcommands.add_parser("frontend-contract", help="Print the frontend API contract for MOXI / Brain UI")
     subcommands.add_parser("license", help="Inspect the configured license file")
     subcommands.add_parser("jobs", help="List recent file-backed jobs")
     subcommands.add_parser("document-ingests", help="List planned document ingestion records")
@@ -370,6 +372,10 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "capabilities":
         print_json({"service": "hermes", "capabilities": collect_capabilities(settings)})
+        return 0
+
+    if command == "frontend-contract":
+        print_json({"service": "hermes", "frontend_contract": build_frontend_contract(settings, __version__)})
         return 0
 
     if command == "license":

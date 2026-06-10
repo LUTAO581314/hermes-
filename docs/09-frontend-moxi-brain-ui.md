@@ -28,15 +28,32 @@ The UI must provide:
 The frontend reads:
 
 - `/frontend/contract`;
-- `/config/schema`;
 - `/capabilities`;
 - `/jobs`;
-- `/approvals`;
-- `/memory/candidates`;
-- `/intelligence/hotspots`;
-- `/simulation/runs`.
+- `/runtime/readiness`;
+- `/platform/heartbeat`;
+- `/document/parse/session-list`;
+- `/document/parse/session-summary`;
+- `/document/parse/workbench-next`;
+- `/document/parse/workbench-run-until-blocked`;
+- `/document/parse/memory-review-pending`;
+- `/document/parse/memory-review-batch`;
+- `/document/ingest-reports`;
+- `/source-refs`.
 
 The frontend must not hard-code capability readiness.
+
+`/frontend/contract` is now implemented by Hermes and is also available from
+the CLI:
+
+```bash
+python -m src.hermes frontend-contract
+```
+
+It returns the product brand fields, supported UI screens, stable API groups,
+status sources, user actions, and state values such as `ready`, `partial`,
+`blocked`, `missing_config`, and `needs_review`. Planned endpoints must stay
+outside the ready screen/action lists until the backend implements them.
 
 ## 4. Framework Path
 

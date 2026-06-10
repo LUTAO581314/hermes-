@@ -128,14 +128,19 @@ The backend should expose stable contract groups:
 
 - `/health`, `/ready`, `/version`;
 - `/frontend/contract`;
-- `/config/schema`, `/config/update`;
-- `/social/turn`;
-- `/jobs`, `/jobs/event`;
-- `/media/plan-send`;
-- `/memory/search`, `/memory/candidates`, `/memory/promote`;
-- `/intelligence/search`, `/intelligence/hotspots`;
-- `/simulation/brief`, `/simulation/run`;
-- `/approvals`, `/approvals/{id}/approve`, `/approvals/{id}/deny`.
+- `/capabilities`, `/runtime/readiness`, `/platform/heartbeat`;
+- `/jobs`;
+- `/chat`;
+- `/memory/status`;
+- `/document/parse/session-list`, `/document/parse/session-summary`;
+- `/document/parse/workbench-state`, `/document/parse/workbench-next`;
+- `/document/parse/workbench-run-until-blocked`;
+- `/document/parse/memory-review-pending`;
+- `/document/parse/review-memory-candidate`;
+- `/document/parse/memory-review-batch`;
+- `/document/ingest-reports`, `/source-refs`;
+- `/voice/asr/status`, `/document/parse/status`, `/intel/status`;
+- `/simulation/status`, `/search/status`, `/index/status`.
 
 Only endpoints proven by code should be shown as ready. Future endpoints must be
 reported as `planned` or `missing_config`.

@@ -59,6 +59,7 @@ from .document_pipeline import (
     run_document_workbench_until_blocked,
     run_document_ingest,
 )
+from .frontend_contract import build_frontend_contract
 from .license import load_license
 from .model_gateway import complete_chat
 from .platform import build_platform_heartbeat
@@ -127,6 +128,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/capabilities":
             self._send({"service": "hermes", "capabilities": collect_capabilities(settings)})
+            return
+        if self.path == "/frontend/contract":
+            self._send({"service": "hermes", "frontend_contract": build_frontend_contract(settings, __version__)})
             return
         if self.path == "/runtime/readiness":
             self._send({"service": "hermes", "runtime_readiness": collect_runtime_readiness(settings)})
