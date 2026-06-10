@@ -116,7 +116,9 @@ Hermes owns:
 
 - `src/hermes/adapters/mineru.py`;
 - CLI commands under `python -m src.hermes document parse ...`;
-- HTTP status route under `/document/parse/status`;
+- file-backed planned ingestion records in `document_ingests.jsonl`;
+- HTTP routes under `/document/parse/status`, `/document/parse/ingest-plan`,
+  and `/document/ingests`;
 - operational configuration through `MINERU_PROJECT_ROOT`,
   `MINERU_OUTPUT_DIR`, `MINERU_BACKEND`, `MINERU_DEVICE`, and
   `MINERU_TIMEOUT_SECONDS`;
@@ -130,9 +132,11 @@ MinerU owns:
 - extracted image/table/formula artifacts;
 - the upstream CLI and optional service modes.
 
-Hermes must not pretend document ingestion is complete until a supervised
-worker executes parsing, records output artifacts, indexes text, and stores
-source references.
+Hermes may create a planned ingestion record before execution. That record is
+not a parsed result. It is a machine-readable handoff for the next supervised
+worker phase: execute MinerU, register artifacts, index text in Sonic, submit
+memory candidates to EverOS, store PostgreSQL source references, and write an
+Obsidian report when appropriate.
 
 ## 7. TrendRadar Adapter Contract
 

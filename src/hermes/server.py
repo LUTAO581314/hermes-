@@ -21,7 +21,7 @@ from .adapters.funasr import (
     status as funasr_status,
     transcribe as funasr_transcribe,
 )
-from .adapters.mineru import as_payload as mineru_payload, status as mineru_status
+from .adapters.mineru import as_payload as mineru_payload, build_parse_command as build_mineru_parse_command, status as mineru_status
 from .adapters.mirofish import as_payload as mirofish_payload, status as mirofish_status
 from .adapters.searxng import (
     as_payload as searxng_payload,
@@ -46,7 +46,7 @@ from .license import load_license
 from .model_gateway import complete_chat
 from .platform import build_platform_heartbeat
 from .runtime_readiness import collect_runtime_readiness
-from .storage import create_audit_event, create_job, list_audit_events, list_jobs, write_obsidian_report
+from .storage import create_audit_event, create_document_ingest, create_job, list_audit_events, list_document_ingests, list_jobs, write_obsidian_report
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
@@ -107,6 +107,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/jobs":
             self._send({"service": "hermes", "jobs": list_jobs(settings.data_dir)})
+            return
+        if self.path == "/document/ingests":
+            self._send({"service": "hermes", "document_ingests": list_document_ingests(settings.data_dir)})
             return
         if self.path == "/audit":
             self._send({"service": "hermes", "audit": list_audit_events(settings.data_dir)})
@@ -314,6 +317,31 @@ class HermesHandler(BaseHTTPRequestHandler):
                 ),
             )
             self._send({"service": "hermes", "voice_asr": funasr_payload(result)}, status=200 if result.status == "completed" else 503)
+            return
+
+        if self.path == "/document/parse/ingest-plan":
+            input_path = str(payload.get("input_path", ""))
+            if not input_path.strip():
+                self._send({"error": "invalid_request", "message": "input_path is required"}, status=400)
+                return
+            plan = build_mineru_parse_command(
+                settings,
+                input_path=input_path,
+                output_dir=str(payload.get("output_dir", "")),
+                backend=str(payload.get("backend", "")),
+                language=str(payload.get("language", "")),
+                source=str(payload.get("source", "")),
+                device=str(payload.get("device", "")),
+            )
+            output_dir = plan.command[plan.command.index("-o") + 1]
+            ingest = create_document_ingest(
+                settings.data_dir,
+                title=str(payload.get("title", "")),
+                input_path=input_path,
+                output_dir=output_dir,
+                parser_command=plan.command,
+            )
+            self._send({"service": "hermes", "document_ingest": ingest.__dict__, "document_parse": mineru_payload(plan)}, status=201)
             return
 
         if self.path == "/admin/migrate":

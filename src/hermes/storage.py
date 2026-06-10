@@ -57,6 +57,20 @@ class Job:
     updated_at: str
 
 
+@dataclass(frozen=True)
+class DocumentIngest:
+    id: str
+    title: str
+    status: str
+    input_path: str
+    output_dir: str
+    parser: str
+    parser_command: tuple[str, ...]
+    pipeline: dict[str, str]
+    created_at: str
+    updated_at: str
+
+
 def create_audit_event(
     data_dir: Path,
     action: str,
@@ -113,6 +127,49 @@ def create_job(data_dir: Path, title: str, prompt: str, route: str = "general") 
 
 def list_jobs(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
     return _read_jsonl(data_dir / "jobs.jsonl", limit=limit)
+
+
+def create_document_ingest(
+    data_dir: Path,
+    *,
+    title: str,
+    input_path: str,
+    output_dir: str,
+    parser_command: tuple[str, ...],
+) -> DocumentIngest:
+    now = utc_now()
+    ingest = DocumentIngest(
+        id=str(uuid.uuid4()),
+        title=title.strip() or Path(input_path).name or "Document ingest",
+        status="planned",
+        input_path=input_path,
+        output_dir=output_dir,
+        parser="mineru",
+        parser_command=parser_command,
+        pipeline={
+            "parse": "planned",
+            "artifact_registration": "pending",
+            "sonic_index": "pending",
+            "everos_memory_candidate": "pending",
+            "postgresql_source_ref": "pending",
+            "obsidian_report": "pending",
+        },
+        created_at=now,
+        updated_at=now,
+    )
+    _append_jsonl(data_dir / "document_ingests.jsonl", asdict(ingest))
+    create_audit_event(
+        data_dir,
+        "document.ingest_planned",
+        resource_type="document_ingest",
+        resource_ref=ingest.id,
+        payload={"title": ingest.title, "input_path": input_path, "parser": ingest.parser},
+    )
+    return ingest
+
+
+def list_document_ingests(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
+    return _read_jsonl(data_dir / "document_ingests.jsonl", limit=limit)
 
 
 def _slug(value: str) -> str:

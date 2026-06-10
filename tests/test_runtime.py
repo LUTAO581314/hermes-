@@ -20,7 +20,7 @@ from src.hermes.license import load_license, sign_license_payload
 from src.hermes.model_gateway import build_chat_payload, complete_chat
 from src.hermes.platform import HEARTBEAT_PROTOCOL_VERSION, build_platform_heartbeat
 from src.hermes.runtime_readiness import collect_runtime_readiness
-from src.hermes.storage import create_job, list_audit_events, list_jobs, write_obsidian_report
+from src.hermes.storage import create_document_ingest, create_job, list_audit_events, list_document_ingests, list_jobs, write_obsidian_report
 
 
 class RuntimeFoundationTests(unittest.TestCase):
@@ -78,6 +78,25 @@ class RuntimeFoundationTests(unittest.TestCase):
             self.assertEqual(len(list_jobs(data_dir)), 1)
             audit = list_audit_events(data_dir)
             self.assertEqual(audit[0]["action"], "job.created")
+
+    def test_create_document_ingest_writes_plan_and_audit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            ingest = create_document_ingest(
+                data_dir,
+                title="Contract",
+                input_path="contract.pdf",
+                output_dir="out",
+                parser_command=("mineru", "-p", "contract.pdf", "-o", "out"),
+            )
+            self.assertEqual(ingest.status, "planned")
+            self.assertEqual(ingest.pipeline["parse"], "planned")
+            self.assertEqual(ingest.pipeline["sonic_index"], "pending")
+            records = list_document_ingests(data_dir)
+            self.assertEqual(records[0]["parser"], "mineru")
+            self.assertEqual(records[0]["title"], "Contract")
+            audit = list_audit_events(data_dir)
+            self.assertEqual(audit[0]["action"], "document.ingest_planned")
 
     def test_write_obsidian_report_creates_markdown_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -267,6 +286,29 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["document_parse"]["command"][:3], ("mineru", "-p", "sample.pdf"))
+
+    def test_cli_document_ingest_plan_writes_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp) / "data"
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "MINERU_OUTPUT_DIR": str(Path(tmp) / "mineru-output"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "ingest-plan", "--input-path", "sample.pdf", "--title", "Sample"])
+                listed = list_document_ingests(data_dir)
+                with patch("src.hermes.cli.print_json") as list_print_json:
+                    list_code = run(["document-ingests"])
+        self.assertEqual(code, 0)
+        self.assertEqual(list_code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_ingest"].status, "planned")
+        self.assertEqual(payload["document_ingest"].pipeline["artifact_registration"], "pending")
+        self.assertEqual(listed[0]["title"], "Sample")
+        self.assertEqual(list_print_json.call_args.args[0]["document_ingests"][0]["title"], "Sample")
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:

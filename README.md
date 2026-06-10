@@ -126,6 +126,8 @@ python -m src.hermes voice asr status
 python -m src.hermes voice asr server-command
 python -m src.hermes document parse status
 python -m src.hermes document parse parse-command --input-path ./sample.pdf
+python -m src.hermes document parse ingest-plan --input-path ./sample.pdf --title "Sample"
+python -m src.hermes document-ingests
 python -m src.hermes intel status
 python -m src.hermes intel mcp-command
 python -m src.hermes simulation status

@@ -70,7 +70,7 @@ from .model_gateway import complete_chat
 from .platform import build_platform_heartbeat
 from .runtime_readiness import collect_runtime_readiness
 from .server import serve
-from .storage import create_job, list_audit_events, list_jobs, write_obsidian_report
+from .storage import create_document_ingest, create_job, list_audit_events, list_document_ingests, list_jobs, write_obsidian_report
 
 
 def _normalize(value: Any) -> Any:
@@ -97,6 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("capabilities", help="List runtime and vendor capabilities")
     subcommands.add_parser("license", help="Inspect the configured license file")
     subcommands.add_parser("jobs", help="List recent file-backed jobs")
+    subcommands.add_parser("document-ingests", help="List planned document ingestion records")
     subcommands.add_parser("audit", help="List recent audit events")
     subcommands.add_parser("migrate", help="Run PostgreSQL schema migrations")
     subcommands.add_parser("heartbeat", help="Print the platform heartbeat payload")
@@ -212,6 +213,14 @@ def build_parser() -> argparse.ArgumentParser:
     parse_command.add_argument("--language", default="")
     parse_command.add_argument("--source", default="")
     parse_command.add_argument("--device", default="")
+    ingest_plan = parse_subcommands.add_parser("ingest-plan", help="Create a planned MinerU document ingestion record")
+    ingest_plan.add_argument("--input-path", required=True)
+    ingest_plan.add_argument("--title", default="")
+    ingest_plan.add_argument("--output-dir", default="")
+    ingest_plan.add_argument("--backend", default="")
+    ingest_plan.add_argument("--language", default="")
+    ingest_plan.add_argument("--source", default="")
+    ingest_plan.add_argument("--device", default="")
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -271,6 +280,10 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "jobs":
         print_json({"service": "hermes", "jobs": list_jobs(settings.data_dir)})
+        return 0
+
+    if command == "document-ingests":
+        print_json({"service": "hermes", "document_ingests": list_document_ingests(settings.data_dir)})
         return 0
 
     if command == "audit":
@@ -491,22 +504,36 @@ def run(argv: list[str] | None = None) -> int:
             print_json({"service": "hermes", "document_parse": mineru_payload(build_mineru_install_command(settings))})
             return 0
         if parse_command == "parse-command":
-            print_json(
-                {
-                    "service": "hermes",
-                    "document_parse": mineru_payload(
-                        build_mineru_parse_command(
-                            settings,
-                            input_path=args.input_path,
-                            output_dir=args.output_dir,
-                            backend=args.backend,
-                            language=args.language,
-                            source=args.source,
-                            device=args.device,
-                        )
-                    ),
-                }
+            plan = build_mineru_parse_command(
+                settings,
+                input_path=args.input_path,
+                output_dir=args.output_dir,
+                backend=args.backend,
+                language=args.language,
+                source=args.source,
+                device=args.device,
             )
+            print_json({"service": "hermes", "document_parse": mineru_payload(plan)})
+            return 0
+        if parse_command == "ingest-plan":
+            plan = build_mineru_parse_command(
+                settings,
+                input_path=args.input_path,
+                output_dir=args.output_dir,
+                backend=args.backend,
+                language=args.language,
+                source=args.source,
+                device=args.device,
+            )
+            output_dir = plan.command[plan.command.index("-o") + 1]
+            ingest = create_document_ingest(
+                settings.data_dir,
+                title=args.title,
+                input_path=args.input_path,
+                output_dir=output_dir,
+                parser_command=plan.command,
+            )
+            print_json({"service": "hermes", "document_ingest": ingest, "document_parse": mineru_payload(plan)})
             return 0
         parser.error(f"unknown document parse command: {parse_command}")
         return 2

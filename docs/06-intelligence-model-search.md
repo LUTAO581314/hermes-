@@ -187,12 +187,24 @@ Current Hermes CLI surface:
 python -m src.hermes document parse status
 python -m src.hermes document parse install-command
 python -m src.hermes document parse parse-command --input-path ./sample.pdf
+python -m src.hermes document parse ingest-plan --input-path ./sample.pdf --title "Sample"
+python -m src.hermes document-ingests
 ```
 
-Hermes does not claim parsing is complete by printing a command. The next
-pipeline step will execute the command inside a supervised worker, register
-output files, index titles/text in Sonic, and store source references in
-PostgreSQL.
+`ingest-plan` creates a local `document_ingests.jsonl` record with the input
+file, output directory, MinerU command, and downstream pipeline states:
+
+- parse: planned;
+- artifact registration: pending;
+- Sonic index: pending;
+- EverOS memory candidate: pending;
+- PostgreSQL source reference: pending;
+- Obsidian report: pending.
+
+Hermes does not claim parsing is complete by printing a command or writing an
+ingest plan. The next pipeline step will execute the command inside a
+supervised worker, register output files, index titles/text in Sonic, and store
+source references in PostgreSQL.
 
 ## 8. Unified Runtime Readiness
 
