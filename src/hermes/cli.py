@@ -74,6 +74,7 @@ from .document_pipeline import (
     index_document_artifacts,
     register_document_artifacts,
     review_document_memory_candidate,
+    run_document_workbench_until_blocked,
     run_document_ingest,
 )
 from .license import load_license
@@ -288,6 +289,14 @@ def build_parser() -> argparse.ArgumentParser:
     workbench_next.add_argument("--bucket", default="documents")
     workbench_next.add_argument("--lang", default="")
     workbench_next.add_argument("--max-candidates", type=int, default=20)
+    workbench_run = parse_subcommands.add_parser("workbench-run-until-blocked", help="Run safe document ingestion workbench actions until complete or blocked")
+    workbench_run.add_argument("--ingest-id", required=True)
+    workbench_run.add_argument("--timeout-seconds", type=int, default=0)
+    workbench_run.add_argument("--collection", default="bairui")
+    workbench_run.add_argument("--bucket", default="documents")
+    workbench_run.add_argument("--lang", default="")
+    workbench_run.add_argument("--max-candidates", type=int, default=20)
+    workbench_run.add_argument("--max-steps", type=int, default=10)
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -698,6 +707,19 @@ def run(argv: list[str] | None = None) -> int:
             )
             print_json({"service": "hermes", "document_workbench_step": result})
             return 0 if result.status in {"completed", "needs_review"} else 1
+        if parse_command == "workbench-run-until-blocked":
+            result = run_document_workbench_until_blocked(
+                settings,
+                args.ingest_id,
+                timeout_seconds=args.timeout_seconds or settings.mineru_timeout_seconds,
+                collection=args.collection,
+                bucket=args.bucket,
+                lang=args.lang,
+                max_candidates=args.max_candidates,
+                max_steps=args.max_steps,
+            )
+            print_json({"service": "hermes", "document_workbench_run": result})
+            return 0 if result.status in {"completed", "needs_review", "step_limit_reached"} else 1
         parser.error(f"unknown document parse command: {parse_command}")
         return 2
 

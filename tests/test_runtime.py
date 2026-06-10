@@ -9,13 +9,13 @@ from src.hermes.capabilities import collect_capabilities
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import SCHEMA_SQL, database_status
-from src.hermes.document_pipeline import build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, review_document_memory_candidate, run_document_ingest
+from src.hermes.document_pipeline import build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, review_document_memory_candidate, run_document_ingest, run_document_workbench_until_blocked
 from src.hermes.adapters.everos import EverOSResult, build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
 from src.hermes.adapters.mirofish import build_dev_command, status as mirofish_status
 from src.hermes.adapters.searxng import build_docker_command as build_searxng_docker_command, build_search_payload as build_searxng_search_payload, status as searxng_status
-from src.hermes.adapters.sonic import build_docker_command as build_sonic_docker_command, build_query_payload as build_sonic_query_payload, status as sonic_status
+from src.hermes.adapters.sonic import SonicResult, build_docker_command as build_sonic_docker_command, build_query_payload as build_sonic_query_payload, status as sonic_status
 from src.hermes.adapters.trendradar import build_mcp_command, status as trendradar_status
 from src.hermes.license import load_license, sign_license_payload
 from src.hermes.model_gateway import build_chat_payload, complete_chat
@@ -646,6 +646,38 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(len(result.result["pending_candidates"]), 1)
         self.assertEqual(result.state.counts["memory_reviews"], 0)
 
+    def test_document_workbench_run_until_blocked_stops_for_memory_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text("Owner must review this candidate before memory promotion.", encoding="utf-8")
+            ingest = create_document_ingest(
+                data_dir,
+                title="Run until review plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("python", "-c", "print('run until blocked ok')"),
+            )
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "SONIC_HOST": "127.0.0.1",
+                "SONIC_PASSWORD": "secret",
+            }
+            sonic_result = SonicResult(status="completed", channel="ingest", command="PUSH", payload={})
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.document_pipeline.sonic_push", return_value=sonic_result):
+                    result = run_document_workbench_until_blocked(load_settings(), ingest.id, timeout_seconds=10)
+        self.assertEqual(result.status, "needs_review")
+        self.assertEqual([step.action["command"] for step in result.steps], ["run-ingest", "register-artifacts", "index-artifacts", "memory-candidates", "review-memory-candidate"])
+        self.assertEqual(result.state.pipeline["parse"], "completed")
+        self.assertEqual(result.state.pipeline["artifact_registration"], "completed")
+        self.assertEqual(result.state.counts["memory_candidates"], 1)
+        self.assertEqual(result.state.counts["memory_reviews"], 0)
+
     def test_write_obsidian_report_creates_markdown_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1143,6 +1175,37 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(payload["document_workbench_step"].status, "completed")
         self.assertEqual(payload["document_workbench_step"].action["command"], "run-ingest")
         self.assertEqual(payload["document_workbench_step"].state.pipeline["parse"], "completed")
+
+    def test_cli_document_workbench_run_until_blocked_executes_safe_actions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text("Owner preference: CLI run until blocked should stop for review before memory promotion.", encoding="utf-8")
+            ingest = create_document_ingest(
+                data_dir,
+                title="CLI workbench run plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("python", "-c", "print('cli run ok')"),
+            )
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "SONIC_HOST": "127.0.0.1",
+                "SONIC_PASSWORD": "secret",
+            }
+            sonic_result = SonicResult(status="completed", channel="ingest", command="PUSH", payload={})
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.document_pipeline.sonic_push", return_value=sonic_result):
+                    with patch("src.hermes.cli.print_json") as print_json:
+                        code = run(["document", "parse", "workbench-run-until-blocked", "--ingest-id", ingest.id, "--timeout-seconds", "10"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_workbench_run"].status, "needs_review")
+        self.assertEqual(payload["document_workbench_run"].steps[-1].action["command"], "review-memory-candidate")
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:

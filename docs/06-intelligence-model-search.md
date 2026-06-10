@@ -197,6 +197,7 @@ python -m src.hermes document parse source-refs --ingest-id <ingest_id>
 python -m src.hermes document parse ingest-report --ingest-id <ingest_id>
 python -m src.hermes document parse workbench-state --ingest-id <ingest_id>
 python -m src.hermes document parse workbench-next --ingest-id <ingest_id>
+python -m src.hermes document parse workbench-run-until-blocked --ingest-id <ingest_id>
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
 python -m src.hermes document-ingest-reports
@@ -298,6 +299,26 @@ generation, source reference creation, and Obsidian report writing. It does not
 auto-approve or auto-reject memory candidates. When owner review is required,
 it returns `needs_review` with the pending candidates so the UI can show an
 explicit approval/rejection step.
+
+`workbench-run-until-blocked` repeats the same safe action loop until the
+ingest is complete or a real stop condition appears:
+
+- `needs_review`: memory candidates require explicit owner approval/rejection;
+- `failed` or `not_found`: an underlying pipeline action failed or the ingest
+  record is missing;
+- `no_progress`: an action returned success/skipped but did not advance the
+  workbench state;
+- `step_limit_reached`: the configured safety limit was reached.
+
+It is available as:
+
+```bash
+python -m src.hermes document parse workbench-run-until-blocked --ingest-id <ingest_id>
+```
+
+and over HTTP at `POST /document/parse/workbench-run-until-blocked`. This is
+the preferred backend contract for a single "advance until blocked" button in
+the document knowledge ingestion workbench.
 
 ## 8. Unified Runtime Readiness
 

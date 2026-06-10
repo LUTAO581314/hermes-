@@ -131,7 +131,8 @@ Hermes owns:
   `/document/parse/index-artifacts`, `/document/parse/memory-candidates`,
   `/document/parse/review-memory-candidate`, `/document/parse/source-refs`,
   `/document/parse/ingest-report`, `/document/parse/workbench-state`,
-  `/document/parse/workbench-next`, `/document/ingests`,
+  `/document/parse/workbench-next`,
+  `/document/parse/workbench-run-until-blocked`, `/document/ingests`,
   `/document/ingest-runs`, `/document/ingest-reports`, `/document/artifacts`,
   `/document/index-runs`, `/document/memory-candidates`, and
   `/document/memory-reviews`, plus `/source-refs`;
@@ -156,10 +157,13 @@ workflow. It aggregates the ingest plan, parser runs, registered artifacts,
 Sonic index runs, memory candidates and reviews, source references, Obsidian
 ingest reports, blockers, warnings, counts, latest records, and the next safe
 action into a single response. `/document/parse/workbench-next` executes that
-next safe action and returns the refreshed state. It stops with `needs_review`
-for memory candidate review so owner authorization remains explicit. Missing
-runtime configuration is surfaced as a warning or blocker instead of being
-hidden behind fake success.
+next safe action and returns the refreshed state.
+`/document/parse/workbench-run-until-blocked` repeats safe actions until the
+workflow completes or stops on `needs_review`, `failed`, `not_found`,
+`no_progress`, or `step_limit_reached`. It stops with `needs_review` for memory
+candidate review so owner authorization remains explicit. Missing runtime
+configuration is surfaced as a warning or blocker instead of being hidden
+behind fake success.
 
 MinerU owns:
 

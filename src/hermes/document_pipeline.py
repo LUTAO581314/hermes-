@@ -124,6 +124,14 @@ class DocumentWorkbenchStepResult:
     state: DocumentWorkbenchState
 
 
+@dataclass(frozen=True)
+class DocumentWorkbenchRunResult:
+    status: str
+    detail: str
+    steps: tuple[DocumentWorkbenchStepResult, ...]
+    state: DocumentWorkbenchState
+
+
 def run_document_ingest(data_dir: Path, ingest_id: str, *, timeout_seconds: int) -> DocumentPipelineResult:
     ingest = _find_ingest(data_dir, ingest_id)
     if ingest is None:
@@ -800,6 +808,79 @@ def execute_document_workbench_next(
         action=action,
         result=result,
         state=next_state,
+    )
+
+
+def run_document_workbench_until_blocked(
+    settings: Settings,
+    ingest_id: str,
+    *,
+    timeout_seconds: int,
+    collection: str = "bairui",
+    bucket: str = "documents",
+    lang: str = "",
+    max_candidates: int = 20,
+    max_steps: int = 10,
+) -> DocumentWorkbenchRunResult:
+    steps: list[DocumentWorkbenchStepResult] = []
+    current_state = build_document_workbench_state(settings, ingest_id)
+    if current_state.status == "not_found":
+        return DocumentWorkbenchRunResult(
+            status="not_found",
+            detail=current_state.detail,
+            steps=(),
+            state=current_state,
+        )
+
+    for _ in range(max(1, max_steps)):
+        action = current_state.next_actions[0] if current_state.next_actions else {"command": "done"}
+        if action.get("command") == "done":
+            return DocumentWorkbenchRunResult(
+                status="completed",
+                detail="document ingest workflow is complete",
+                steps=tuple(steps),
+                state=current_state,
+            )
+
+        step = execute_document_workbench_next(
+            settings,
+            ingest_id,
+            timeout_seconds=timeout_seconds,
+            collection=collection,
+            bucket=bucket,
+            lang=lang,
+            max_candidates=max_candidates,
+        )
+        steps.append(step)
+        current_state = step.state
+        next_action = current_state.next_actions[0] if current_state.next_actions else {"command": "done"}
+        if step.status == "completed" and next_action.get("command") == action.get("command"):
+            return DocumentWorkbenchRunResult(
+                status="no_progress",
+                detail=f"workbench action did not advance pipeline: {action.get('command')}",
+                steps=tuple(steps),
+                state=current_state,
+            )
+        if step.status == "needs_review":
+            return DocumentWorkbenchRunResult(
+                status="needs_review",
+                detail=step.detail,
+                steps=tuple(steps),
+                state=current_state,
+            )
+        if step.status not in {"completed"}:
+            return DocumentWorkbenchRunResult(
+                status=step.status,
+                detail=step.detail,
+                steps=tuple(steps),
+                state=current_state,
+            )
+
+    return DocumentWorkbenchRunResult(
+        status="step_limit_reached",
+        detail=f"stopped after {max(1, max_steps)} workbench steps",
+        steps=tuple(steps),
+        state=current_state,
     )
 
 

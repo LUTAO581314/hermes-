@@ -136,6 +136,7 @@ python -m src.hermes document parse source-refs --ingest-id <ingest_id>
 python -m src.hermes document parse ingest-report --ingest-id <ingest_id>
 python -m src.hermes document parse workbench-state --ingest-id <ingest_id>
 python -m src.hermes document parse workbench-next --ingest-id <ingest_id>
+python -m src.hermes document parse workbench-run-until-blocked --ingest-id <ingest_id>
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
 python -m src.hermes document-ingest-reports

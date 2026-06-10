@@ -52,6 +52,7 @@ from .document_pipeline import (
     index_document_artifacts,
     register_document_artifacts,
     review_document_memory_candidate,
+    run_document_workbench_until_blocked,
     run_document_ingest,
 )
 from .license import load_license
@@ -538,6 +539,29 @@ class HermesHandler(BaseHTTPRequestHandler):
             if result.status == "unsupported_action":
                 status = 409
             self._send({"service": "hermes", "document_workbench_step": asdict(result)}, status=status)
+            return
+
+        if self.path == "/document/parse/workbench-run-until-blocked":
+            ingest_id = str(payload.get("ingest_id", ""))
+            if not ingest_id.strip():
+                self._send({"error": "invalid_request", "message": "ingest_id is required"}, status=400)
+                return
+            result = run_document_workbench_until_blocked(
+                settings,
+                ingest_id,
+                timeout_seconds=int(payload.get("timeout_seconds") or settings.mineru_timeout_seconds),
+                collection=str(payload.get("collection", "bairui")),
+                bucket=str(payload.get("bucket", "documents")),
+                lang=str(payload.get("lang", "")),
+                max_candidates=int(payload.get("max_candidates", 20)),
+                max_steps=int(payload.get("max_steps", 10)),
+            )
+            status = 200 if result.status in {"completed", "needs_review", "step_limit_reached"} else 503
+            if result.status == "not_found":
+                status = 404
+            if result.status == "unsupported_action":
+                status = 409
+            self._send({"service": "hermes", "document_workbench_run": asdict(result)}, status=status)
             return
 
         if self.path == "/admin/migrate":
