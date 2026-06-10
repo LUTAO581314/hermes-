@@ -56,11 +56,20 @@ python -m src.hermes memory status
 python -m src.hermes memory ingest --text "Owner prefers concise reports" --user-id owner --session-id owner-setup
 python -m src.hermes memory flush --session-id owner-setup
 python -m src.hermes memory search --query "report preference" --user-id owner
+python -m src.hermes document parse memory-candidates --ingest-id <ingest_id>
+python -m src.hermes document-memory-candidates
 ```
 
 `EVEROS_BASE_URL` enables live calls. Without it, Hermes reports
 `missing_config` for live memory operations while still detecting the local
 Apache-2.0 EverOS source under `vendor/runtimes/everos`.
+
+Document-derived memory currently stops at a governed candidate stage.
+`document parse memory-candidates` reads registered document text artifacts and
+writes `document_memory_candidates.jsonl` records with `pending_review` status.
+This stage does not call EverOS `/add`, does not write Obsidian notes, and does
+not promote anything to durable memory. Promotion remains a separate owner or
+platform review action.
 
 ## 4. Memory Flow
 

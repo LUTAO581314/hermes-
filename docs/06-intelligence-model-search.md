@@ -191,10 +191,12 @@ python -m src.hermes document parse ingest-plan --input-path ./sample.pdf --titl
 python -m src.hermes document parse run-ingest --ingest-id <ingest_id>
 python -m src.hermes document parse register-artifacts --ingest-id <ingest_id>
 python -m src.hermes document parse index-artifacts --ingest-id <ingest_id>
+python -m src.hermes document parse memory-candidates --ingest-id <ingest_id>
 python -m src.hermes document-ingests
 python -m src.hermes document-ingest-runs
 python -m src.hermes document-artifacts
 python -m src.hermes document-index-runs
+python -m src.hermes document-memory-candidates
 ```
 
 `ingest-plan` creates a local `document_ingests.jsonl` record with the input
@@ -227,8 +229,15 @@ bucket, indexed/skipped/failed counts, per-artifact status, and any error. If
 instead of reporting fake indexing success.
 
 Hermes still does not claim full knowledge ingestion is complete after Sonic
-indexing. The next pipeline phases are EverOS memory candidates, PostgreSQL
-source references, and Obsidian report generation.
+indexing.
+
+`memory-candidates` reads registered text-like artifacts and creates
+`document_memory_candidates.jsonl` records with `pending_review` status. These
+records are memory candidates only: they are not pushed into EverOS, not
+promoted into Obsidian, and not treated as owner-approved long-term memory.
+
+The next pipeline phases are reviewed EverOS promotion, PostgreSQL source
+references, and Obsidian report generation.
 
 ## 8. Unified Runtime Readiness
 

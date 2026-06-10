@@ -117,6 +117,20 @@ class DocumentIndexRun:
     created_at: str
 
 
+@dataclass(frozen=True)
+class DocumentMemoryCandidate:
+    id: str
+    ingest_id: str
+    artifact_id: str
+    source_path: str
+    status: str
+    candidate_type: str
+    text: str
+    confidence: float
+    reason: str
+    created_at: str
+
+
 def create_audit_event(
     data_dir: Path,
     action: str,
@@ -346,6 +360,37 @@ def create_document_index_run(
 
 def list_document_index_runs(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
     return _read_jsonl(data_dir / "document_index_runs.jsonl", limit=limit)
+
+
+def create_document_memory_candidate(
+    data_dir: Path,
+    *,
+    ingest_id: str,
+    artifact_id: str,
+    source_path: str,
+    candidate_type: str,
+    text: str,
+    confidence: float,
+    reason: str,
+) -> DocumentMemoryCandidate:
+    candidate = DocumentMemoryCandidate(
+        id=str(uuid.uuid4()),
+        ingest_id=ingest_id,
+        artifact_id=artifact_id,
+        source_path=source_path,
+        status="pending_review",
+        candidate_type=candidate_type,
+        text=text,
+        confidence=confidence,
+        reason=reason,
+        created_at=utc_now(),
+    )
+    _append_jsonl(data_dir / "document_memory_candidates.jsonl", asdict(candidate))
+    return candidate
+
+
+def list_document_memory_candidates(data_dir: Path, limit: int = 50) -> list[dict[str, Any]]:
+    return _read_jsonl(data_dir / "document_memory_candidates.jsonl", limit=limit)
 
 
 def _file_sha256(path: Path) -> str:

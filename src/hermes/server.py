@@ -43,7 +43,12 @@ from .adapters.trendradar import as_payload as trendradar_payload, status as tre
 from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
-from .document_pipeline import index_document_artifacts, register_document_artifacts, run_document_ingest
+from .document_pipeline import (
+    generate_document_memory_candidates,
+    index_document_artifacts,
+    register_document_artifacts,
+    run_document_ingest,
+)
 from .license import load_license
 from .model_gateway import complete_chat
 from .platform import build_platform_heartbeat
@@ -57,6 +62,7 @@ from .storage import (
     list_document_index_runs,
     list_document_ingest_runs,
     list_document_ingests,
+    list_document_memory_candidates,
     list_jobs,
     write_obsidian_report,
 )
@@ -132,6 +138,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/document/index-runs":
             self._send({"service": "hermes", "document_index_runs": list_document_index_runs(settings.data_dir)})
+            return
+        if self.path == "/document/memory-candidates":
+            self._send({"service": "hermes", "document_memory_candidates": list_document_memory_candidates(settings.data_dir)})
             return
         if self.path == "/audit":
             self._send({"service": "hermes", "audit": list_audit_events(settings.data_dir)})
@@ -410,6 +419,22 @@ class HermesHandler(BaseHTTPRequestHandler):
             if result.status == "not_found":
                 status = 404
             self._send({"service": "hermes", "document_index": asdict(result)}, status=status)
+            return
+
+        if self.path == "/document/parse/memory-candidates":
+            ingest_id = str(payload.get("ingest_id", ""))
+            if not ingest_id.strip():
+                self._send({"error": "invalid_request", "message": "ingest_id is required"}, status=400)
+                return
+            result = generate_document_memory_candidates(
+                settings.data_dir,
+                ingest_id,
+                max_candidates=int(payload.get("max_candidates", 20)),
+            )
+            status = 200 if result.status in {"completed", "skipped"} else 503
+            if result.status == "not_found":
+                status = 404
+            self._send({"service": "hermes", "document_memory_candidate_generation": asdict(result)}, status=status)
             return
 
         if self.path == "/admin/migrate":

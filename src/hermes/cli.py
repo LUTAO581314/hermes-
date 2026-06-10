@@ -65,7 +65,12 @@ from .adapters.trendradar import (
 from .capabilities import collect_capabilities
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
-from .document_pipeline import index_document_artifacts, register_document_artifacts, run_document_ingest
+from .document_pipeline import (
+    generate_document_memory_candidates,
+    index_document_artifacts,
+    register_document_artifacts,
+    run_document_ingest,
+)
 from .license import load_license
 from .model_gateway import complete_chat
 from .platform import build_platform_heartbeat
@@ -79,6 +84,7 @@ from .storage import (
     list_document_index_runs,
     list_document_ingest_runs,
     list_document_ingests,
+    list_document_memory_candidates,
     list_jobs,
     write_obsidian_report,
 )
@@ -112,6 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("document-ingest-runs", help="List document ingestion execution records")
     subcommands.add_parser("document-artifacts", help="List registered document parser artifacts")
     subcommands.add_parser("document-index-runs", help="List document artifact indexing execution records")
+    subcommands.add_parser("document-memory-candidates", help="List pending document memory candidates")
     subcommands.add_parser("audit", help="List recent audit events")
     subcommands.add_parser("migrate", help="Run PostgreSQL schema migrations")
     subcommands.add_parser("heartbeat", help="Print the platform heartbeat payload")
@@ -245,6 +252,9 @@ def build_parser() -> argparse.ArgumentParser:
     index_artifacts.add_argument("--collection", default="bairui")
     index_artifacts.add_argument("--bucket", default="documents")
     index_artifacts.add_argument("--lang", default="")
+    memory_candidates = parse_subcommands.add_parser("memory-candidates", help="Generate pending memory candidates from document artifacts")
+    memory_candidates.add_argument("--ingest-id", required=True)
+    memory_candidates.add_argument("--max-candidates", type=int, default=20)
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -320,6 +330,10 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "document-index-runs":
         print_json({"service": "hermes", "document_index_runs": list_document_index_runs(settings.data_dir)})
+        return 0
+
+    if command == "document-memory-candidates":
+        print_json({"service": "hermes", "document_memory_candidates": list_document_memory_candidates(settings.data_dir)})
         return 0
 
     if command == "audit":
@@ -592,6 +606,14 @@ def run(argv: list[str] | None = None) -> int:
                 lang=args.lang,
             )
             print_json({"service": "hermes", "document_index": result})
+            return 0 if result.status in {"completed", "skipped"} else 1
+        if parse_command == "memory-candidates":
+            result = generate_document_memory_candidates(
+                settings.data_dir,
+                args.ingest_id,
+                max_candidates=args.max_candidates,
+            )
+            print_json({"service": "hermes", "document_memory_candidate_generation": result})
             return 0 if result.status in {"completed", "skipped"} else 1
         parser.error(f"unknown document parse command: {parse_command}")
         return 2

@@ -9,7 +9,7 @@ from src.hermes.capabilities import collect_capabilities
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import database_status
-from src.hermes.document_pipeline import index_document_artifacts, register_document_artifacts, run_document_ingest
+from src.hermes.document_pipeline import generate_document_memory_candidates, index_document_artifacts, register_document_artifacts, run_document_ingest
 from src.hermes.adapters.everos import build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
 from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
@@ -29,6 +29,7 @@ from src.hermes.storage import (
     list_document_index_runs,
     list_document_ingest_runs,
     list_document_ingests,
+    list_document_memory_candidates,
     list_jobs,
     write_obsidian_report,
 )
@@ -259,6 +260,56 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(runs[0]["collection"], "bairui")
         self.assertEqual(runs[0]["bucket"], "docs")
         self.assertEqual(sonic_push.call_count, 2)
+
+    def test_generate_document_memory_candidates_creates_pending_review_records(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text(
+                "# Hermes Notes\n\n主人要求 Bairui Hermes 文档记忆必须先进入 pending review，不允许直接写长期记忆。",
+                encoding="utf-8",
+            )
+            (output_dir / "page.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            ingest = create_document_ingest(
+                data_dir,
+                title="Memory plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            result = generate_document_memory_candidates(data_dir, ingest.id, max_candidates=3)
+            candidates = list_document_memory_candidates(data_dir)
+            audit = list_audit_events(data_dir)
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(len(result.candidates), 1)
+        self.assertEqual(candidates[0]["status"], "pending_review")
+        self.assertEqual(candidates[0]["candidate_type"], "document_fact")
+        self.assertIn("pending review", candidates[0]["text"])
+        self.assertEqual(candidates[0]["confidence"], 0.55)
+        self.assertEqual(audit[-1]["action"], "document.memory_candidates_generated")
+
+    def test_generate_document_memory_candidates_skips_without_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "page.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            ingest = create_document_ingest(
+                data_dir,
+                title="Image only",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            result = generate_document_memory_candidates(data_dir, ingest.id)
+        self.assertEqual(result.status, "skipped")
+        self.assertEqual(result.candidates, ())
+        self.assertEqual(result.skipped_count, 1)
 
     def test_write_obsidian_report_creates_markdown_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -561,6 +612,37 @@ class RuntimeFoundationTests(unittest.TestCase):
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["document_index"].status, "failed")
         self.assertEqual(list_print_json.call_args.args[0]["document_index_runs"][0]["status"], "failed")
+
+    def test_cli_document_memory_candidates_lists_pending_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            output_dir = root / "mineru-output"
+            output_dir.mkdir()
+            (output_dir / "sample.md").write_text("Hermes 项目要求记忆候选先审核再进入 EverOS。", encoding="utf-8")
+            ingest = create_document_ingest(
+                data_dir,
+                title="CLI memory candidate plan",
+                input_path="sample.pdf",
+                output_dir=str(output_dir),
+                parser_command=("mineru", "-p", "sample.pdf", "-o", str(output_dir)),
+            )
+            register_document_artifacts(data_dir, ingest.id)
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "memory-candidates", "--ingest-id", ingest.id])
+                with patch("src.hermes.cli.print_json") as list_print_json:
+                    list_code = run(["document-memory-candidates"])
+        self.assertEqual(code, 0)
+        self.assertEqual(list_code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_memory_candidate_generation"].status, "completed")
+        self.assertEqual(list_print_json.call_args.args[0]["document_memory_candidates"][0]["status"], "pending_review")
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:

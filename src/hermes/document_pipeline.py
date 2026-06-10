@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,10 +11,12 @@ from .storage import (
     DocumentArtifact,
     DocumentIndexRun,
     DocumentIngestRun,
+    DocumentMemoryCandidate,
     create_audit_event,
     create_document_artifact,
     create_document_index_run,
     create_document_ingest_run,
+    create_document_memory_candidate,
     list_document_artifacts,
     list_document_ingests,
     utc_now,
@@ -42,6 +45,15 @@ class DocumentIndexResult:
     detail: str
     ingest: dict[str, object] | None
     run: DocumentIndexRun | None
+
+
+@dataclass(frozen=True)
+class DocumentMemoryCandidateResult:
+    status: str
+    detail: str
+    ingest: dict[str, object] | None
+    candidates: tuple[DocumentMemoryCandidate, ...]
+    skipped_count: int
 
 
 def run_document_ingest(data_dir: Path, ingest_id: str, *, timeout_seconds: int) -> DocumentPipelineResult:
@@ -267,6 +279,69 @@ def index_document_artifacts(
     return DocumentIndexResult(status=status, detail=detail, ingest=ingest, run=run)
 
 
+def generate_document_memory_candidates(
+    data_dir: Path,
+    ingest_id: str,
+    *,
+    max_candidates: int = 20,
+) -> DocumentMemoryCandidateResult:
+    ingest = _find_ingest(data_dir, ingest_id)
+    if ingest is None:
+        return DocumentMemoryCandidateResult(
+            status="not_found",
+            detail=f"document ingest not found: {ingest_id}",
+            ingest=None,
+            candidates=(),
+            skipped_count=0,
+        )
+
+    artifacts = [artifact for artifact in list_document_artifacts(data_dir, limit=1000) if artifact.get("ingest_id") == ingest_id]
+    text_artifacts = [artifact for artifact in artifacts if artifact.get("artifact_type") in {"markdown", "text", "json", "html"}]
+    skipped_count = len(artifacts) - len(text_artifacts)
+    candidates: list[DocumentMemoryCandidate] = []
+    for artifact in text_artifacts:
+        if len(candidates) >= max_candidates:
+            break
+        path = Path(str(artifact.get("path", "")))
+        if not path.exists():
+            skipped_count += 1
+            continue
+        for text, reason in _extract_candidate_texts(path, str(artifact.get("artifact_type", ""))):
+            if len(candidates) >= max_candidates:
+                break
+            candidates.append(
+                create_document_memory_candidate(
+                    data_dir,
+                    ingest_id=ingest_id,
+                    artifact_id=str(artifact.get("id", "")),
+                    source_path=str(artifact.get("relative_path") or artifact.get("path") or ""),
+                    candidate_type="document_fact",
+                    text=text,
+                    confidence=0.55,
+                    reason=reason,
+                )
+            )
+
+    status = "completed" if candidates else "skipped"
+    detail = f"generated {len(candidates)} pending memory candidates"
+    if not candidates:
+        detail = "no suitable document text found for memory candidates"
+    create_audit_event(
+        data_dir,
+        "document.memory_candidates_generated",
+        resource_type="document_ingest",
+        resource_ref=ingest_id,
+        payload={"candidate_count": len(candidates), "skipped_count": skipped_count, "status": status},
+    )
+    return DocumentMemoryCandidateResult(
+        status=status,
+        detail=detail,
+        ingest=ingest,
+        candidates=tuple(candidates),
+        skipped_count=skipped_count,
+    )
+
+
 def _find_ingest(data_dir: Path, ingest_id: str) -> dict[str, object] | None:
     for ingest in reversed(list_document_ingests(data_dir, limit=1000)):
         if ingest.get("id") == ingest_id:
@@ -295,3 +370,46 @@ def _sonic_result_summary(artifact: dict[str, object], result: SonicResult) -> d
         "status": result.status,
         "error": result.error,
     }
+
+
+def _extract_candidate_texts(path: Path, artifact_type: str) -> list[tuple[str, str]]:
+    text = _read_indexable_text(path, artifact_type)
+    chunks: list[tuple[str, str]] = []
+    for paragraph in _split_candidate_paragraphs(text):
+        normalized = " ".join(paragraph.split())
+        if _looks_like_memory_candidate(normalized):
+            chunks.append((normalized[:1200], "document paragraph contains durable factual context"))
+        if len(chunks) >= 5:
+            break
+    return chunks
+
+
+def _split_candidate_paragraphs(text: str) -> list[str]:
+    paragraphs = re.split(r"\n\s*\n|(?<=[。！？.!?])\s+", text)
+    return [paragraph.strip(" \t\r\n#-*`>") for paragraph in paragraphs if paragraph.strip()]
+
+
+def _looks_like_memory_candidate(text: str) -> bool:
+    if len(text) < 20:
+        return False
+    if len(text) > 4000:
+        return False
+    lowered = text.lower()
+    durable_markers = (
+        "owner",
+        "用户",
+        "主人",
+        "偏好",
+        "要求",
+        "规则",
+        "配置",
+        "项目",
+        "bairui",
+        "hermes",
+        "moxi",
+        "everos",
+        "postgresql",
+        "sonic",
+        "mineru",
+    )
+    return any(marker in lowered or marker in text for marker in durable_markers)

@@ -121,11 +121,12 @@ Hermes owns:
 - file-backed execution records in `document_ingest_runs.jsonl`;
 - file-backed artifact records in `document_artifacts.jsonl`;
 - file-backed Sonic indexing records in `document_index_runs.jsonl`;
+- file-backed memory candidate records in `document_memory_candidates.jsonl`;
 - HTTP routes under `/document/parse/status`, `/document/parse/ingest-plan`,
   `/document/parse/run-ingest`, `/document/parse/register-artifacts`,
-  `/document/parse/index-artifacts`, `/document/ingests`,
-  `/document/ingest-runs`, `/document/artifacts`, and
-  `/document/index-runs`;
+  `/document/parse/index-artifacts`, `/document/parse/memory-candidates`,
+  `/document/ingests`, `/document/ingest-runs`, `/document/artifacts`,
+  `/document/index-runs`, and `/document/memory-candidates`;
 - operational configuration through `MINERU_PROJECT_ROOT`,
   `MINERU_OUTPUT_DIR`, `MINERU_BACKEND`, `MINERU_DEVICE`, and
   `MINERU_TIMEOUT_SECONDS`;
@@ -149,6 +150,9 @@ references, and Obsidian report generation remain separate pipeline phases.
 The Sonic indexing phase only indexes registered text-like artifacts
 (Markdown, text, JSON, and HTML) and records skipped/failed artifacts
 explicitly.
+The memory candidate phase creates `pending_review` document facts only. It
+does not call EverOS or promote anything into Obsidian until a later review
+step approves the candidate.
 
 ## 7. TrendRadar Adapter Contract
 
