@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.hermes.capabilities import collect_capabilities
+from src.hermes.channels import channel_status, channel_targets, plan_channel_send
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import SCHEMA_SQL, database_status
@@ -94,6 +95,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         api_groups = {group["id"]: group for group in contract["api_groups"]}
         document_paths = {endpoint["path"] for endpoint in api_groups["document_workbench"]["endpoints"]}
         operation_paths = {endpoint["path"] for endpoint in api_groups["operations"]["endpoints"]}
+        channel_paths = {endpoint["path"] for endpoint in api_groups["channels"]["endpoints"]}
         serialized = json.dumps(contract, ensure_ascii=False)
         forbidden = (
             "Hermes",
@@ -123,6 +125,10 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("/audit", screens["dashboard"]["read"])
         self.assertIn("/events", screens["dashboard"]["read"])
         self.assertIn("document_ingest", screens)
+        self.assertIn("channels", screens)
+        self.assertIn("/channels/status", screens["channels"]["read"])
+        self.assertIn("/channels/targets", screens["channels"]["read"])
+        self.assertIn("channel_send", contract["forms"])
         self.assertIn("/document/parse/session-list", screens["document_ingest"]["read"])
         self.assertIn("/document/parse/session-summary", screens["document_ingest"]["read"])
         self.assertIn("document_ingest_plan", contract["forms"])
@@ -131,8 +137,10 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("/jobs", operation_paths)
         self.assertIn("/audit", operation_paths)
         self.assertIn("/events", operation_paths)
+        self.assertIn("/channels/send", channel_paths)
         self.assertIn("/document/parse/workbench-next", document_paths)
         self.assertIn("needs_review", contract["state_values"])
+        self.assertIn("approval_required", contract["state_values"])
 
     def test_public_api_service_name_is_bairui(self):
         self.assertEqual(PUBLIC_SERVICE, "bairui")
@@ -172,6 +180,60 @@ class RuntimeFoundationTests(unittest.TestCase):
         )
         self.assertEqual(event["type"], "audit.event")
         self.assertEqual(event["data"]["payload"], {"ok": True})
+
+    def test_channels_default_status_requires_configuration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "BAIRUI_CHANNELS_ENABLED": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                settings = load_settings()
+                status = channel_status(settings)
+                targets = channel_targets(settings)
+        self.assertEqual(status.status, "missing_config")
+        self.assertIn("channels_disabled", status.blockers)
+        self.assertEqual(targets[0]["id"], "owner_review")
+        self.assertEqual(targets[0]["channel_type"], "personal_chat")
+
+    def test_channel_send_plan_is_audited_and_never_sends(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp) / "data"
+            env = {
+                "HERMES_DATA_DIR": str(data_dir),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "BAIRUI_CHANNELS_ENABLED": "1",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                result = plan_channel_send(
+                    load_settings(),
+                    {"target_id": "owner_review", "text": "approve this summary", "media_kind": "text"},
+                )
+                audit = list_audit_events(data_dir)
+        self.assertEqual(result.status, "approval_required")
+        self.assertFalse(result.will_send)
+        self.assertEqual(result.reason, "owner_confirmation_required")
+        self.assertEqual(audit[-1]["action"], "channel.send_planned")
+        self.assertEqual(audit[-1]["payload"]["will_send"], False)
+
+    def test_channel_send_rejects_unsupported_media(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "BAIRUI_CHANNELS_ENABLED": "1",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                result = plan_channel_send(
+                    load_settings(),
+                    {"target_id": "owner_review", "text": "hello", "media_kind": "audio"},
+                )
+        self.assertEqual(result.status, "unsupported_media")
+        self.assertEqual(result.reason, "unsupported_media_kind")
 
     def test_create_document_ingest_writes_plan_and_audit(self):
         with tempfile.TemporaryDirectory() as tmp:

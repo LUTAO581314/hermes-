@@ -41,6 +41,7 @@ from .adapters.sonic import (
 )
 from .adapters.trendradar import as_payload as trendradar_payload, status as trendradar_status
 from .capabilities import collect_capabilities
+from .channels import as_payload as channel_payload, channel_status, channel_targets, plan_channel_send
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
 from .document_pipeline import (
@@ -178,6 +179,12 @@ class HermesHandler(BaseHTTPRequestHandler):
         if self.path == "/events":
             self._send_sse(list_frontend_events(settings.data_dir))
             return
+        if self.path == "/channels/status":
+            self._send({"service": PUBLIC_SERVICE, "channels": channel_payload(channel_status(settings))})
+            return
+        if self.path == "/channels/targets":
+            self._send({"service": PUBLIC_SERVICE, "channel_targets": list(channel_targets(settings))})
+            return
         if self.path == "/memory/status":
             self._send({"service": PUBLIC_SERVICE, "memory": as_payload(everos_status(settings))})
             return
@@ -245,6 +252,29 @@ class HermesHandler(BaseHTTPRequestHandler):
             )
             status = 200 if result.status == "completed" else 503
             self._send({"service": PUBLIC_SERVICE, "chat": result.__dict__}, status=status)
+            return
+
+        if self.path == "/channels/send":
+            target_id = str(payload.get("target_id", ""))
+            media_kind = str(payload.get("media_kind", "text"))
+            text = str(payload.get("text", ""))
+            attachment_path = str(payload.get("attachment_path", ""))
+            if not target_id.strip():
+                self._send({"error": "invalid_request", "message": "target_id is required"}, status=400)
+                return
+            if not media_kind.strip():
+                self._send({"error": "invalid_request", "message": "media_kind is required"}, status=400)
+                return
+            if not text.strip() and not attachment_path.strip():
+                self._send({"error": "invalid_request", "message": "text or attachment_path is required"}, status=400)
+                return
+            result = plan_channel_send(settings, payload)
+            status = 202 if result.status == "approval_required" else 503
+            if result.status in {"invalid_request", "unsupported_media"}:
+                status = 400
+            if result.status == "not_found":
+                status = 404
+            self._send({"service": PUBLIC_SERVICE, "channel_send": channel_payload(result)}, status=status)
             return
 
         if self.path == "/memory/ingest":

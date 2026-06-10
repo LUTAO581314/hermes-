@@ -63,6 +63,9 @@ The frontend reads:
 - `/platform/heartbeat`;
 - `/audit`;
 - `/events`;
+- `/channels/status`;
+- `/channels/targets`;
+- `/channels/send`;
 - `/document/parse/session-list`;
 - `/document/parse/session-summary`;
 - `/document/parse/workbench-next`;

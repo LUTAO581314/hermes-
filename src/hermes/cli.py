@@ -63,6 +63,7 @@ from .adapters.trendradar import (
     status as trendradar_status,
 )
 from .capabilities import collect_capabilities
+from .channels import as_payload as channel_payload, channel_status, channel_targets, plan_channel_send
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
 from .document_pipeline import (
@@ -144,6 +145,16 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("heartbeat", help="Print the platform heartbeat payload")
     subcommands.add_parser("paths", help="Print runtime paths and key configuration")
     subcommands.add_parser("runtime-readiness", help="Print unified vendor runtime readiness")
+
+    channels_parser = subcommands.add_parser("channels", help="Operate governed outbound channel plans")
+    channels_subcommands = channels_parser.add_subparsers(dest="channels_command")
+    channels_subcommands.add_parser("status", help="Inspect outbound channel configuration")
+    channels_subcommands.add_parser("targets", help="List configured outbound channel targets")
+    channel_send = channels_subcommands.add_parser("plan-send", help="Create an owner-approved outbound send plan")
+    channel_send.add_argument("--target-id", required=True)
+    channel_send.add_argument("--text", default="")
+    channel_send.add_argument("--media-kind", default="text")
+    channel_send.add_argument("--attachment-path", default="")
 
     memory_parser = subcommands.add_parser("memory", help="Operate the EverOS-backed memory adapter")
     memory_subcommands = memory_parser.add_subparsers(dest="memory_command")
@@ -454,6 +465,29 @@ def run(argv: list[str] | None = None) -> int:
     if command == "runtime-readiness":
         print_json({"service": "bairui", "runtime_readiness": collect_runtime_readiness(settings)})
         return 0
+
+    if command == "channels":
+        channels_command = args.channels_command or "status"
+        if channels_command == "status":
+            print_json({"service": "bairui", "channels": channel_payload(channel_status(settings))})
+            return 0
+        if channels_command == "targets":
+            print_json({"service": "bairui", "channel_targets": list(channel_targets(settings))})
+            return 0
+        if channels_command == "plan-send":
+            result = plan_channel_send(
+                settings,
+                {
+                    "target_id": args.target_id,
+                    "text": args.text,
+                    "media_kind": args.media_kind,
+                    "attachment_path": args.attachment_path,
+                },
+            )
+            print_json({"service": "bairui", "channel_send": channel_payload(result)})
+            return 0 if result.status == "approval_required" else 1
+        parser.error(f"unknown channels command: {channels_command}")
+        return 2
 
     if command == "memory":
         memory_command = args.memory_command or "status"

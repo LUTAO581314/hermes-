@@ -178,7 +178,7 @@ def create_audit_event(
     action: str,
     *,
     actor_type: str = "system",
-    actor_ref: str = "hermes",
+    actor_ref: str = "bairui",
     resource_type: str = "runtime",
     resource_ref: str = "local",
     risk_level: str = "low",

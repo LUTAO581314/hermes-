@@ -13,7 +13,7 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
         "env": settings.env,
     }
     return {
-        "contract_version": "2026-06-11.3",
+        "contract_version": "2026-06-11.4",
         "service": "bairui",
         "brand": brand,
         "product": brand,
@@ -178,6 +178,12 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                 "actions": ({"id": "write_report", "method": "POST", "path": "/obsidian/reports", "schema": "report_write"},),
             },
             {
+                "id": "channels",
+                "title": "Channels",
+                "read": ("/channels/status", "/channels/targets", "/events"),
+                "actions": ({"id": "plan_channel_send", "method": "POST", "path": "/channels/send", "schema": "channel_send"},),
+            },
+            {
                 "id": "runtime_settings",
                 "title": "Settings",
                 "read": (
@@ -249,6 +255,15 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                     {"name": "body", "type": "textarea", "required": True, "label": "Body"},
                 )
             },
+            "channel_send": {
+                "fields": (
+                    {"name": "target_id", "type": "select", "required": True, "label": "Target", "source": "/channels/targets"},
+                    {"name": "media_kind", "type": "segmented", "required": True, "label": "Media", "options": ("text", "image", "video", "file")},
+                    {"name": "text", "type": "textarea", "required": False, "label": "Message"},
+                    {"name": "attachment_path", "type": "file_path", "required": False, "label": "Attachment"},
+                    {"name": "owner_confirmation", "type": "toggle", "required": True, "label": "Owner Confirmation"},
+                )
+            },
         },
         "api_groups": (
             {
@@ -283,6 +298,15 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                 ),
             },
             {
+                "id": "channels",
+                "stability": "stable",
+                "endpoints": (
+                    {"method": "GET", "path": "/channels/status"},
+                    {"method": "GET", "path": "/channels/targets"},
+                    {"method": "POST", "path": "/channels/send"},
+                ),
+            },
+            {
                 "id": "runtime_status",
                 "stability": "stable",
                 "endpoints": (
@@ -306,5 +330,7 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
             "failed",
             "needs_review",
             "step_limit_reached",
+            "approval_required",
+            "unsupported_media",
         ),
     }

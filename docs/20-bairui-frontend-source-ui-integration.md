@@ -306,7 +306,7 @@ UI:
 
 Purpose: future connector control surface.
 
-Current backend status: supplemental work required.
+Current backend status: initial neutral contract implemented.
 
 Source UI ideas worth adopting:
 
@@ -321,12 +321,14 @@ Initial backend supplement should expose neutral `bairui` endpoints:
 - `GET /channels/status`
 - `GET /channels/targets`
 - `POST /channels/send`
-- `GET /channels/wechat/qr`
-- `POST /channels/wechat/logout`
 - `GET /events`
 
 Do not expose connector vendor names as product brands. Render them as channel
 types and configuration states.
+
+The current implementation plans and audits outbound text/image/video/file
+payloads, but it does not send them. Real external dispatch remains gated by
+owner confirmation, target configuration, and compliance review.
 
 ### Settings
 
@@ -392,7 +394,7 @@ The strongest source-backed supplements to add next are:
      review prompts.
 
 3. Channels and media.
-   - Add a neutral dispatch layer for text/image/video/file payloads.
+   - Initial neutral dispatch contract exists for text/image/video/file payloads.
    - Store channel configuration and status separately from customer copy.
    - Do not ship personal-channel automation as default customer feature until
      compliance and consent rules are documented.
