@@ -21,6 +21,7 @@ from .adapters.funasr import (
     status as funasr_status,
     transcribe as funasr_transcribe,
 )
+from .adapters.mineru import as_payload as mineru_payload, status as mineru_status
 from .adapters.mirofish import as_payload as mirofish_payload, status as mirofish_status
 from .adapters.searxng import (
     as_payload as searxng_payload,
@@ -115,6 +116,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/voice/asr/status":
             self._send({"service": "hermes", "voice_asr": funasr_payload(funasr_status(settings))})
+            return
+        if self.path == "/document/parse/status":
+            self._send({"service": "hermes", "document_parse": mineru_payload(mineru_status(settings))})
             return
         if self.path == "/intel/status":
             self._send({"service": "hermes", "intelligence": trendradar_payload(trendradar_status(settings))})

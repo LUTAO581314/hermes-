@@ -28,6 +28,7 @@ reinvention.
 | --- | --- | --- | --- | --- |
 | EverOS | `vendor/runtimes/everos` | Automatic memory extraction and retrieval | Apache-2.0 | first source-level adapter |
 | FunASR | Docker/Linux service or `vendor/runtimes/funasr` | Voice ASR and OpenAI-compatible transcription | MIT | HTTP service adapter |
+| MinerU | Docker/Linux service or `vendor/runtimes/mineru` | PDF/image/Office document parsing | MinerU Open Source License | CLI/service adapter |
 | TrendRadar | `vendor/runtimes/trendradar` | Trend, RSS, hot-list, and public-opinion intelligence | GPLv3 | source-level adapter |
 | MiroFish | `vendor/runtimes/mirofish` | Scenario simulation and multi-agent rehearsal | AGPLv3 | source-level adapter |
 | SearXNG | Docker or Linux checkout | Optional metasearch | AGPLv3 | HTTP service adapter |
@@ -105,7 +106,35 @@ Hermes must not pretend ASR is available until `FUNASR_BASE_URL` is configured.
 The first integration surface is OpenAI-compatible file transcription; streaming
 ASR and diarization controls can be added after the server contract is proven.
 
-## 6. TrendRadar Adapter Contract
+## 6. MinerU Adapter Contract
+
+MinerU is the document parsing runtime for PDF, image, and Office ingestion.
+Hermes treats it as a local CLI/service runtime because parsing can be heavy and
+customer documents must stay inside the controlled deployment boundary.
+
+Hermes owns:
+
+- `src/hermes/adapters/mineru.py`;
+- CLI commands under `python -m src.hermes document parse ...`;
+- HTTP status route under `/document/parse/status`;
+- operational configuration through `MINERU_PROJECT_ROOT`,
+  `MINERU_OUTPUT_DIR`, `MINERU_BACKEND`, `MINERU_DEVICE`, and
+  `MINERU_TIMEOUT_SECONDS`;
+- capability and commercial-boundary reporting.
+
+MinerU owns:
+
+- document layout analysis;
+- OCR/parsing models;
+- Markdown and JSON generation;
+- extracted image/table/formula artifacts;
+- the upstream CLI and optional service modes.
+
+Hermes must not pretend document ingestion is complete until a supervised
+worker executes parsing, records output artifacts, indexes text, and stores
+source references.
+
+## 7. TrendRadar Adapter Contract
 
 TrendRadar is the first intelligence runtime integration. Because it is GPLv3,
 Hermes treats it as an isolated runtime with an explicit source and license
@@ -132,7 +161,7 @@ TrendRadar owns:
 Hermes must not copy TrendRadar internals into core code. Use the upstream CLI,
 MCP server, process boundary, or service boundary.
 
-## 7. MiroFish Adapter Contract
+## 8. MiroFish Adapter Contract
 
 MiroFish is the scenario simulation and decision rehearsal runtime. Because it
 is AGPLv3, Hermes treats it as an isolated runtime with an explicit hosted-use
@@ -163,7 +192,7 @@ MiroFish owns:
 Hermes must not copy MiroFish internals into core code. Use the upstream npm
 scripts, Flask API, process boundary, or service boundary.
 
-## 8. SearXNG Adapter Contract
+## 9. SearXNG Adapter Contract
 
 SearXNG is the optional self-hosted metasearch runtime. Because the upstream
 repository has Windows-incompatible checkout paths and is AGPLv3, Hermes treats
@@ -189,7 +218,7 @@ The JSON API requires `format=json`, and SearXNG configuration must permit the
 `json` output format. Hermes must not pretend SearXNG is available until
 `SEARXNG_BASE_URL` is configured.
 
-## 9. Sonic Adapter Contract
+## 10. Sonic Adapter Contract
 
 Sonic is the local internal search index runtime. It is not a public web search
 tool and does not replace SearXNG.
@@ -216,7 +245,7 @@ Sonic owns:
 Hermes talks to Sonic through the upstream channel protocol instead of copying
 Rust internals into Hermes core.
 
-## 10. Unified Runtime Readiness
+## 11. Unified Runtime Readiness
 
 Hermes exposes runtime orchestration readiness through:
 
@@ -227,13 +256,17 @@ This is the machine-readable bridge between adapters and deployment
 orchestration. Scripts and the Bairui platform should consume readiness
 blockers and warnings instead of scraping logs.
 
-## 11. Commercial Boundaries
+## 12. Commercial Boundaries
 
 Apache-2.0 runtimes such as EverOS are suitable for deeper productized
 integration, while preserving LICENSE, NOTICE, upstream name, and attribution.
 
 MIT runtimes such as FunASR are suitable for productized ASR integration, while
 preserving LICENSE, upstream name, and attribution.
+
+MinerU uses a project-specific open-source license based on Apache-2.0 with
+additional terms. Treat it as commercial-review-required before customer
+distribution or hosted parsing service use.
 
 GPLv3 runtimes such as TrendRadar require source-code availability obligations
 when distributed as part of the product package.
@@ -248,18 +281,19 @@ source is changed.
 
 This document is general engineering guidance, not legal advice.
 
-## 12. Integration Order
+## 13. Integration Order
 
 1. EverOS adapter for memory candidates and retrieval.
 2. FunASR adapter for voice ASR and audio-to-text ingestion.
-3. TrendRadar adapter for intelligence input.
-4. MiroFish adapter for simulation briefs and reports.
-5. SearXNG as an optional Docker-based metasearch runtime after Linux/server
+3. MinerU adapter for document parsing and knowledge ingestion.
+4. TrendRadar adapter for intelligence input.
+5. MiroFish adapter for simulation briefs and reports.
+6. SearXNG as an optional Docker-based metasearch runtime after Linux/server
    deployment.
-6. Sonic as a Docker-based local index for Bairui-owned notes, logs, documents,
+7. Sonic as a Docker-based local index for Bairui-owned notes, logs, documents,
    and task records.
 
-## 13. Verification Requirements
+## 14. Verification Requirements
 
 Each runtime integration must prove:
 

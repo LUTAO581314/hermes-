@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 
 from .adapters.everos import status as everos_status
 from .adapters.funasr import status as funasr_status
+from .adapters.mineru import status as mineru_status
 from .adapters.mirofish import status as mirofish_status
 from .adapters.searxng import status as searxng_status
 from .adapters.sonic import status as sonic_status
@@ -38,6 +39,7 @@ class RuntimeReadiness:
 def collect_runtime_readiness(settings: Settings) -> dict[str, object]:
     everos = everos_status(settings)
     funasr = funasr_status(settings)
+    mineru = mineru_status(settings)
     trendradar = trendradar_status(settings)
     mirofish = mirofish_status(settings)
     searxng = searxng_status(settings)
@@ -46,6 +48,7 @@ def collect_runtime_readiness(settings: Settings) -> dict[str, object]:
     items = (
         RuntimeReadinessItem("everos_memory", everos.status, True, everos.detail, everos.source_path, everos.license),
         RuntimeReadinessItem("funasr_voice_asr", funasr.status, False, funasr.detail, funasr.source, funasr.license),
+        RuntimeReadinessItem("mineru_document_parse", mineru.status, False, mineru.detail, mineru.source, mineru.license),
         RuntimeReadinessItem("trendradar_intelligence", trendradar.status, False, trendradar.detail, trendradar.source_path, trendradar.license),
         RuntimeReadinessItem("mirofish_simulation", mirofish.status, False, mirofish.detail, mirofish.source_path, mirofish.license),
         RuntimeReadinessItem("searxng_metasearch", searxng.status, False, searxng.detail, searxng.source, searxng.license),

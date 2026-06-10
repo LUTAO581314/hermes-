@@ -55,6 +55,11 @@ class Settings:
     funasr_public_base_url: str
     funasr_model: str
     funasr_timeout_seconds: int
+    mineru_project_root: Path | None
+    mineru_output_dir: Path
+    mineru_backend: str
+    mineru_device: str
+    mineru_timeout_seconds: int
 
     @property
     def has_database(self) -> bool:
@@ -110,6 +115,11 @@ def load_settings() -> Settings:
         funasr_public_base_url=os.getenv("FUNASR_PUBLIC_BASE_URL", ""),
         funasr_model=os.getenv("FUNASR_MODEL", "fun-asr-nano"),
         funasr_timeout_seconds=int(os.getenv("FUNASR_TIMEOUT_SECONDS", "120")),
+        mineru_project_root=Path(os.environ["MINERU_PROJECT_ROOT"]) if os.getenv("MINERU_PROJECT_ROOT") else None,
+        mineru_output_dir=Path(os.getenv("MINERU_OUTPUT_DIR", "./data/mineru-output")),
+        mineru_backend=os.getenv("MINERU_BACKEND", "pipeline"),
+        mineru_device=os.getenv("MINERU_DEVICE", "cpu"),
+        mineru_timeout_seconds=int(os.getenv("MINERU_TIMEOUT_SECONDS", "600")),
     )
 
 

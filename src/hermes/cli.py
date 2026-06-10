@@ -24,6 +24,12 @@ from .adapters.funasr import (
     status as funasr_status,
     transcribe as funasr_transcribe,
 )
+from .adapters.mineru import (
+    as_payload as mineru_payload,
+    build_install_command as build_mineru_install_command,
+    build_parse_command as build_mineru_parse_command,
+    status as mineru_status,
+)
 from .adapters.mirofish import (
     as_payload as mirofish_payload,
     build_backend_command,
@@ -192,6 +198,20 @@ def build_parser() -> argparse.ArgumentParser:
     asr_transcribe.add_argument("--language", default="")
     asr_transcribe.add_argument("--prompt", default="")
     asr_transcribe.add_argument("--response-format", default="json")
+
+    document_parser = subcommands.add_parser("document", help="Operate document parsing runtime adapters")
+    document_subcommands = document_parser.add_subparsers(dest="document_command")
+    parse_parser = document_subcommands.add_parser("parse", help="Operate MinerU document parser runtime")
+    parse_subcommands = parse_parser.add_subparsers(dest="parse_command")
+    parse_subcommands.add_parser("status", help="Inspect MinerU parser configuration")
+    parse_subcommands.add_parser("install-command", help="Print MinerU CLI install command")
+    parse_command = parse_subcommands.add_parser("parse-command", help="Print a MinerU document parse command")
+    parse_command.add_argument("--input-path", required=True)
+    parse_command.add_argument("--output-dir", default="")
+    parse_command.add_argument("--backend", default="")
+    parse_command.add_argument("--language", default="")
+    parse_command.add_argument("--source", default="")
+    parse_command.add_argument("--device", default="")
 
     job_parser = subcommands.add_parser("job", help="Create a queued job")
     job_parser.add_argument("--title", default="CLI job")
@@ -456,6 +476,39 @@ def run(argv: list[str] | None = None) -> int:
             print_json({"service": "hermes", "voice_asr": funasr_payload(result)})
             return 0 if result.status == "completed" else 1
         parser.error(f"unknown voice asr command: {asr_command}")
+        return 2
+
+    if command == "document":
+        document_command = args.document_command or "parse"
+        if document_command != "parse":
+            parser.error(f"unknown document command: {document_command}")
+            return 2
+        parse_command = args.parse_command or "status"
+        if parse_command == "status":
+            print_json({"service": "hermes", "document_parse": mineru_payload(mineru_status(settings))})
+            return 0
+        if parse_command == "install-command":
+            print_json({"service": "hermes", "document_parse": mineru_payload(build_mineru_install_command(settings))})
+            return 0
+        if parse_command == "parse-command":
+            print_json(
+                {
+                    "service": "hermes",
+                    "document_parse": mineru_payload(
+                        build_mineru_parse_command(
+                            settings,
+                            input_path=args.input_path,
+                            output_dir=args.output_dir,
+                            backend=args.backend,
+                            language=args.language,
+                            source=args.source,
+                            device=args.device,
+                        )
+                    ),
+                }
+            )
+            return 0
+        parser.error(f"unknown document parse command: {parse_command}")
         return 2
 
     if command == "job":

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .adapters.everos import status as everos_status
 from .adapters.funasr import status as funasr_status
+from .adapters.mineru import status as mineru_status
 from .adapters.mirofish import status as mirofish_status
 from .adapters.searxng import status as searxng_status
 from .adapters.sonic import status as sonic_status
@@ -35,6 +36,7 @@ def collect_capabilities(settings: Settings) -> list[dict[str, str]]:
     license_status = load_license(settings.license_file, settings.license_secret)
     everos = everos_status(settings)
     funasr = funasr_status(settings)
+    mineru = mineru_status(settings)
     trendradar = trendradar_status(settings)
     mirofish = mirofish_status(settings)
     searxng = searxng_status(settings)
@@ -63,6 +65,13 @@ def collect_capabilities(settings: Settings) -> list[dict[str, str]]:
             funasr.detail,
             source=funasr.source,
             license=funasr.license,
+        ),
+        Capability(
+            "mineru_document_parse",
+            mineru.status,
+            mineru.detail,
+            source=mineru.source,
+            license=mineru.license,
         ),
         Capability(
             "trendradar_intelligence",

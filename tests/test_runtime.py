@@ -11,6 +11,7 @@ from src.hermes.config import load_settings
 from src.hermes.db import database_status
 from src.hermes.adapters.everos import build_search_payload, status as everos_status
 from src.hermes.adapters.funasr import build_server_command as build_funasr_server_command, build_transcription_payload as build_funasr_transcription_payload, status as funasr_status
+from src.hermes.adapters.mineru import build_parse_command as build_mineru_parse_command, status as mineru_status
 from src.hermes.adapters.mirofish import build_dev_command, status as mirofish_status
 from src.hermes.adapters.searxng import build_docker_command as build_searxng_docker_command, build_search_payload as build_searxng_search_payload, status as searxng_status
 from src.hermes.adapters.sonic import build_docker_command as build_sonic_docker_command, build_query_payload as build_sonic_query_payload, status as sonic_status
@@ -123,6 +124,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("heartbeat", help_text)
         self.assertIn("memory", help_text)
         self.assertIn("voice", help_text)
+        self.assertIn("document", help_text)
         self.assertIn("intel", help_text)
         self.assertIn("simulation", help_text)
         self.assertIn("search", help_text)
@@ -213,6 +215,58 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(code, 1)
         payload = print_json.call_args.args[0]
         self.assertEqual(payload["voice_asr"]["status"], "missing_config")
+
+    def test_mineru_adapter_reports_missing_config_and_cli_contract(self):
+        settings = load_settings()
+        state = mineru_status(settings)
+        self.assertEqual(state.license, "MinerU Open Source License")
+        self.assertEqual(state.source, "https://github.com/opendatalab/MinerU")
+        self.assertIn("mineru -p <input_path> -o <output_path>", state.cli_contract)
+        self.assertIn("Markdown output for LLM-ready reading", state.output_contract)
+        self.assertIn(state.status, {"missing_config", "source_ready"})
+
+    def test_build_mineru_parse_command_uses_local_output_dir(self):
+        settings = load_settings()
+        plan = build_mineru_parse_command(settings, input_path="sample.pdf", backend="pipeline", language="zh")
+        self.assertEqual(plan.status, "ready")
+        self.assertEqual(plan.command[:4], ("mineru", "-p", "sample.pdf", "-o"))
+        self.assertIn("data\\mineru-output", plan.command[4].replace("/", "\\"))
+        self.assertIn("-b", plan.command)
+        self.assertIn("pipeline", plan.command)
+        self.assertIn("-l", plan.command)
+        self.assertIn("zh", plan.command)
+
+    def test_cli_document_parse_status_prints_mineru_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "MINERU_PROJECT_ROOT": "",
+                "MINERU_OUTPUT_DIR": str(Path(tmp) / "mineru-output"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "status"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["service"], "hermes")
+        self.assertEqual(payload["document_parse"]["license"], "MinerU Open Source License")
+
+    def test_cli_document_parse_command_prints_mineru_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "MINERU_OUTPUT_DIR": str(Path(tmp) / "mineru-output"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["document", "parse", "parse-command", "--input-path", "sample.pdf", "--language", "zh"])
+        self.assertEqual(code, 0)
+        payload = print_json.call_args.args[0]
+        self.assertEqual(payload["document_parse"]["command"][:3], ("mineru", "-p", "sample.pdf"))
 
     def test_cli_memory_status_prints_everos_status(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -442,8 +496,10 @@ class RuntimeFoundationTests(unittest.TestCase):
         names = {item["name"] for item in readiness["items"]}
         self.assertIn("everos_memory", names)
         self.assertIn("funasr_voice_asr", names)
+        self.assertIn("mineru_document_parse", names)
         self.assertIn("sonic_local_index", names)
         self.assertTrue(any("funasr_voice_asr" in warning for warning in readiness["warnings"]))
+        self.assertTrue(any("mineru_document_parse" in warning for warning in readiness["warnings"]))
         self.assertTrue(any("sonic_local_index" in warning for warning in readiness["warnings"]))
 
     def test_cli_status_prints_runtime_status(self):

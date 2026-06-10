@@ -10,6 +10,7 @@ Use:
 - OpenAI-compatible model gateway for model calls;
 - TrendRadar for trends, RSS, hot lists, and public-opinion inputs;
 - FunASR as optional ASR for audio transcription and voice-command input;
+- MinerU as optional document parsing for PDF, image, and Office ingestion;
 - SearXNG as optional self-hosted metasearch;
 - Sonic as optional local internal search for our own documents, notes, logs,
   and task records;
@@ -163,7 +164,37 @@ python -m src.hermes voice asr transcribe --audio-path ./sample.wav
 `missing_config` and still exposes the upstream server command and API contract
 needed to deploy FunASR correctly.
 
-## 7. Unified Runtime Readiness
+## 7. MinerU Document Parsing
+
+MinerU is the first heavy document parsing runtime.
+
+Use it when:
+
+- PDF, image, DOCX, PPTX, or spreadsheet files need to become Markdown/JSON;
+- tables, formulas, layout, and embedded images matter;
+- parsed output should feed Sonic local index, EverOS memory, PostgreSQL source
+  records, and Obsidian reports.
+
+Hermes integrates MinerU as a local CLI/service boundary:
+
+- `mineru -p <input_path> -o <output_path>`
+- output Markdown/JSON is written under `MINERU_OUTPUT_DIR`
+- customer documents stay inside the controlled runtime directory
+
+Current Hermes CLI surface:
+
+```bash
+python -m src.hermes document parse status
+python -m src.hermes document parse install-command
+python -m src.hermes document parse parse-command --input-path ./sample.pdf
+```
+
+Hermes does not claim parsing is complete by printing a command. The next
+pipeline step will execute the command inside a supervised worker, register
+output files, index titles/text in Sonic, and store source references in
+PostgreSQL.
+
+## 8. Unified Runtime Readiness
 
 Hermes now exposes a machine-readable readiness summary for vendor runtimes:
 
@@ -184,7 +215,7 @@ This is the bridge from adapter visibility to one-click orchestration. Platform
 and deployment scripts should consume this endpoint instead of guessing from
 free-form logs.
 
-## 8. Research Flow
+## 9. Research Flow
 
 ```text
 owner question
@@ -197,7 +228,7 @@ owner question
   -> short owner summary
 ```
 
-## 9. Source Rules
+## 10. Source Rules
 
 Research outputs must:
 
