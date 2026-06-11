@@ -311,6 +311,11 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                 )
             },
             "agent_promotion": {
+                "safety": {
+                    "will_execute_external_action": False,
+                    "idempotency_key": "event_id + target",
+                    "source_chain": "created_resource.source links back to agent_event, session, agent, role, and target",
+                },
                 "fields": (
                     {"name": "event_id", "type": "id", "required": True, "label": "Event ID"},
                     {"name": "target", "type": "select", "required": True, "label": "Target", "options": ("job", "report", "memory_review", "channel_draft")},

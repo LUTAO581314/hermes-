@@ -56,6 +56,21 @@ class AgentEvent:
     created_at: str
 
 
+@dataclass(frozen=True)
+class AgentPromotion:
+    id: str
+    event_id: str
+    session_id: str
+    agent_id: str
+    target: str
+    resource_type: str
+    resource_id: str
+    resource_status: str
+    review_required: bool
+    source: dict[str, Any]
+    created_at: str
+
+
 def as_payload(value: Any) -> dict[str, Any]:
     if hasattr(value, "__dataclass_fields__"):
         return asdict(value)
@@ -330,21 +345,58 @@ def promote_agent_event(settings: Settings, event_id: str, target: str) -> dict[
     if not _event_text(event).strip():
         return {"status": "invalid_request", "detail": "agent event has no promotable content"}
 
+    existing = _find_promotion(settings, event_id, target)
+    if existing is not None:
+        created = _resource_from_promotion(existing)
+        create_audit_event(
+            settings.data_dir,
+            "agent.event_promotion_reused",
+            resource_type=created["type"],
+            resource_ref=str(created["id"]),
+            risk_level="medium" if target in {"memory_review", "channel_draft"} else "low",
+            payload={
+                "target": target,
+                "event_id": event_id,
+                "promotion_id": existing.get("id", ""),
+                "will_execute_external_action": False,
+                "duplicate": True,
+            },
+        )
+        return {
+            "status": "duplicate",
+            "detail": f"promotion to {target} already exists",
+            "target": target,
+            "promotion_id": existing.get("id", ""),
+            "created_resource": created,
+            "will_execute_external_action": False,
+            "duplicate": True,
+        }
+
     created = _create_promotion_resource(settings, event, target)
+    promotion = _record_promotion(settings, event, target, created)
     create_audit_event(
         settings.data_dir,
         "agent.event_promoted",
         resource_type=created["type"],
         resource_ref=str(created["id"]),
         risk_level="medium" if target in {"memory_review", "channel_draft"} else "low",
-        payload={"target": target, "event_id": event_id, "will_execute_external_action": False},
+        payload={
+            "target": target,
+            "event_id": event_id,
+            "promotion_id": promotion.id,
+            "source": created.get("source", {}),
+            "will_execute_external_action": False,
+            "duplicate": False,
+        },
     )
     return {
         "status": "planned",
         "detail": f"promotion to {target} recorded for owner review",
         "target": target,
+        "promotion_id": promotion.id,
         "created_resource": created,
         "will_execute_external_action": False,
+        "duplicate": False,
     }
 
 
@@ -366,9 +418,10 @@ def _create_promotion_resource(settings: Settings, event: dict[str, Any], target
     agent_id = str(event.get("agent_id", "agent"))
     role = str(event.get("role", agent_id))
     title = f"Agent {role} {target.replace('_', ' ')}"
+    source = _promotion_source(event, target)
     if target == "job":
         job = create_job(settings.data_dir, title=title, prompt=_promotion_body(event), route=role or "general")
-        return {"type": "job", "id": job.id, "status": job.status, "path": "", "review_required": False}
+        return {"type": "job", "id": job.id, "status": job.status, "path": "", "review_required": False, "source": source}
     if target == "report":
         report = create_report_record(
             settings.data_dir,
@@ -378,7 +431,7 @@ def _create_promotion_resource(settings: Settings, event: dict[str, Any], target
             source_ref=event_id,
             status="draft",
         )
-        return {"type": "report", "id": report.id, "status": report.status, "path": report.path, "review_required": False}
+        return {"type": "report", "id": report.id, "status": report.status, "path": report.path, "review_required": False, "source": source}
     if target == "memory_review":
         candidate = create_document_memory_candidate(
             settings.data_dir,
@@ -390,7 +443,7 @@ def _create_promotion_resource(settings: Settings, event: dict[str, Any], target
             confidence=0.5,
             reason="agent_event_promotion_requires_owner_review",
         )
-        return {"type": "document_memory_candidate", "id": candidate.id, "status": candidate.status, "path": "", "review_required": True}
+        return {"type": "document_memory_candidate", "id": candidate.id, "status": candidate.status, "path": "", "review_required": True, "source": source}
     approval = create_channel_approval_request(
         settings.data_dir,
         target_id="owner_review",
@@ -399,7 +452,59 @@ def _create_promotion_resource(settings: Settings, event: dict[str, Any], target
         message_preview=content[:160],
         reason="agent_event_channel_draft_requires_owner_review",
     )
-    return {"type": "channel_approval_request", "id": approval.id, "status": approval.status, "path": "", "review_required": True}
+    return {"type": "channel_approval_request", "id": approval.id, "status": approval.status, "path": "", "review_required": True, "source": source}
+
+
+def _promotion_source(event: dict[str, Any], target: str) -> dict[str, Any]:
+    return {
+        "source_type": "agent_event",
+        "source_ref": str(event.get("id", "")),
+        "session_id": str(event.get("session_id", "")),
+        "agent_id": str(event.get("agent_id", "")),
+        "role": str(event.get("role", "")),
+        "target": target,
+        "status": str(event.get("status", "")),
+    }
+
+
+def _record_promotion(settings: Settings, event: dict[str, Any], target: str, created: dict[str, Any]) -> AgentPromotion:
+    promotion = AgentPromotion(
+        id=str(uuid.uuid4()),
+        event_id=str(event.get("id", "")),
+        session_id=str(event.get("session_id", "")),
+        agent_id=str(event.get("agent_id", "")),
+        target=target,
+        resource_type=str(created.get("type", "")),
+        resource_id=str(created.get("id", "")),
+        resource_status=str(created.get("status", "")),
+        review_required=bool(created.get("review_required", False)),
+        source=dict(created.get("source", {})),
+        created_at=utc_now(),
+    )
+    _append_jsonl(_promotions_path(settings), asdict(promotion))
+    return promotion
+
+
+def _find_promotion(settings: Settings, event_id: str, target: str) -> dict[str, Any] | None:
+    return next(
+        (
+            promotion
+            for promotion in _read_jsonl(_promotions_path(settings), limit=10000)
+            if promotion.get("event_id") == event_id and promotion.get("target") == target
+        ),
+        None,
+    )
+
+
+def _resource_from_promotion(promotion: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": promotion.get("resource_type", ""),
+        "id": promotion.get("resource_id", ""),
+        "status": promotion.get("resource_status", ""),
+        "path": "",
+        "review_required": bool(promotion.get("review_required", False)),
+        "source": promotion.get("source", {}),
+    }
 
 
 def _event_text(event: dict[str, Any]) -> str:
@@ -468,6 +573,10 @@ def _sessions_path(settings: Settings) -> Path:
 
 def _events_path(settings: Settings) -> Path:
     return settings.data_dir / "agents" / "events.jsonl"
+
+
+def _promotions_path(settings: Settings) -> Path:
+    return settings.data_dir / "agents" / "promotions.jsonl"
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:

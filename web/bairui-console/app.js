@@ -675,7 +675,9 @@ function renderPromotionResults(eventId) {
               <div>
                 ${pill(resource.status || promotion.status || "planned")}
                 <span class="chip">${escapeHtml(promotion.target)}</span>
+                <span class="chip">${escapeHtml(promotion.duplicate ? "reused" : "created")}</span>
                 <span class="chip mono">${escapeHtml(shortId(resource.id))}</span>
+                <span class="chip mono">src ${escapeHtml(shortId(resource.source?.source_ref || ""))}</span>
               </div>
               <button class="ghost-btn mini" type="button" data-open-promotion="${escapeHtml(resource.type)}" data-resource-id="${escapeHtml(resource.id)}">View</button>
             </div>`;
@@ -691,7 +693,18 @@ async function openPromotionResource(resourceType, resourceId) {
   if (target === "memory") await loadMemory();
   if (target === "channels") await loadChannels();
   const entity = findResourceEntity(resourceType, resourceId);
-  state.selectedEntity = entity || { type: resourceType, title: resourceType, status: "created", ref: resourceId, raw: { id: resourceId } };
+  const promotion = Object.values(state.promotionResults)
+    .flat()
+    .find((item) => String(item.created_resource?.id || "") === String(resourceId));
+  state.selectedEntity =
+    entity ||
+    {
+      type: resourceType,
+      title: resourceType,
+      status: promotion?.created_resource?.status || "created",
+      ref: resourceId,
+      raw: { id: resourceId, source: promotion?.created_resource?.source || {}, promotion_id: promotion?.promotion_id || "" },
+    };
   state.screen = target;
   render();
 }
@@ -953,9 +966,9 @@ function renderEntityCard(entity, heading = "Entity card") {
 function entityFields(entity) {
   const raw = entity.raw || {};
   if (entity.type === "job") return [["Route", raw.route], ["Status", raw.status], ["Job ID", raw.id], ["Created", raw.created_at]];
-  if (entity.type === "report") return [["Status", raw.status], ["Source", raw.source_type || "document"], ["Reference", raw.source_ref || raw.ingest_id], ["Path", raw.path]];
-  if (entity.type === "memory") return [["Candidate", raw.candidate_type], ["Confidence", raw.confidence], ["Source", raw.source_path], ["Created", raw.created_at]];
-  if (entity.type === "channel") return [["Target", raw.target_id], ["Channel", raw.channel_type], ["Media", raw.media_kind], ["Review", raw.review_status || raw.status]];
+  if (entity.type === "report") return [["Status", raw.status], ["Source", raw.source_type || raw.source?.source_type || "document"], ["Reference", raw.source_ref || raw.source?.source_ref || raw.ingest_id], ["Path", raw.path]];
+  if (entity.type === "memory") return [["Candidate", raw.candidate_type], ["Confidence", raw.confidence], ["Source", raw.source_path || raw.source?.source_ref], ["Created", raw.created_at]];
+  if (entity.type === "channel") return [["Target", raw.target_id], ["Channel", raw.channel_type], ["Media", raw.media_kind], ["Review", raw.review_status || raw.status], ["Source", raw.source?.source_ref]];
   return [["Status", entity.status || raw.status], ["Reference", entity.ref || raw.id], ["Type", entity.type], ["Created", raw.created_at]];
 }
 

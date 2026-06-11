@@ -209,6 +209,8 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("agent_session_title", contract["forms"])
         self.assertIn("agent_message_append", contract["forms"])
         self.assertFalse(contract["forms"]["agent_retry"]["safety"]["will_execute_external_action"])
+        self.assertFalse(contract["forms"]["agent_promotion"]["safety"]["will_execute_external_action"])
+        self.assertEqual(contract["forms"]["agent_promotion"]["safety"]["idempotency_key"], "event_id + target")
         self.assertIn("/agents", screens["chat"]["read"])
         self.assertIn("/agents/session/{session_id}/message", agent_paths)
         self.assertIn("/agents/session/{session_id}/title", agent_paths)
@@ -338,6 +340,7 @@ class RuntimeFoundationTests(unittest.TestCase):
                 run_agent_round(settings, session.id, "promote this")
                 event = list_agent_events(settings, session_id=session.id)[-1]
                 job = promote_agent_event(settings, event["id"], "job")
+                job_again = promote_agent_event(settings, event["id"], "job")
                 report = promote_agent_event(settings, event["id"], "report")
                 memory = promote_agent_event(settings, event["id"], "memory_review")
                 channel = promote_agent_event(settings, event["id"], "channel_draft")
@@ -346,17 +349,32 @@ class RuntimeFoundationTests(unittest.TestCase):
                 reports = list_reports(settings.data_dir)
                 candidates = list_document_memory_candidates(settings.data_dir)
                 approvals = list_channel_approval_requests(settings.data_dir)
+                audit = list_audit_events(settings.data_dir, limit=50)
 
         self.assertEqual(job["created_resource"]["type"], "job")
+        self.assertEqual(job_again["status"], "duplicate")
+        self.assertTrue(job_again["duplicate"])
+        self.assertEqual(job_again["created_resource"]["id"], job["created_resource"]["id"])
+        self.assertEqual(job["created_resource"]["source"]["source_ref"], event["id"])
+        self.assertEqual(job["created_resource"]["source"]["session_id"], session.id)
+        self.assertEqual(job["created_resource"]["source"]["target"], "job")
         self.assertEqual(report["created_resource"]["type"], "report")
+        self.assertEqual(report["created_resource"]["source"]["source_type"], "agent_event")
         self.assertEqual(memory["created_resource"]["type"], "document_memory_candidate")
         self.assertTrue(memory["created_resource"]["review_required"])
+        self.assertEqual(memory["created_resource"]["source"]["target"], "memory_review")
         self.assertEqual(channel["created_resource"]["type"], "channel_approval_request")
         self.assertTrue(channel["created_resource"]["review_required"])
+        self.assertEqual(channel["created_resource"]["source"]["target"], "channel_draft")
+        self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[-1]["id"], job["created_resource"]["id"])
         self.assertEqual(reports[-1]["id"], report["created_resource"]["id"])
         self.assertEqual(candidates[-1]["id"], memory["created_resource"]["id"])
         self.assertEqual(approvals[-1]["id"], channel["created_resource"]["id"])
+        promoted = [event for event in audit if event["action"] == "agent.event_promoted"]
+        reused = [event for event in audit if event["action"] == "agent.event_promotion_reused"]
+        self.assertTrue(all(event["payload"]["promotion_id"] for event in promoted))
+        self.assertEqual(reused[-1]["payload"]["duplicate"], True)
 
     def test_agent_sessions_support_title_message_paging_and_retry(self):
         with tempfile.TemporaryDirectory() as tmp:
