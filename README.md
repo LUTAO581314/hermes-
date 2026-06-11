@@ -86,6 +86,7 @@ Internal frontend source reference:
 - [Brand And Trademark Fields](docs/19-brand-and-trademark-fields.md)
 - [bairui Frontend Source UI Integration](docs/20-bairui-frontend-source-ui-integration.md)
 - [Backend Contract Freeze For Frontend](docs/21-backend-contract-freeze-for-frontend.md)
+- [bairui Frontend Design And Source UI Modification](docs/22-bairui-frontend-design-and-source-ui-modification.md)
 
 ## CLI Entry Point
 
