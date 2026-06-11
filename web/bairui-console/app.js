@@ -2594,22 +2594,230 @@ function renderAvatarValidationResult() {
 
 function renderSettings() {
   setScreenHead("Settings", "runtime status");
-  const statuses = [
-    ["Memory", state.runtimeStatus.memory?.memory?.status],
-    ["Voice", state.runtimeStatus.voice?.voice_asr?.status],
-    ["Documents", state.runtimeStatus.document?.document_parse?.status],
-    ["Intelligence", state.runtimeStatus.intel?.intelligence?.status],
-    ["Simulation", state.runtimeStatus.simulation?.simulation?.status],
-    ["Search", state.runtimeStatus.search?.search?.status],
-    ["Index", state.runtimeStatus.index?.index?.status],
-    ["Avatar", state.avatarStatus?.avatar?.status],
-    ["CodeGraph", state.runtimeStatus.codegraph?.codegraph?.status],
-  ].map(([name, status]) => ({ name, status: status || "missing_config", detail: "contract-bound runtime status" }));
+  el.actions.innerHTML = `
+    <button class="primary-btn" id="settings-refresh" type="button">Refresh Checks</button>
+    <button class="ghost-btn" id="settings-open-activation" type="button">Open Activation</button>
+    <button class="ghost-btn" id="settings-open-events" type="button">Open Events</button>`;
+  const readiness = state.readiness?.runtime_readiness || {};
   el.body.innerHTML = `
+    <section class="panel pad runtime-health-overview">
+      <div class="conversation-head">
+        <div>
+          <h2 class="panel-title">System readiness</h2>
+          <p class="muted compact-copy">Settings is the operator view for /health, /ready, /runtime/readiness, runtime adapters, license, platform heartbeat, and safe repair actions.</p>
+        </div>
+        ${pill(readiness.status || state.ready?.status || "partial")}
+      </div>
+      ${renderSettingsGateGrid()}
+      ${renderSettingsNextActions(readiness)}
+    </section>
     <div class="grid two">
-      <section class="panel pad"><h2 class="panel-title">Runtime surfaces</h2>${renderTable(["name", "status", "detail"], statuses)}</section>
-      <section class="panel pad"><h2 class="panel-title">Capabilities</h2>${renderTable(["name", "status", "detail"], state.capabilities)}</section>
+      <section class="panel pad">
+        <h2 class="panel-title">Runtime readiness</h2>
+        <p class="muted compact-copy">${escapeHtml(readiness.summary || "Runtime readiness has not been loaded yet.")}</p>
+        ${renderSettingsReadinessList(readiness)}
+      </section>
+      <section class="panel pad">
+        <h2 class="panel-title">Configuration boundary</h2>
+        ${renderSettingsConfigBoundary()}
+      </section>
+    </div>
+    <section class="panel pad top-gap">
+      <div class="conversation-head">
+        <div>
+          <h2 class="panel-title">Runtime adapter matrix</h2>
+          <p class="muted compact-copy">Each row is backed by a real status endpoint or readiness item. Optional runtimes may stay partial without blocking local demo flow.</p>
+        </div>
+        ${pill(readiness.status || "partial")}
+      </div>
+      ${renderSettingsRuntimeMatrix()}
+      ${renderProductError("settings-refresh")}
+      ${renderProductError("memory-status")}
+      ${renderProductError("voice-status")}
+      ${renderProductError("document-status")}
+      ${renderProductError("intel-status")}
+      ${renderProductError("simulation-status")}
+      ${renderProductError("search-status")}
+      ${renderProductError("index-status")}
+      ${renderProductError("codegraph-status")}
+    </section>`;
+  document.getElementById("settings-refresh")?.addEventListener("click", async () => {
+    await runAction("settings-refresh", refresh);
+  });
+  document.getElementById("settings-open-activation")?.addEventListener("click", async () => {
+    state.screen = "activation";
+    await refreshScreenData();
+  });
+  document.getElementById("settings-open-events")?.addEventListener("click", async () => {
+    state.screen = "events";
+    await refreshScreenData();
+  });
+}
+
+function renderSettingsGateGrid() {
+  const license = state.license?.license || {};
+  const heartbeat = state.platform?.heartbeat || {};
+  const gates = [
+    { label: "HTTP health", status: state.health?.status || "missing_config", detail: "GET /health" },
+    { label: "Deploy readiness", status: state.ready?.status || "partial", detail: "GET /ready" },
+    { label: "License", status: license.status || state.ready?.license || "missing_config", detail: "license status only; secrets never echo" },
+    { label: "Platform heartbeat", status: heartbeat.status || state.ready?.platform || "missing_config", detail: "server identity and platform link check" },
+  ];
+  return `
+    <div class="settings-gate-grid">
+      ${gates
+        .map(
+          (gate) => `
+            <div>
+              <span>${escapeHtml(gate.label)}</span>
+              <strong>${pill(gate.status)}</strong>
+              <p>${escapeHtml(gate.detail)}</p>
+            </div>`,
+        )
+        .join("")}
     </div>`;
+}
+
+function renderSettingsReadinessList(readiness) {
+  const blockers = readiness.blockers || [];
+  const warnings = readiness.warnings || [];
+  if (!blockers.length && !warnings.length) {
+    return `<div class="empty-state top-gap">No readiness blockers. Continue with Command, Documents, Reports, and approval checks.</div>`;
+  }
+  return `
+    <div class="settings-readiness-list top-gap">
+      ${blockers.map((item) => `<div class="warning-row">${pill("blocked")}<span>${escapeHtml(customerSafeRuntimeText(item))}</span></div>`).join("")}
+      ${warnings.map((item) => `<div class="warning-row">${pill("partial", "warning")}<span>${escapeHtml(customerSafeRuntimeText(item))}</span></div>`).join("")}
+    </div>`;
+}
+
+function renderSettingsRuntimeMatrix() {
+  const readinessItems = state.readiness?.runtime_readiness?.items || [];
+  const directItems = [
+    runtimeRow("memory_substrate", state.runtimeStatus.memory?.memory?.status, state.runtimeStatus.memory?.memory?.detail, true),
+    runtimeRow("voice_asr", state.runtimeStatus.voice?.voice_asr?.status, state.runtimeStatus.voice?.voice_asr?.detail, false),
+    runtimeRow("document_parser", state.runtimeStatus.document?.document_parse?.status, state.runtimeStatus.document?.document_parse?.detail, false),
+    runtimeRow("intelligence_radar", state.runtimeStatus.intel?.intelligence?.status, state.runtimeStatus.intel?.intelligence?.detail, false),
+    runtimeRow("simulation_lab", state.runtimeStatus.simulation?.simulation?.status, state.runtimeStatus.simulation?.simulation?.detail, false),
+    runtimeRow("web_search", state.runtimeStatus.search?.search?.status, state.runtimeStatus.search?.search?.detail, false),
+    runtimeRow("local_index", state.runtimeStatus.index?.index?.status, state.runtimeStatus.index?.index?.detail, false),
+    runtimeRow("avatar_state_layer", state.avatarStatus?.avatar?.status, state.avatarStatus?.avatar?.detail, false),
+    runtimeRow("code_structure", state.runtimeStatus.codegraph?.codegraph?.status, state.runtimeStatus.codegraph?.codegraph?.detail, false),
+  ];
+  const rows = readinessItems.length
+    ? readinessItems.map((item) => runtimeRow(item.name, item.status, item.detail, item.required_for_usable))
+    : directItems;
+  return `
+    <div class="settings-runtime-matrix">
+      ${rows
+        .map(
+          (item) => `
+            <div>
+              <div class="agent-meta">
+                ${pill(item.status || "missing_config")}
+                <span class="chip">${item.required ? "required" : "optional"}</span>
+              </div>
+              <strong>${escapeHtml(runtimeDisplayName(item.name))}</strong>
+              <p>${escapeHtml(customerSafeRuntimeText(item.detail || "Status endpoint connected."))}</p>
+            </div>`,
+        )
+        .join("")}
+    </div>`;
+}
+
+function renderSettingsConfigBoundary() {
+  const model = capabilityByName("model_gateway");
+  const database = capabilityByName("postgresql");
+  const memoryVault = capabilityByName("obsidian_vault");
+  const audit = capabilityByName("audit_api");
+  const rows = [
+    { label: "Model gateway", status: model?.status || "missing_config", detail: "OpenAI-compatible endpoint configured by environment variables." },
+    { label: "Data store", status: database?.status || "partial", detail: "JSONL remains the local product store; database status is reported for migration readiness." },
+    { label: "Long-term memory", status: memoryVault?.status || "missing_config", detail: "Memory candidates require owner approval before any durable write." },
+    { label: "Audit trail", status: audit?.status || "ready", detail: "Every approval, state change, and generated resource must be traceable." },
+    { label: "External actions", status: "approval_required", detail: "Channel planning and review keep will_send=false until a future approved sender exists." },
+  ];
+  return `
+    <div class="settings-boundary-list">
+      ${rows
+        .map(
+          (row) => `
+            <div>
+              <span>${escapeHtml(row.label)}</span>
+              ${pill(row.status)}
+              <p>${escapeHtml(row.detail)}</p>
+            </div>`,
+        )
+        .join("")}
+    </div>`;
+}
+
+function renderSettingsNextActions(readiness) {
+  const blockers = readiness.blockers || [];
+  const warnings = readiness.warnings || [];
+  const action = blockers.length
+    ? "Fix required runtime configuration before calling the product usable."
+    : warnings.length
+      ? "Optional adapters are incomplete; core demo can continue while gaps stay visible."
+      : "Run the demo flow, then inspect Events for audit evidence.";
+  return `
+    <div class="settings-next-actions">
+      <div><span>Next diagnostic action</span><strong>${escapeHtml(action)}</strong></div>
+      <div><span>Safety invariant</span><strong>no external send, no automatic long-term memory write, no dangerous operation without review</strong></div>
+    </div>`;
+}
+
+function runtimeRow(name, status, detail, required = false) {
+  return { name, status: status || "missing_config", detail: detail || "", required: Boolean(required) };
+}
+
+function capabilityByName(name) {
+  return (state.capabilities || []).find((item) => item.name === name);
+}
+
+function runtimeDisplayName(name = "") {
+  const map = {
+    everos_memory: "Memory substrate",
+    memory_substrate: "Memory substrate",
+    funasr_voice_asr: "Voice ASR",
+    voice_asr: "Voice ASR",
+    mineru_document_parse: "Document parser",
+    document_parser: "Document parser",
+    trendradar_intelligence: "Intelligence radar",
+    intelligence_radar: "Intelligence radar",
+    mirofish_simulation: "Simulation lab",
+    simulation_lab: "Simulation lab",
+    searxng_metasearch: "Web search",
+    searxng_search: "Web search",
+    web_search: "Web search",
+    sonic_local_index: "Local index",
+    local_index: "Local index",
+    bairui_avatar_runtime: "Avatar state layer",
+    avatar_state_layer: "Avatar state layer",
+    bairui_codegraph: "Code structure",
+    code_structure: "Code structure",
+    bairui_agents: "Multi-agent core",
+  };
+  return map[name] || String(name || "Runtime").replaceAll("_", " ");
+}
+
+function customerSafeRuntimeText(text = "") {
+  const oldRuntimeName = (...parts) => new RegExp(parts.join(""), "gi");
+  const replacements = [
+    [oldRuntimeName("Ever", "OS"), "memory substrate"],
+    [oldRuntimeName("Fun", "ASR"), "voice ASR"],
+    [oldRuntimeName("Miner", "U"), "document parser"],
+    [oldRuntimeName("Trend", "Radar"), "intelligence radar"],
+    [oldRuntimeName("Miro", "Fish"), "simulation lab"],
+    [oldRuntimeName("Sear", "XNG"), "web search"],
+    [oldRuntimeName("Sonic"), "local index"],
+    [oldRuntimeName("Obsid", "ian"), "memory vault"],
+    [oldRuntimeName("Her", "mes"), "bairui"],
+    [oldRuntimeName("Bai", "Long", "ma"), "bairui"],
+    [oldRuntimeName("白", "龙", "马"), "bairui"],
+    [oldRuntimeName("小", "白", "龙"), "bairui"],
+  ];
+  return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), String(text || ""));
 }
 
 function renderCodeGraph() {

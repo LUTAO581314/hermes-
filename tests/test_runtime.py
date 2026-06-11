@@ -874,6 +874,31 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".avatar-result-card", styles)
         self.assertIn(".avatar-validation-card", styles)
 
+    def test_settings_console_surfaces_runtime_readiness_and_safe_repair_actions(self):
+        app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
+        styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("function renderSettingsGateGrid", app_js)
+        self.assertIn("function renderSettingsReadinessList", app_js)
+        self.assertIn("function renderSettingsRuntimeMatrix", app_js)
+        self.assertIn("function renderSettingsConfigBoundary", app_js)
+        self.assertIn("function renderSettingsNextActions", app_js)
+        self.assertIn("function customerSafeRuntimeText", app_js)
+        self.assertIn("Settings is the operator view for /health, /ready, /runtime/readiness", app_js)
+        self.assertIn("no external send, no automatic long-term memory write, no dangerous operation without review", app_js)
+        self.assertIn("license status only; secrets never echo", app_js)
+        self.assertIn("will_send=false", app_js)
+        self.assertIn('api.get("/health")', app_js)
+        self.assertIn('api.get("/ready")', app_js)
+        self.assertIn('api.get("/runtime/readiness")', app_js)
+        self.assertIn('api.get("/platform/heartbeat")', app_js)
+        self.assertIn('api.get("/license")', app_js)
+        self.assertIn('renderProductError("settings-refresh")', app_js)
+        self.assertIn(".settings-gate-grid", styles)
+        self.assertIn(".settings-runtime-matrix", styles)
+        self.assertIn(".settings-boundary-list", styles)
+        self.assertIn(".settings-next-actions", styles)
+
     def test_quickstart_and_deploy_docs_reference_console_demo_flow_and_readiness(self):
         readme = Path("README.md").read_text(encoding="utf-8")
         deployment = Path("docs/12-one-click-deployment.md").read_text(encoding="utf-8")
