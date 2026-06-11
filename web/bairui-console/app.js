@@ -47,6 +47,7 @@ const state = {
   agents: [],
   agentSessions: [],
   selectedAgentSessionId: "",
+  selectedAgentIds: [],
   agentEvents: [],
   avatarStatus: null,
   avatarManifest: null,
@@ -291,38 +292,93 @@ function renderCommand() {
   const agents = state.agents.length ? state.agents : [];
   const session = state.agentSessions.find((item) => item.id === state.selectedAgentSessionId) || state.agentSessions.at(-1);
   if (session && !state.selectedAgentSessionId) state.selectedAgentSessionId = session.id;
+  if (!state.selectedAgentIds.length) {
+    state.selectedAgentIds = session?.agent_ids?.length ? [...session.agent_ids] : agents.map((agent) => agent.id);
+  }
+  const selectedCount = state.selectedAgentIds.length;
   el.actions.innerHTML = `
     <button class="ghost-btn" id="refresh-agents" type="button">Refresh</button>
-    <button class="primary-btn" id="create-agent-session" type="button">New Session</button>
+    <button class="primary-btn" id="create-agent-session" type="button">New Session (${selectedCount})</button>
     <button class="ghost-btn" id="run-agent-round" type="button" ${!state.selectedAgentSessionId ? "disabled" : ""}>Run Round</button>`;
   el.body.innerHTML = `
     <div class="agent-layout">
       <section class="panel pad">
         <h2 class="panel-title">Agent roster</h2>
+        <p class="muted compact-copy">Choose the agents that join the next session. Approval agents can draft review items only.</p>
         <div class="agent-roster">
-          ${agents.map((agent) => renderAgentRow(agent.display_name, agent.role, agent.model, agent.permission, agent.status, agent.avatar_initials)).join("") || `<div class="empty-state">No agent roster loaded yet.</div>`}
+          ${agents.map((agent) => renderAgentRow(agent)).join("") || `<div class="empty-state">No agent roster loaded yet.</div>`}
+        </div>
+        <div class="session-stack top-gap">
+          <h3 class="section-label">Sessions</h3>
+          ${
+            state.agentSessions
+              .slice(-5)
+              .reverse()
+              .map(
+                (item) => `
+                  <button class="session-item ${item.id === state.selectedAgentSessionId ? "active" : ""}" type="button" data-agent-session="${escapeHtml(item.id)}">
+                    <span>${escapeHtml(item.title || "bairui command session")}</span>
+                    <span class="chip mono">${escapeHtml(shortId(item.id))}</span>
+                  </button>`,
+              )
+              .join("") || `<div class="empty-state">No sessions yet.</div>`
+          }
         </div>
       </section>
       <section class="panel pad">
-        <h2 class="panel-title">Conversation ${session ? `<span class="chip mono">${escapeHtml(shortId(session.id))}</span>` : ""}</h2>
+        <div class="conversation-head">
+          <div>
+            <h2 class="panel-title">Conversation ${session ? `<span class="chip mono">${escapeHtml(shortId(session.id))}</span>` : ""}</h2>
+            <p class="muted compact-copy">${escapeHtml(session?.status || "no active session")} · ${escapeHtml(String(session?.agent_ids?.length || selectedCount || 0))} agents</p>
+          </div>
+          ${pill(state.errors["agent-round"] ? "blocked" : "ready", state.errors["agent-round"] ? "blocked" : "governed")}
+        </div>
         <div class="conversation">
           ${
             state.agentEvents.length
-              ? state.agentEvents.map((event) => renderMessage(agentName(event.agent_id), event.role || event.agent_id, event.model, event.permission, event.status, event.content || event.error)).join("")
+              ? state.agentEvents.map((event) => renderMessage(event)).join("")
               : `<div class="empty-state">Create a session and run a round to record governed agent events.</div>`
           }
         </div>
       </section>
     </div>`;
   document.getElementById("refresh-agents")?.addEventListener("click", refreshScreenData);
+  el.body.querySelectorAll("[data-agent-toggle]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const next = new Set(state.selectedAgentIds);
+      if (input.checked) next.add(input.dataset.agentToggle);
+      else next.delete(input.dataset.agentToggle);
+      state.selectedAgentIds = [...next];
+      renderCommand();
+    });
+  });
+  el.body.querySelectorAll("[data-agent-session]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.selectedAgentSessionId = button.dataset.agentSession;
+      const selected = state.agentSessions.find((item) => item.id === state.selectedAgentSessionId);
+      state.selectedAgentIds = selected?.agent_ids?.length ? [...selected.agent_ids] : state.selectedAgentIds;
+      await loadAgents();
+      render();
+    });
+  });
+  el.body.querySelectorAll("[data-promote-event]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const eventId = button.dataset.promoteEvent;
+      const target = button.dataset.promoteTarget;
+      await runAction("agent-promote", () => api.post(`/agents/session/${state.selectedAgentSessionId}/promote`, { event_id: eventId, target }));
+      await loadAgents();
+      render();
+    });
+  });
   document.getElementById("create-agent-session")?.addEventListener("click", async () => {
     const result = await runAction("agent-session", () =>
       api.post("/agents/session", {
         title: "bairui command session",
-        agent_ids: agents.map((agent) => agent.id),
+        agent_ids: state.selectedAgentIds.length ? state.selectedAgentIds : agents.map((agent) => agent.id),
       }),
     );
     state.selectedAgentSessionId = result?.agent_session?.id || state.selectedAgentSessionId;
+    state.selectedAgentIds = result?.agent_session?.agent_ids || state.selectedAgentIds;
     await loadAgents();
     render();
   });
@@ -338,35 +394,58 @@ function agentName(agentId) {
   return state.agents.find((agent) => agent.id === agentId)?.display_name || agentId || "Agent";
 }
 
-function renderAgentRow(name, role, model, permission, status, initials = "") {
-  return `
-    <div class="agent-row">
-      <div class="agent-avatar">${escapeHtml(initials || role.slice(0, 2))}</div>
-      <div>
-        <div class="agent-name">${escapeHtml(name)}</div>
-        <div class="agent-meta">
-          <span class="chip">${escapeHtml(role)}</span>
-          <span class="chip">${escapeHtml(model)}</span>
-          <span class="chip">${escapeHtml(permission)}</span>
-          ${pill(status)}
-        </div>
-      </div>
-    </div>`;
+function agentProfile(agentId) {
+  return state.agents.find((agent) => agent.id === agentId) || {};
 }
 
-function renderMessage(name, role, model, permission, status, content) {
+function renderAgentRow(agent) {
+  const selected = state.selectedAgentIds.includes(agent.id);
+  return `
+    <label class="agent-row ${selected ? "selected" : ""}">
+      <input class="agent-check" type="checkbox" data-agent-toggle="${escapeHtml(agent.id)}" ${selected ? "checked" : ""}>
+      <div class="agent-avatar">${escapeHtml(agent.avatar_initials || agent.role.slice(0, 2))}</div>
+      <div>
+        <div class="agent-name">${escapeHtml(agent.display_name)}</div>
+        <div class="agent-meta">
+          <span class="chip">${escapeHtml(agent.role)}</span>
+          <span class="chip">${escapeHtml(agent.model)}</span>
+          <span class="chip">${escapeHtml(agent.permission)}</span>
+          ${pill(agent.status)}
+        </div>
+      </div>
+    </label>`;
+}
+
+function renderMessage(event) {
+  const profile = agentProfile(event.agent_id);
+  const role = event.role || profile.role || event.agent_id || "agent";
+  const content = event.content || event.error || "";
+  const actionable = event.agent_id !== "owner" && event.status !== "missing_config";
   return `
     <article class="message">
-      <div class="agent-avatar">${escapeHtml(role.slice(0, 2))}</div>
+      <div class="agent-avatar">${escapeHtml(profile.avatar_initials || role.slice(0, 2))}</div>
       <div class="message-body">
-        <div class="agent-name">${escapeHtml(name)}</div>
+        <div class="message-titleline">
+          <div class="agent-name">${escapeHtml(agentName(event.agent_id))}</div>
+          <span class="chip mono">${escapeHtml(shortId(event.id))}</span>
+        </div>
         <div class="agent-meta">
           <span class="chip">${escapeHtml(role)}</span>
-          <span class="chip">${escapeHtml(model)}</span>
-          <span class="chip">${escapeHtml(permission)}</span>
-          ${pill(status)}
+          <span class="chip">${escapeHtml(event.model || profile.model || "")}</span>
+          <span class="chip">${escapeHtml(event.permission || profile.permission || "")}</span>
+          ${pill(event.status)}
         </div>
         <p>${escapeHtml(content)}</p>
+        ${
+          actionable
+            ? `<div class="message-actions">
+                <button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="job">Task</button>
+                <button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="report">Report</button>
+                <button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="memory_review">Memory Review</button>
+                <button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="channel_draft">Channel Draft</button>
+              </div>`
+            : ""
+        }
       </div>
     </article>`;
 }
@@ -999,6 +1078,8 @@ async function loadAgents() {
   state.agents = agents || [];
   state.agentSessions = sessions || [];
   if (!state.selectedAgentSessionId && state.agentSessions.length) state.selectedAgentSessionId = state.agentSessions.at(-1).id;
+  const selected = state.agentSessions.find((item) => item.id === state.selectedAgentSessionId);
+  if (!state.selectedAgentIds.length) state.selectedAgentIds = selected?.agent_ids?.length ? [...selected.agent_ids] : state.agents.map((agent) => agent.id);
   if (state.selectedAgentSessionId) {
     state.agentEvents = await safe(() => api.get(`/agents/session/${state.selectedAgentSessionId}/events`).then((data) => data.agent_events || []), state.agentEvents, "agent-events");
   }
@@ -1051,7 +1132,25 @@ function connectEvents() {
 el.commandSend.addEventListener("click", async () => {
   const promptText = el.commandInput.value.trim();
   if (!promptText) return;
-  await runAction("command", () => api.post("/jobs", { title: "Command request", prompt: promptText, route: "general" }));
+  if (state.screen === "command") {
+    if (!state.selectedAgentSessionId) {
+      const agents = state.agents.length ? state.agents : await safe(() => api.get("/agents").then((data) => data.agents || []), [], "agents");
+      state.agents = agents || state.agents;
+      const result = await runAction("agent-session", () =>
+        api.post("/agents/session", {
+          title: "bairui command session",
+          agent_ids: state.selectedAgentIds.length ? state.selectedAgentIds : state.agents.map((agent) => agent.id),
+        }),
+      );
+      state.selectedAgentSessionId = result?.agent_session?.id || "";
+      state.selectedAgentIds = result?.agent_session?.agent_ids || state.selectedAgentIds;
+    }
+    if (!state.selectedAgentSessionId) return;
+    await runAction("agent-round", () => api.post(`/agents/session/${state.selectedAgentSessionId}/round`, { prompt: promptText }));
+    await loadAgents();
+  } else {
+    await runAction("command", () => api.post("/jobs", { title: "Command request", prompt: promptText, route: "general" }));
+  }
   el.commandInput.value = "";
 });
 
