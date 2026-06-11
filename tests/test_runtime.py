@@ -705,6 +705,21 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(escape_status, 403)
         self.assertIn(b"forbidden", escape_body)
 
+    def test_console_product_errors_explain_next_steps_and_safety(self):
+        app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
+        styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("function productErrorGuide", app_js)
+        self.assertIn("function renderProductError", app_js)
+        self.assertIn("Register a source repository, select it, scan it", app_js)
+        self.assertIn("Channel actions only create approval records; will_send remains false.", app_js)
+        self.assertIn("Document parsing may create candidates, but memory still requires owner review.", app_js)
+        self.assertIn('renderProductError("demo-flow")', app_js)
+        self.assertIn('renderProductError("channel")', app_js)
+        self.assertIn('renderProductError("codegraph-query")', app_js)
+        self.assertIn(".product-error", styles)
+        self.assertIn(".error-guide-grid", styles)
+
     def test_avatar_engine_status_uses_advanced_runtime_contract(self):
         state = avatar_engine_status(load_settings())
         self.assertEqual(state.package, "pixi-live2d-display-advanced")

@@ -1,8 +1,9 @@
 const api = {
   async get(path) {
     const response = await fetch(path, { cache: "no-store" });
-    if (!response.ok) throw new Error(`${path} ${response.status}`);
-    return response.json();
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw createApiError(path, response.status, data);
+    return data;
   },
   async post(path, payload = {}) {
     const response = await fetch(path, {
@@ -11,11 +12,20 @@ const api = {
       body: JSON.stringify(payload),
     });
     const data = await response.json().catch(() => ({}));
-    const message = data?.message || data?.chat?.error || data?.error || `${path} ${response.status}`;
-    if (!response.ok) throw new Error(message);
+    if (!response.ok) throw createApiError(path, response.status, data);
     return data;
   },
 };
+
+function createApiError(path, status, data = {}) {
+  const message = data?.message || data?.chat?.error || data?.error || data?.detail || `${path} ${status}`;
+  const error = new Error(message);
+  error.path = path;
+  error.status = status;
+  error.code = data?.error || data?.chat?.status || data?.status || "";
+  error.payload = data;
+  return error;
+}
 
 const screens = [
   ["activation", "Activation", "A1"],
@@ -89,6 +99,7 @@ const state = {
   selectedStep: "brand_lock",
   loading: new Set(),
   errors: {},
+  errorDetails: {},
 };
 
 const el = {
@@ -141,19 +152,90 @@ function setBusy(key, active) {
 async function runAction(key, fn, after = refreshScreenData) {
   setBusy(key, true);
   state.errors[key] = "";
+  state.errorDetails[key] = null;
   render();
   try {
     const result = await fn();
     await after();
     return result;
   } catch (error) {
-    state.errors[key] = error.message;
+    const detail = productErrorGuide(error, key);
+    state.errors[key] = detail.summary;
+    state.errorDetails[key] = detail;
     render();
     return null;
   } finally {
     setBusy(key, false);
     render();
   }
+}
+
+function productErrorGuide(error, key = "") {
+  const path = error?.path || "";
+  const status = error?.status || "";
+  const raw = error?.message || "Action failed.";
+  const code = error?.code || "";
+  const guide = {
+    title: "Action needs attention",
+    summary: raw,
+    reason: "The backend returned an error before completing the requested action.",
+    next: "Review the visible configuration and try again after the missing input is fixed.",
+    safety: "No external send or long-term memory write was completed.",
+    technical: [path, status ? `HTTP ${status}` : "", code, raw].filter(Boolean).join(" | "),
+  };
+  if (status === 400 || code === "invalid_request" || /required/i.test(raw)) {
+    guide.title = "Required input is missing";
+    guide.reason = "The action did not have all required fields.";
+    guide.next = "Fill the highlighted path, id, message, decision, or prompt field, then run the action again.";
+  }
+  if (status === 404 || code === "not_found" || /not found/i.test(raw)) {
+    guide.title = "Record was not found";
+    guide.reason = "The selected item no longer exists or the page is using an outdated reference.";
+    guide.next = "Refresh this screen, select the item again, then retry.";
+  }
+  if (status === 503 || code === "missing_config" || /missing_config|disabled|not configured/i.test(raw)) {
+    guide.title = "Runtime is not configured";
+    guide.reason = "A required local runtime, model, channel, parser, or path is missing.";
+    guide.next = "Open Activation or Settings, complete the missing_config item, then return here.";
+  }
+  if (status === 409 || /already/i.test(raw)) {
+    guide.title = "Already reviewed";
+    guide.reason = "This review item has already been handled.";
+    guide.next = "Refresh the queue and open the latest review record.";
+  }
+  if (key.startsWith("codegraph")) {
+    guide.next = "Register a source repository, select it, scan it, then run query or impact again.";
+    guide.safety = "CodeGraph reads source structure only and does not write long-term memory.";
+  }
+  if (key.startsWith("doc") || key === "documents") {
+    guide.next = "Check the document path and selected ingest session, then advance the workbench one step.";
+    guide.safety = "Document parsing may create candidates, but memory still requires owner review.";
+  }
+  if (key.startsWith("channel")) {
+    guide.next = "Check channel target diagnostics, message text, media type, and attachment path.";
+    guide.safety = "Channel actions only create approval records; will_send remains false.";
+  }
+  if (key.startsWith("demo")) {
+    guide.next = "Run Seed Demo first if resources are empty, then run Demo Flow again.";
+    guide.safety = "Demo Flow verifies approvals without sending externally or writing memory automatically.";
+  }
+  return guide;
+}
+
+function renderProductError(key) {
+  const detail = state.errorDetails[key];
+  if (!detail) return "";
+  return `
+    <div class="product-error" role="alert">
+      <div class="step-title"><span>${escapeHtml(detail.title)}</span>${pill("blocked", "needs action")}</div>
+      <p>${escapeHtml(detail.summary)}</p>
+      <div class="error-guide-grid">
+        <div><span>Why</span><strong>${escapeHtml(detail.reason)}</strong></div>
+        <div><span>Next</span><strong>${escapeHtml(detail.next)}</strong></div>
+        <div><span>Safety</span><strong>${escapeHtml(detail.safety)}</strong></div>
+      </div>
+      <p class="muted mono compact-copy">${escapeHtml(detail.technical)}</p>
+    </div>`;
 }
 
 function renderRail() {
@@ -544,8 +626,8 @@ function renderDashboard() {
       </div>
       ${renderDemoSeedState(demo)}
       ${renderDemoFlowState(demoFlow)}
-      ${state.errors["demo-seed"] ? `<p class="error-text">${escapeHtml(state.errors["demo-seed"])}</p>` : ""}
-      ${state.errors["demo-flow"] ? `<p class="error-text">${escapeHtml(state.errors["demo-flow"])}</p>` : ""}
+      ${renderProductError("demo-seed")}
+      ${renderProductError("demo-flow")}
     </section>
     <div class="grid two top-gap">
       <section class="panel pad">
@@ -1137,7 +1219,9 @@ function renderDocuments() {
             </label>
           </div>
           <p class="muted compact-copy">Creates a local ingest plan only. Parsing and memory writes still require explicit workflow and review steps.</p>
-          ${state.errors.documents || state.errors["doc-plan"] ? `<p class="error-text">${escapeHtml(state.errors.documents || state.errors["doc-plan"])}</p>` : ""}
+          ${renderProductError("documents")}
+          ${renderProductError("doc-plan")}
+          ${renderProductError("doc-run")}
         </div>
         <hr class="rule" />
         <h2 class="panel-title">Ingest sessions</h2>
@@ -1902,7 +1986,8 @@ function renderChannels() {
         <label class="form-label">Message</label>
         <textarea class="textarea" id="channel-text" rows="5" placeholder="Draft message for owner approval"></textarea>
         <button class="primary-btn top-gap" id="plan-channel" type="button" ${!firstTarget ? "disabled" : ""}>Create Approval Plan</button>
-        ${state.errors.channel ? `<p class="error-text">${escapeHtml(state.errors.channel)}</p>` : ""}
+        ${renderProductError("channel")}
+        ${renderProductError("channel-review")}
       </section>
       <section class="panel pad">
         <h2 class="panel-title">Approval queue</h2>
@@ -2147,6 +2232,10 @@ function renderCodeGraph() {
         <h3 class="sub-title">Query</h3>
         <input class="field" id="codegraph-query-text" placeholder="function, class, route, file" />
         <button class="ghost-btn top-gap" id="codegraph-query" type="button">Search</button>
+        ${renderProductError("codegraph-register")}
+        ${renderProductError("codegraph-scan")}
+        ${renderProductError("codegraph-query")}
+        ${renderProductError("codegraph-impact")}
       </section>
       <section class="panel pad">
         <h2 class="panel-title">Results</h2>
