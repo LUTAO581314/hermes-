@@ -810,6 +810,12 @@ h1 {
   margin-top: 10px;
 }
 
+.message-actions .is-linked {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  background: rgba(53, 230, 199, 0.055);
+}
+
 .promotion-results {
   display: grid;
   gap: 6px;

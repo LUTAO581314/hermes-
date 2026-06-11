@@ -822,12 +822,7 @@ function renderMessage(event) {
         <p>${escapeHtml(content)}</p>
         ${
           actionable
-            ? `<div class="message-actions">
-                <button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="job">Task</button>
-                <button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="report">Report</button>
-                <button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="memory_review">Memory Review</button>
-                <button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="channel_draft">Channel Draft</button>
-              </div>`
+            ? `<div class="message-actions">${renderPromotionAction(event, "job", "Task")}${renderPromotionAction(event, "report", "Report")}${renderPromotionAction(event, "memory_review", "Memory Review")}${renderPromotionAction(event, "channel_draft", "Channel Draft")}</div>`
             : ""
         }
         ${
@@ -842,8 +837,56 @@ function renderMessage(event) {
     </article>`;
 }
 
+function renderPromotionAction(event, target, label) {
+  const promotion = promotionForEventTarget(event.id, target);
+  const resource = promotion?.created_resource || {};
+  if (resource.id) {
+    const viewLabel =
+      target === "memory_review" ? "Review Memory" : target === "channel_draft" ? "Review Draft" : target === "job" ? "View Task" : "View Report";
+    return `<button class="ghost-btn mini is-linked" type="button" data-open-promotion="${escapeHtml(resource.type)}" data-resource-id="${escapeHtml(resource.id)}">${escapeHtml(viewLabel)}</button>`;
+  }
+  return `<button class="ghost-btn mini" type="button" data-promote-event="${escapeHtml(event.id)}" data-promote-target="${escapeHtml(target)}">${escapeHtml(label)}</button>`;
+}
+
+function promotionForEventTarget(eventId, target) {
+  const transient = state.promotionResults[eventId] || [];
+  const persisted = state.agentPromotions
+    .filter((promotion) => promotion.event_id === eventId && promotion.target === target)
+    .map((promotion) => ({
+      target: promotion.target,
+      status: "planned",
+      detail: "Promotion recorded for owner review.",
+      promotion_id: promotion.id,
+      created_resource: {
+        type: promotion.resource_type,
+        id: promotion.resource_id,
+        status: promotion.resource_status,
+        review_required: promotion.review_required,
+        source: promotion.source || {},
+      },
+    }));
+  return [...transient, ...persisted].at(-1) || null;
+}
+
 function renderPromotionResults(eventId) {
-  const results = state.promotionResults[eventId] || [];
+  const persisted = state.agentPromotions
+    .filter((promotion) => promotion.event_id === eventId)
+    .map((promotion) => ({
+      target: promotion.target,
+      status: "planned",
+      detail: "Promotion recorded for owner review.",
+      duplicate: false,
+      created_resource: {
+        type: promotion.resource_type,
+        id: promotion.resource_id,
+        status: promotion.resource_status,
+        review_required: promotion.review_required,
+        source: promotion.source || {},
+      },
+    }));
+  const byTarget = new Map();
+  [...persisted, ...(state.promotionResults[eventId] || [])].forEach((promotion) => byTarget.set(promotion.target, promotion));
+  const results = [...byTarget.values()];
   if (!results.length) return "";
   return `
     <div class="promotion-results">
