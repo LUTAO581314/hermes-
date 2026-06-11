@@ -430,6 +430,7 @@ function renderActivation() {
         <p class="muted">${escapeHtml(selected?.complete_when || "Load backend contract to inspect activation.")}</p>
         ${renderActivationEvidence(selected?.id || "")}
         ${renderActivationDiagnostics(selected, selectedState)}
+        ${renderActivationRepairCard(selected, selectedState, targetScreen)}
         ${renderActivationStepOperations(selected, selectedState, targetScreen)}
         <div class="grid">
           ${(selected?.read || []).map((path) => `<span class="status-pill">${escapeHtml(path)}</span>`).join("")}
@@ -490,6 +491,63 @@ function activationTargetScreen(stepId) {
   );
 }
 
+function activationConfigTarget(stepId) {
+  return (
+    {
+      license_and_platform: "license",
+      model_gateway: "model_gateway",
+      document_runtime: "document_output_dir",
+      channels: "channel_targets",
+      avatar: "avatar_assets",
+      codegraph: "codegraph_root",
+    }[stepId] || ""
+  );
+}
+
+function activationRepairDetail(step, stepState, targetScreen) {
+  const stepId = step?.id || "";
+  const target = activationConfigTarget(stepId);
+  const item = configStatusItem(target);
+  const checklist = state.configStatus?.config_status?.checklist || {};
+  const stepRepair = configChecklistStep(target);
+  const command = (checklist.commands || [])[0] || "python -m src.hermes config-status";
+  if (target === "model_gateway") {
+    return {
+      title: "Set model gateway env",
+      target,
+      status: item?.status || stepState || "missing_config",
+      fix: "Set BAIRUI_MODEL_BASE_URL, BAIRUI_MODEL_API_KEY, and BAIRUI_MODEL_NAME, then run the probe.",
+      verify: command,
+    };
+  }
+  if (target === "channel_targets") {
+    return {
+      title: "Prepare owner-reviewed channel targets",
+      target,
+      status: item?.status || stepState || "missing_config",
+      fix: "Set BAIRUI_CHANNEL_TARGETS_JSON only for approved targets. Activation still shows will_send=false.",
+      verify: "python -m src.hermes channels diagnostics",
+    };
+  }
+  if (target) {
+    const path = item?.fields?.path || stepRepair?.detail || "";
+    return {
+      title: `Check ${target}`,
+      target,
+      status: item?.status || stepState || "partial",
+      fix: path ? `Create or configure this path: ${path}` : stepRepair?.detail || "Refresh Settings and follow the generated deployment checklist.",
+      verify: command,
+    };
+  }
+  return {
+    title: stepState === "ready" ? "Evidence is healthy" : "Continue guided setup",
+    target: targetScreen || "workflow",
+    status: stepState || "partial",
+    fix: targetScreen ? `Open ${screens.find(([id]) => id === targetScreen)?.[1] || targetScreen} and complete the visible next action.` : "Refresh Activation and inspect runtime blockers.",
+    verify: command,
+  };
+}
+
 function renderActivationProgress(flow) {
   if (!flow.length) return "";
   const states = flow.map((step) => inferStepState(step));
@@ -511,6 +569,29 @@ function renderActivationProgress(flow) {
         </div>
       </div>
       <div class="activation-progress-track"><span style="width: ${Math.max(0, Math.min(100, percent))}%"></span></div>
+    </div>`;
+}
+
+function renderActivationRepairCard(step, stepState, targetScreen) {
+  if (!step) return "";
+  const repair = activationRepairDetail(step, stepState, targetScreen);
+  return `
+    <div class="activation-repair-card">
+      <div>
+        <span>Repair</span>
+        <strong>${escapeHtml(repair.title)}</strong>
+        <p>${escapeHtml(repair.fix)}</p>
+      </div>
+      <div>
+        <span>Mapped config</span>
+        ${pill(repair.status || "partial")}
+        <p>${escapeHtml(repair.target || "workflow")}</p>
+      </div>
+      <div>
+        <span>Verify</span>
+        <strong>${escapeHtml(repair.verify)}</strong>
+        <p>Refresh Activation after the command reports ready or partial without required blockers.</p>
+      </div>
     </div>`;
 }
 
