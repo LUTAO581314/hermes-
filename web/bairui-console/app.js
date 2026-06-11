@@ -96,6 +96,7 @@ const state = {
   codegraphOverview: null,
   codegraphQuery: null,
   codegraphImpact: null,
+  codegraphActionResult: null,
   activationProbe: null,
   activationAction: null,
   demoSeed: null,
@@ -2572,6 +2573,7 @@ function renderCodeGraph() {
         ${pill(state.codegraph?.codegraph?.status || "missing_config")}
       </div>
       ${renderCountStrip({ repos: state.codegraphRepos.length, files: counts.files ?? files.length, symbols: counts.symbols ?? symbols.length, imports: counts.imports ?? imports.length })}
+      ${renderCodeGraphBoundaryMatrix()}
     </section>
     <div class="channels-layout">
       <section class="panel pad">
@@ -2601,6 +2603,7 @@ function renderCodeGraph() {
           <button class="primary-btn" id="codegraph-register" type="button">Register</button>
           <button class="ghost-btn" id="codegraph-scan" type="button" ${!selectedRepo ? "disabled" : ""}>Scan Selected</button>
         </div>
+        ${renderCodeGraphActionResult()}
         <h3 class="sub-title">Latest scan</h3>
         ${renderCodeGraphOverview(scan, files, symbols, imports)}
         <h3 class="sub-title">Query</h3>
@@ -2642,12 +2645,14 @@ function renderCodeGraph() {
       }),
     );
     if (result?.codegraph_repo?.id) state.selectedCodegraphRepoId = result.codegraph_repo.id;
+    state.codegraphActionResult = codegraphActionSummary(result, "/codegraph/repos/register");
     await loadCodeGraph();
     render();
   });
   document.getElementById("codegraph-scan")?.addEventListener("click", async () => {
     const repo = selectedCodegraphRepo();
-    await runAction("codegraph-scan", () => api.post("/codegraph/repos/scan", { repo_id: repo?.id || "" }));
+    const result = await runAction("codegraph-scan", () => api.post("/codegraph/repos/scan", { repo_id: repo?.id || "" }));
+    state.codegraphActionResult = codegraphActionSummary(result, "/codegraph/repos/scan");
     await loadCodeGraph();
     render();
   });
@@ -2661,6 +2666,7 @@ function renderCodeGraph() {
       }),
     );
     state.codegraphQuery = result?.codegraph_query || state.codegraphQuery;
+    state.codegraphActionResult = codegraphActionSummary(result, "/codegraph/query");
     render();
   });
   document.getElementById("codegraph-impact")?.addEventListener("click", async () => {
@@ -2672,9 +2678,44 @@ function renderCodeGraph() {
       }),
     );
     state.codegraphImpact = result?.codegraph_impact || state.codegraphImpact;
+    state.codegraphActionResult = codegraphActionSummary(result, "/codegraph/impact");
     render();
   });
   bindCodeGraphCards();
+}
+
+function renderCodeGraphBoundaryMatrix() {
+  return `
+    <div class="codegraph-boundary-grid">
+      <div><span>Read scope</span><strong>source structure only</strong><p>Scans files, symbols, and imports from registered repositories.</p></div>
+      <div><span>Memory</span><strong>no auto promotion</strong><p>CodeGraph does not write long-term memory or Obsidian notes.</p></div>
+      <div><span>Actions</span><strong>register / scan / query / impact</strong><p>All buttons call explicit backend contracts and return visible status.</p></div>
+      <div><span>Use in Command</span><strong>cite result manually</strong><p>Agent workflows can reference findings, but code facts stay separate.</p></div>
+    </div>`;
+}
+
+function renderCodeGraphActionResult() {
+  const result = state.codegraphActionResult;
+  if (!result) return "";
+  return `
+    <div class="codegraph-action-result">
+      <div class="agent-meta">
+        ${pill(result.status || "completed")}
+        <span class="chip mono">${escapeHtml(result.path || "")}</span>
+        <span class="chip">memory_write=false</span>
+      </div>
+      <p>${escapeHtml(result.detail || "CodeGraph action completed.")}</p>
+    </div>`;
+}
+
+function codegraphActionSummary(result, path) {
+  if (!result) return null;
+  const payload = result.codegraph_repo || result.codegraph_scan || result.codegraph_query || result.codegraph_impact || {};
+  return {
+    path,
+    status: payload.status || "completed",
+    detail: payload.detail || payload.name || payload.root_path || "CodeGraph action completed without long-term memory writes.",
+  };
 }
 
 function selectedCodegraphRepo() {

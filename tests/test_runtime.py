@@ -837,6 +837,25 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".channel-safety-grid", styles)
         self.assertIn(".channel-result-card", styles)
 
+    def test_codegraph_console_keeps_source_structure_separate_from_memory(self):
+        app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
+        styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("codegraphActionResult", app_js)
+        self.assertIn("function renderCodeGraphBoundaryMatrix", app_js)
+        self.assertIn("function renderCodeGraphActionResult", app_js)
+        self.assertIn("function codegraphActionSummary", app_js)
+        self.assertIn("memory_write=false", app_js)
+        self.assertIn("CodeGraph indexes source structure only; it does not write long-term memory.", app_js)
+        self.assertIn("CodeGraph does not write long-term memory or Obsidian notes.", app_js)
+        self.assertIn("register / scan / query / impact", app_js)
+        self.assertIn('api.post("/codegraph/repos/register"', app_js)
+        self.assertIn('api.post("/codegraph/repos/scan"', app_js)
+        self.assertIn('api.post("/codegraph/query"', app_js)
+        self.assertIn('api.post("/codegraph/impact"', app_js)
+        self.assertIn(".codegraph-boundary-grid", styles)
+        self.assertIn(".codegraph-action-result", styles)
+
     def test_quickstart_and_deploy_docs_reference_console_demo_flow_and_readiness(self):
         readme = Path("README.md").read_text(encoding="utf-8")
         deployment = Path("docs/12-one-click-deployment.md").read_text(encoding="utf-8")
