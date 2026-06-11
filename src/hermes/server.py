@@ -77,6 +77,7 @@ from .codegraph import (
 )
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
+from .demo import seed_demo_data
 from .document_pipeline import (
     build_document_ingest_session_summary,
     build_document_workbench_state,
@@ -311,6 +312,12 @@ class HermesHandler(BaseHTTPRequestHandler):
                 return
             job = create_job(settings.data_dir, title=title, prompt=prompt, route=route)
             self._send({"service": PUBLIC_SERVICE, "job": job.__dict__}, status=201)
+            return
+
+        if self.path == "/demo/seed":
+            result = seed_demo_data(settings, force=bool(payload.get("force", False)))
+            status = 201 if result["status"] == "completed" else 200
+            self._send({"service": PUBLIC_SERVICE, "demo_seed": result}, status=status)
             return
 
         if self.path == "/obsidian/reports":

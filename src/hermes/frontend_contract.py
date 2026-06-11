@@ -170,7 +170,10 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                 "id": "dashboard",
                 "title": "Dashboard",
                 "read": ("/health", "/ready", "/runtime/readiness", "/capabilities", "/platform/heartbeat", "/jobs", "/audit", "/events"),
-                "actions": ({"id": "create_job", "method": "POST", "path": "/jobs", "schema": "job_create"},),
+                "actions": (
+                    {"id": "create_job", "method": "POST", "path": "/jobs", "schema": "job_create"},
+                    {"id": "seed_demo_data", "method": "POST", "path": "/demo/seed", "schema": "demo_seed"},
+                ),
             },
             {
                 "id": "chat",
@@ -272,6 +275,16 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                     {"name": "prompt", "type": "textarea", "required": True, "label": "Task"},
                     {"name": "route", "type": "select", "required": False, "label": "Route", "options": ("general", "research", "document", "operations")},
                 )
+            },
+            "demo_seed": {
+                "safety": {
+                    "will_send": False,
+                    "will_write_long_term_memory": False,
+                    "idempotent": True,
+                },
+                "fields": (
+                    {"name": "force", "type": "toggle", "required": False, "label": "Create Another Demo Set"},
+                ),
             },
             "agent_session_create": {
                 "fields": (
@@ -401,6 +414,7 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                 "endpoints": (
                     {"method": "GET", "path": "/jobs"},
                     {"method": "POST", "path": "/jobs"},
+                    {"method": "POST", "path": "/demo/seed"},
                     {"method": "GET", "path": "/audit"},
                     {"method": "GET", "path": "/events", "content_type": "text/event-stream"},
                     {"method": "GET", "path": "/platform/heartbeat"},

@@ -69,6 +69,7 @@ const state = {
   codegraphRepos: [],
   codegraphQuery: null,
   codegraphImpact: null,
+  demoSeed: null,
   selectedEntity: null,
   selectedStep: "brand_lock",
   loading: new Set(),
@@ -330,7 +331,10 @@ function renderReadinessBlockers() {
 
 function renderDashboard() {
   setScreenHead("Dashboard", "operational truth");
-  el.actions.innerHTML = `<button class="primary-btn" id="create-sample-job" type="button">Create Job</button>`;
+  el.actions.innerHTML = `
+    <button class="primary-btn" id="seed-demo-data" type="button">Seed Demo</button>
+    <button class="ghost-btn" id="create-sample-job" type="button">Create Job</button>`;
+  const demo = state.demoSeed?.demo_seed;
   el.body.innerHTML = `
     <div class="grid three">
       <section class="panel pad">
@@ -349,6 +353,17 @@ function renderDashboard() {
         <p class="muted">runtime surfaces detected</p>
       </section>
     </div>
+    <section class="panel pad top-gap">
+      <div class="conversation-head">
+        <div>
+          <h2 class="panel-title">Demo walkthrough</h2>
+          <p class="muted compact-copy">Create safe local data for product demos: task, draft report, memory review item, and channel approval draft.</p>
+        </div>
+        ${pill(demo?.status || "ready", demo?.status || "not seeded")}
+      </div>
+      ${renderDemoSeedState(demo)}
+      ${state.errors["demo-seed"] ? `<p class="error-text">${escapeHtml(state.errors["demo-seed"])}</p>` : ""}
+    </section>
     <div class="grid two top-gap">
       <section class="panel pad">
         <h2 class="panel-title">Jobs</h2>
@@ -361,9 +376,48 @@ function renderDashboard() {
     </div>
     ${state.selectedEntity?.type === "job" ? renderSelectedEntityPanel() : ""}`;
   bindEntityActions();
+  document.getElementById("seed-demo-data")?.addEventListener("click", async () => {
+    const result = await runAction("demo-seed", () => api.post("/demo/seed", { force: false }), refresh);
+    state.demoSeed = result || state.demoSeed;
+    if (result?.demo_seed?.status === "completed") {
+      const job = result.demo_seed.job;
+      state.selectedEntity = job ? { type: "job", title: job.title, status: job.status, ref: job.id, raw: job } : state.selectedEntity;
+    }
+    await refresh();
+  });
   document.getElementById("create-sample-job")?.addEventListener("click", async () => {
     await runAction("job", () => api.post("/jobs", { title: "Frontend console check", prompt: "Inspect bairui dashboard state", route: "operations" }));
   });
+}
+
+function renderDemoSeedState(demo) {
+  const safety = demo?.audit_marker?.payload || {};
+  const counts = demo?.status === "completed"
+    ? {
+        jobs: demo.job ? 1 : 0,
+        reports: demo.report ? 1 : 0,
+        memory_candidates: demo.memory_candidate ? 1 : 0,
+        channel_drafts: demo.channel_approval ? 1 : 0,
+      }
+    : {
+        jobs: state.jobs.length,
+        reports: state.reports.length,
+        memory_candidates: state.memoryCandidates.length,
+        channel_drafts: state.channelApprovals.length,
+      };
+  return `
+    ${renderCountStrip(counts)}
+    <div class="agent-meta top-gap">
+      ${pill(safety.will_send === false ? "ready" : "partial", "will_send=false")}
+      ${pill(safety.will_write_long_term_memory === false ? "ready" : "partial", "will_write_memory=false")}
+      <span class="chip">local data only</span>
+      <span class="chip">owner review required</span>
+    </div>
+    <p class="muted compact-copy top-gap">${
+      demo?.status === "skipped"
+        ? "Demo data already exists. Existing review queues and reports remain available."
+        : "The seed action writes local demo records only. Channel drafts and memory candidates still require explicit owner review."
+    }</p>`;
 }
 
 function renderCommand() {
@@ -1296,6 +1350,7 @@ async function refreshScreenData() {
   if (["reports", "graph", "entity"].includes(state.screen)) await loadReports();
   if (["channels", "entity"].includes(state.screen)) await loadChannels();
   if (["settings", "intel", "codegraph"].includes(state.screen)) await loadRuntimeStatus();
+  if (state.screen === "dashboard") await loadDashboard();
   if (state.screen === "codegraph") await loadCodeGraph();
   if (state.screen === "command") await loadAgents();
   if (state.screen === "events") {
@@ -1305,13 +1360,16 @@ async function refreshScreenData() {
 }
 
 async function loadDashboard() {
-  const [readiness, capabilities, jobs, audit] = await Promise.all([
+  const [readiness, capabilities, jobs, audit, reports, memoryCandidates, channelApprovals] = await Promise.all([
     safe(() => api.get("/runtime/readiness"), state.readiness, "dashboard-readiness"),
     safe(() => api.get("/capabilities").then((data) => data.capabilities || []), state.capabilities, "dashboard-capabilities"),
     safe(() => api.get("/jobs").then((data) => data.jobs || []), state.jobs, "dashboard-jobs"),
     safe(() => api.get("/audit").then((data) => data.audit || []), state.audit, "dashboard-audit"),
+    safe(() => api.get("/reports").then((data) => data.reports || []), state.reports, "dashboard-reports"),
+    safe(() => api.get("/document/memory-candidates").then((data) => data.document_memory_candidates || []), state.memoryCandidates, "dashboard-memory"),
+    safe(() => api.get("/channels/approvals").then((data) => data.channel_approvals || []), state.channelApprovals, "dashboard-channels"),
   ]);
-  Object.assign(state, { readiness, capabilities, jobs, audit });
+  Object.assign(state, { readiness, capabilities, jobs, audit, reports, memoryCandidates, channelApprovals });
 }
 
 async function loadDocuments() {

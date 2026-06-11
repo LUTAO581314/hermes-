@@ -71,6 +71,19 @@ def _http_get(port: int, path: str) -> tuple[int, dict[str, str], bytes]:
         connection.close()
 
 
+def _http_post(port: int, path: str, payload: dict[str, object] | None = None) -> tuple[int, dict[str, str], bytes]:
+    body = json.dumps(payload or {}).encode("utf-8")
+    connection = HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.request("POST", path, body=body, headers={"Content-Type": "application/json"})
+        response = connection.getresponse()
+        response_body = response.read()
+        headers = {key.lower(): value for key, value in response.getheaders()}
+        return response.status, headers, response_body
+    finally:
+        connection.close()
+
+
 class RuntimeFoundationTests(unittest.TestCase):
     def test_load_settings_defaults(self):
         settings = load_settings()
@@ -160,6 +173,9 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("/jobs", screens["dashboard"]["read"])
         self.assertIn("/audit", screens["dashboard"]["read"])
         self.assertIn("/events", screens["dashboard"]["read"])
+        self.assertIn("/demo/seed", {action["path"] for action in screens["dashboard"]["actions"]})
+        self.assertFalse(contract["forms"]["demo_seed"]["safety"]["will_send"])
+        self.assertFalse(contract["forms"]["demo_seed"]["safety"]["will_write_long_term_memory"])
         self.assertIn("document_ingest", screens)
         self.assertIn("channels", screens)
         self.assertIn("avatar", screens)
@@ -359,6 +375,39 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(approvals[-1]["target_id"], "owner_review")
         self.assertFalse(first["audit_marker"]["payload"]["will_send"])
         self.assertFalse(first["audit_marker"]["payload"]["will_write_long_term_memory"])
+
+    def test_demo_seed_http_endpoint_is_safe_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                server = ThreadingHTTPServer(("127.0.0.1", 0), HermesHandler)
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    first_status, _, first_body = _http_post(server.server_port, "/demo/seed")
+                    second_status, _, second_body = _http_post(server.server_port, "/demo/seed")
+                    settings = load_settings()
+                    jobs = list_jobs(settings.data_dir)
+                    approvals = list_channel_approval_requests(settings.data_dir)
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+
+        first = json.loads(first_body.decode("utf-8"))
+        second = json.loads(second_body.decode("utf-8"))
+        self.assertEqual(first_status, 201)
+        self.assertEqual(second_status, 200)
+        self.assertEqual(first["demo_seed"]["status"], "completed")
+        self.assertEqual(second["demo_seed"]["status"], "skipped")
+        self.assertFalse(first["demo_seed"]["audit_marker"]["payload"]["will_send"])
+        self.assertFalse(first["demo_seed"]["audit_marker"]["payload"]["will_write_long_term_memory"])
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(len(approvals), 1)
 
     def test_console_static_assets_are_served_by_backend(self):
         with tempfile.TemporaryDirectory() as tmp:
