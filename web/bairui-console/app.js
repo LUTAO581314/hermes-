@@ -70,6 +70,7 @@ const state = {
   avatarStatus: null,
   avatarManifest: null,
   avatarValidation: null,
+  avatarActionResult: null,
   runtimeStatus: {},
   documentSessions: [],
   selectedIngestId: "",
@@ -2482,16 +2483,30 @@ function renderAvatar() {
   setScreenHead("Avatar", "character state layer");
   const currentState = state.avatarStatus?.avatar_state?.state || state.avatarStatus?.avatar?.status || "idle";
   const states = ["idle", "thinking", "speaking", "approval_required", "error", "done", "hidden"];
+  const manifest = state.avatarManifest?.avatar_manifest || {};
+  const engine = manifest.engine || state.avatarStatus?.avatar || {};
+  const model = manifest.model || {};
+  const runtime = manifest.runtime || {};
   el.actions.innerHTML = states
     .map((item) => `<button class="ghost-btn" type="button" data-avatar-state="${escapeHtml(item)}">${escapeHtml(item)}</button>`)
     .join("");
   el.body.innerHTML = `
+    <section class="panel pad avatar-boundary-panel">
+      <div class="conversation-head">
+        <div>
+          <h2 class="panel-title">Avatar runtime boundary</h2>
+          <p class="muted compact-copy">Avatar is a browser-side Live2D state layer. Backend records state and validates local assets; it does not generate voices, clone identity, or bypass approvals.</p>
+        </div>
+        ${pill(engine.status || "missing_config")}
+      </div>
+      ${renderAvatarBoundaryMatrix(engine, runtime)}
+    </section>
     <div class="grid two">
       <section class="panel system-core-stage">
         <div class="avatar-core avatar-preview"></div>
         <div class="core-label">
           <strong>${escapeHtml(currentState)}</strong>
-          <span>${escapeHtml(state.avatarManifest?.avatar_manifest?.engine?.status || state.avatarStatus?.avatar?.status || "runtime pending")}</span>
+          <span>${escapeHtml(engine.package || engine.status || "runtime pending")}</span>
         </div>
       </section>
       <section class="panel pad">
@@ -2504,10 +2519,13 @@ function renderAvatar() {
         <div class="action-row top-gap">
           ${states.map((item) => `<button class="ghost-btn" type="button" data-avatar-state="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join("")}
         </div>
+        ${renderAvatarActionResult()}
         <h3 class="sub-title">Validate model</h3>
         <input class="field" id="avatar-model-path" placeholder="avatar/bairui.model3.json" />
         <button class="ghost-btn top-gap" id="avatar-validate" type="button">Validate Model</button>
-        ${state.avatarValidation ? `<pre class="mono muted code-block top-gap">${escapeHtml(JSON.stringify(state.avatarValidation, null, 2))}</pre>` : ""}
+        ${renderAvatarValidationResult()}
+        ${renderProductError("avatar")}
+        ${renderProductError("avatar-validate")}
       </section>
     </div>`;
   [...el.actions.querySelectorAll("[data-avatar-state]"), ...el.body.querySelectorAll("[data-avatar-state]")].forEach((button) => {
@@ -2522,6 +2540,7 @@ function renderAvatar() {
         }),
       );
       state.avatarStatus = result?.avatar_state ? { avatar_state: result.avatar_state, avatar: { status: result.avatar_state.state } } : state.avatarStatus;
+      state.avatarActionResult = result?.avatar_state || null;
       render();
     });
   });
@@ -2531,6 +2550,46 @@ function renderAvatar() {
     state.avatarValidation = result?.avatar_validation || result;
     render();
   });
+}
+
+function renderAvatarBoundaryMatrix(engine, runtime) {
+  return `
+    <div class="avatar-boundary-grid">
+      <div><span>Renderer</span><strong>${escapeHtml(engine.browser_runtime || "browser")}</strong><p>Live2D rendering belongs in the frontend runtime.</p></div>
+      <div><span>Backend</span><strong>state + validation</strong><p>Backend accepts state events and validates local model manifests.</p></div>
+      <div><span>Lip sync</span><strong>${escapeHtml(runtime?.audio_lipsync?.driver || "web_audio_amplitude")}</strong><p>Speaking state can request lip_sync, but audio generation is separate.</p></div>
+      <div><span>Approval</span><strong>cannot bypass review</strong><p>approval_required is a visible state, not permission to perform external actions.</p></div>
+    </div>`;
+}
+
+function renderAvatarActionResult() {
+  const result = state.avatarActionResult;
+  if (!result) return "";
+  return `
+    <div class="avatar-result-card">
+      <div class="agent-meta">
+        ${pill(result.status || "accepted")}
+        <span class="chip">${escapeHtml(result.state || "")}</span>
+        <span class="chip">lip_sync=${escapeHtml(String(result.lip_sync === true))}</span>
+        <span class="chip">external_action=false</span>
+      </div>
+      <p>${escapeHtml(result.text || result.motion || "Avatar state accepted and audited locally.")}</p>
+    </div>`;
+}
+
+function renderAvatarValidationResult() {
+  const validation = state.avatarValidation;
+  if (!validation) return "";
+  return `
+    <div class="avatar-validation-card">
+      <div class="agent-meta">
+        ${pill(validation.status || "checked")}
+        <span class="chip">${escapeHtml(validation.model_format || "")}</span>
+        <span class="chip">${escapeHtml((validation.missing_files || []).length)} missing</span>
+      </div>
+      <p>${escapeHtml(validation.model_path || "Model path checked.")}</p>
+      ${validation.missing_files?.length ? `<p class="error-text">${escapeHtml(validation.missing_files.join(" | "))}</p>` : ""}
+    </div>`;
 }
 
 function renderSettings() {

@@ -856,6 +856,24 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".codegraph-boundary-grid", styles)
         self.assertIn(".codegraph-action-result", styles)
 
+    def test_avatar_console_surfaces_browser_runtime_and_approval_boundary(self):
+        app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
+        styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("avatarActionResult", app_js)
+        self.assertIn("function renderAvatarBoundaryMatrix", app_js)
+        self.assertIn("function renderAvatarActionResult", app_js)
+        self.assertIn("function renderAvatarValidationResult", app_js)
+        self.assertIn("Avatar is a browser-side Live2D state layer.", app_js)
+        self.assertIn("approval_required is a visible state, not permission to perform external actions.", app_js)
+        self.assertIn("external_action=false", app_js)
+        self.assertIn('api.post("/avatar/state"', app_js)
+        self.assertIn('api.post("/avatar/validate"', app_js)
+        self.assertIn("lip_sync=${escapeHtml(String(result.lip_sync === true))}", app_js)
+        self.assertIn(".avatar-boundary-grid", styles)
+        self.assertIn(".avatar-result-card", styles)
+        self.assertIn(".avatar-validation-card", styles)
+
     def test_quickstart_and_deploy_docs_reference_console_demo_flow_and_readiness(self):
         readme = Path("README.md").read_text(encoding="utf-8")
         deployment = Path("docs/12-one-click-deployment.md").read_text(encoding="utf-8")
