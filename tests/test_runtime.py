@@ -819,6 +819,24 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".report-detail-grid", styles)
         self.assertIn(".report-actions", styles)
 
+    def test_channels_console_keeps_approval_and_no_send_boundary_visible(self):
+        app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
+        styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("channelPlanResult", app_js)
+        self.assertIn("channelReviewResult", app_js)
+        self.assertIn("function renderChannelSafetyMatrix", app_js)
+        self.assertIn("function renderChannelPlanResult", app_js)
+        self.assertIn("function renderChannelReviewResult", app_js)
+        self.assertIn('api.post("/channels/send"', app_js)
+        self.assertIn('api.post("/channels/approvals/review"', app_js)
+        self.assertIn("will_send=false", app_js)
+        self.assertIn("The backend never sends the message during planning or review.", app_js)
+        self.assertIn("A reviewed approval cannot be reviewed again.", app_js)
+        self.assertIn("Reviewed from bairui console. External send remains disabled in current backend.", app_js)
+        self.assertIn(".channel-safety-grid", styles)
+        self.assertIn(".channel-result-card", styles)
+
     def test_quickstart_and_deploy_docs_reference_console_demo_flow_and_readiness(self):
         readme = Path("README.md").read_text(encoding="utf-8")
         deployment = Path("docs/12-one-click-deployment.md").read_text(encoding="utf-8")

@@ -88,6 +88,8 @@ const state = {
   channelDiagnostics: [],
   channelApprovals: [],
   channelApprovalReviews: [],
+  channelPlanResult: null,
+  channelReviewResult: null,
   codegraph: null,
   codegraphRepos: [],
   selectedCodegraphRepoId: "",
@@ -2286,6 +2288,7 @@ function renderChannels() {
         pending_review: pendingApprovals.length,
         reviewed: reviewedApprovals,
       })}
+      ${renderChannelSafetyMatrix()}
     </section>
     <div class="channels-layout">
       <section class="panel pad">
@@ -2313,11 +2316,13 @@ function renderChannels() {
         <label class="form-label">Message</label>
         <textarea class="textarea" id="channel-text" rows="5" placeholder="Draft message for owner approval"></textarea>
         <button class="primary-btn top-gap" id="plan-channel" type="button" ${!firstTarget ? "disabled" : ""}>Create Approval Plan</button>
+        ${renderChannelPlanResult()}
         ${renderProductError("channel")}
         ${renderProductError("channel-review")}
       </section>
       <section class="panel pad">
         <h2 class="panel-title">Approval queue</h2>
+        ${renderChannelReviewResult()}
         ${pendingApprovals.map(renderChannelApproval).join("") || `<div class="empty-state">No pending approvals. Planning an action records a review item; it does not send externally.</div>`}
         <h3 class="sub-title">Review records</h3>
         ${renderChannelReviewRecords()}
@@ -2337,6 +2342,7 @@ function renderChannels() {
       }),
     );
     if (result?.channel_send_plan?.approval_request_id) {
+      state.channelPlanResult = result.channel_send_plan;
       document.getElementById("channel-text").value = "";
       await loadChannels();
       openChannelApprovalEntity(result.channel_send_plan.approval_request_id);
@@ -2352,7 +2358,9 @@ function renderChannels() {
           reviewer_ref: "owner",
           note: "Reviewed from bairui console. External send remains disabled in current backend.",
         }),
-      );
+      ).then((result) => {
+        state.channelReviewResult = result?.channel_approval_review || null;
+      });
       await loadChannels();
       openChannelApprovalEntity(button.dataset.request);
       render();
@@ -2364,6 +2372,45 @@ function renderChannels() {
       render();
     });
   });
+}
+
+function renderChannelSafetyMatrix() {
+  return `
+    <div class="channel-safety-grid">
+      <div><span>Plan</span><strong>approval_required</strong><p>Planning creates a local approval request and audit event.</p></div>
+      <div><span>Dispatch</span><strong>will_send=false</strong><p>The backend never sends the message during planning or review.</p></div>
+      <div><span>Review</span><strong>owner decision</strong><p>Approve and reject only record review state for this product stage.</p></div>
+      <div><span>Duplicate</span><strong>blocked</strong><p>A reviewed approval cannot be reviewed again.</p></div>
+    </div>`;
+}
+
+function renderChannelPlanResult() {
+  const result = state.channelPlanResult;
+  if (!result) return "";
+  return `
+    <div class="channel-result-card">
+      <div class="agent-meta">
+        ${pill(result.status || "approval_required")}
+        <span class="chip">will_send=${escapeHtml(String(result.will_send === true))}</span>
+        <span class="chip mono">${escapeHtml(shortId(result.approval_request_id || ""))}</span>
+      </div>
+      <p>${escapeHtml(result.reason || "Approval plan recorded without external dispatch.")}</p>
+    </div>`;
+}
+
+function renderChannelReviewResult() {
+  const result = state.channelReviewResult;
+  if (!result) return "";
+  return `
+    <div class="channel-result-card">
+      <div class="agent-meta">
+        ${pill(result.status || "reviewed")}
+        <span class="chip">${escapeHtml(result.decision || "")}</span>
+        <span class="chip">will_send=${escapeHtml(String(result.will_send === true))}</span>
+        <span class="chip mono">${escapeHtml(shortId(result.review_id || result.request_id || ""))}</span>
+      </div>
+      <p>${escapeHtml(result.reason || "Review recorded without external dispatch.")}</p>
+    </div>`;
 }
 
 function openChannelApprovalEntity(requestId) {
