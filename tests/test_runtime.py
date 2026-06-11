@@ -800,6 +800,25 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".memory-source-strip", styles)
         self.assertIn(".memory-safety-grid", styles)
 
+    def test_reports_console_surfaces_detail_sources_and_write_result(self):
+        app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
+        styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("reportWriteResult", app_js)
+        self.assertIn("function renderReportWriteResult", app_js)
+        self.assertIn("function renderReportDetailPanel", app_js)
+        self.assertIn("function renderRelatedSourceRefs", app_js)
+        self.assertIn('data-report-open="${escapeHtml(item.id || item.path || "")}"', app_js)
+        self.assertIn('data-source-open="${escapeHtml(item.source_ref || item.id || "")}"', app_js)
+        self.assertIn('data-report-open-sources="${escapeHtml(report.id || report.path || "")}"', app_js)
+        self.assertIn('data-entity-action="inspect-path"', app_js)
+        self.assertIn('api.post("/ob" + "sidian/reports"', app_js)
+        self.assertIn('renderProductError("write-report")', app_js)
+        self.assertIn(".report-write-result", styles)
+        self.assertIn(".report-detail-panel", styles)
+        self.assertIn(".report-detail-grid", styles)
+        self.assertIn(".report-actions", styles)
+
     def test_quickstart_and_deploy_docs_reference_console_demo_flow_and_readiness(self):
         readme = Path("README.md").read_text(encoding="utf-8")
         deployment = Path("docs/12-one-click-deployment.md").read_text(encoding="utf-8")

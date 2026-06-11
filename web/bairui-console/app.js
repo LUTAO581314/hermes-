@@ -79,6 +79,7 @@ const state = {
   memoryReviews: [],
   memoryReviewResult: null,
   documentActionResult: null,
+  reportWriteResult: null,
   reports: [],
   sourceRefs: [],
   documentPlanDraft: { input_path: "", title: "", output_dir: "", backend: "", language: "", device: "cpu" },
@@ -2056,10 +2057,12 @@ function renderSelectedEntityPanel() {
 
 function renderReports() {
   setScreenHead("Reports", "deliverables and evidence");
-  el.actions.innerHTML = `<button class="primary-btn" id="write-report" type="button">Write Manual Report</button>`;
+  el.actions.innerHTML = `<button class="primary-btn" id="write-report" type="button">Write Manual Report</button><button class="ghost-btn" id="refresh-reports" type="button">Refresh</button>`;
   const selectedReport = state.selectedEntity?.type === "report" ? state.selectedEntity.raw || {} : null;
   el.body.innerHTML = `
     ${renderReportDeliveryOverview()}
+    ${renderReportWriteResult()}
+    ${renderProductError("write-report")}
     <div class="grid two">
       <section class="panel pad">
         <h2 class="panel-title">Reports</h2>
@@ -2093,16 +2096,28 @@ function renderReports() {
       </section>
     </div>
     <div class="top-gap">
-      ${state.selectedEntity?.type === "report" ? renderSelectedEntityPanel() : ""}
+      ${selectedReport ? renderReportDetailPanel(selectedReport) : state.selectedEntity?.type === "report" ? renderSelectedEntityPanel() : ""}
       ${selectedReport ? renderRelatedSourceRefs(selectedReport) : ""}
     </div>
     `;
   bindEntityActions();
+  document.getElementById("refresh-reports")?.addEventListener("click", refreshScreenData);
   document.getElementById("write-report")?.addEventListener("click", async () => {
     const title = prompt("Report title", "bairui Operator Note");
     const body = prompt("Report body", "Operator note from bairui console.");
     if (!body) return;
-    await runAction("write-report", () => api.post("/ob" + "sidian/reports", { title, body }));
+    const result = await runAction("write-report", () => api.post("/ob" + "sidian/reports", { title, body }), loadReports);
+    state.reportWriteResult = result?.report || null;
+    if (state.reportWriteResult) {
+      state.selectedEntity = {
+        type: "report",
+        title: state.reportWriteResult.title,
+        status: state.reportWriteResult.status || "draft",
+        ref: state.reportWriteResult.id || state.reportWriteResult.path,
+        raw: state.reportWriteResult,
+      };
+    }
+    render();
   });
   el.body.querySelectorAll("[data-report-open]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -2121,6 +2136,29 @@ function renderReports() {
       render();
     });
   });
+  el.body.querySelectorAll("[data-report-open-sources]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const report = state.reports.find((item) => String(item.id || item.path) === String(button.dataset.reportOpenSources));
+      const source = report ? relatedSourcesForReport(report)[0] : null;
+      if (!source) return;
+      state.selectedEntity = { type: "source", title: source.title, status: source.confidence, ref: source.source_ref || source.id, raw: source };
+      state.screen = "entity";
+      render();
+    });
+  });
+}
+
+function renderReportWriteResult() {
+  const result = state.reportWriteResult;
+  if (!result) return "";
+  return `
+    <section class="report-write-result">
+      <div>
+        ${pill(result.status || "draft")}
+        <span class="chip mono">${escapeHtml(shortId(result.id || result.path || ""))}</span>
+      </div>
+      <p>${escapeHtml(result.path || "Manual report was written to local report storage.")}</p>
+    </section>`;
 }
 
 function renderReportDeliveryOverview() {
@@ -2137,6 +2175,34 @@ function renderReportDeliveryOverview() {
         ${pill(state.reports.length ? "ready" : "partial", `${state.reports.length} reports`)}
       </div>
       ${renderCountStrip({ drafts: draftCount, ingest_reports: ingestReportCount, sourced: sourcedCount, source_refs: state.sourceRefs.length })}
+    </section>`;
+}
+
+function renderReportDetailPanel(report) {
+  const related = relatedSourcesForReport(report);
+  const path = report.path || "";
+  const sourceRef = report.source_ref || report.ingest_id || report.source?.source_ref || "";
+  return `
+    <section class="panel pad report-detail-panel">
+      <div class="conversation-head">
+        <div>
+          <p class="eyebrow">Report detail</p>
+          <h2 class="panel-title">${escapeHtml(report.title || "Report")}</h2>
+          <p class="muted compact-copy">${escapeHtml(path || "No local path recorded.")}</p>
+        </div>
+        ${pill(report.status || "draft")}
+      </div>
+      <div class="report-detail-grid">
+        <div><span>Report id</span><strong>${escapeHtml(shortId(report.id || ""))}</strong></div>
+        <div><span>Source ref</span><strong>${escapeHtml(shortId(sourceRef || ""))}</strong></div>
+        <div><span>Related refs</span><strong>${escapeHtml(String(related.length))}</strong></div>
+        <div><span>Path</span><strong>${escapeHtml(path || "-")}</strong></div>
+      </div>
+      <div class="report-actions">
+        <button class="ghost-btn mini" type="button" data-entity-action="inspect-path" data-entity-id="${escapeHtml(path)}" ${!path ? "disabled" : ""}>Inspect Path</button>
+        <button class="ghost-btn mini" type="button" data-report-open-sources="${escapeHtml(report.id || report.path || "")}" ${!related.length ? "disabled" : ""}>Show Sources</button>
+      </div>
+      ${renderEntitySourceChain({ type: "report", raw: report })}
     </section>`;
 }
 
