@@ -1279,20 +1279,62 @@ function renderReports() {
     <div class="grid two">
       <section class="panel pad">
         <h2 class="panel-title">Reports</h2>
-        ${renderTable(["title", "status", "path", "source_ref_count"], state.reports.slice().reverse())}
+        ${
+          state.reports
+            .slice()
+            .reverse()
+            .map(
+              (item) => `
+                <button class="object-card button-card report-card" type="button" data-report-open="${escapeHtml(item.id || item.path || "")}">
+                  ${renderObjectCardInner(item, ["title", "status", "path", "source_ref_count"])}
+                </button>`,
+            )
+            .join("") || `<div class="empty-state">No reports yet. Generate one from Documents or Command.</div>`
+        }
       </section>
       <section class="panel pad">
         <h2 class="panel-title">Source references</h2>
-        ${renderTable(["source_type", "provider", "title", "confidence"], state.sourceRefs.slice(-14).reverse())}
+        ${
+          state.sourceRefs
+            .slice(-14)
+            .reverse()
+            .map(
+              (item) => `
+                <button class="object-card button-card source-card" type="button" data-source-open="${escapeHtml(item.source_ref || item.id || "")}">
+                  ${renderObjectCardInner(item, ["source_type", "provider", "title", "confidence"])}
+                </button>`,
+            )
+            .join("") || `<div class="empty-state">No source references yet. Generate source refs from Documents.</div>`
+        }
       </section>
     </div>
-    ${state.selectedEntity?.type === "report" ? renderSelectedEntityPanel() : ""}`;
+    <div class="top-gap">
+      ${state.selectedEntity?.type === "report" ? renderSelectedEntityPanel() : ""}
+    </div>
+    `;
   bindEntityActions();
   document.getElementById("write-report")?.addEventListener("click", async () => {
     const title = prompt("Report title", "bairui Operator Note");
     const body = prompt("Report body", "Operator note from bairui console.");
     if (!body) return;
     await runAction("write-report", () => api.post("/ob" + "sidian/reports", { title, body }));
+  });
+  el.body.querySelectorAll("[data-report-open]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const report = state.reports.find((item) => String(item.id || item.path) === String(button.dataset.reportOpen));
+      if (!report) return;
+      state.selectedEntity = { type: "report", title: report.title, status: report.status, ref: report.id || report.path, raw: report };
+      render();
+    });
+  });
+  el.body.querySelectorAll("[data-source-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const source = state.sourceRefs.find((item) => String(item.source_ref || item.id) === String(button.dataset.sourceOpen));
+      if (!source) return;
+      state.selectedEntity = { type: "source", title: source.title, status: source.confidence, ref: source.source_ref || source.id, raw: source };
+      state.screen = "entity";
+      render();
+    });
   });
 }
 
