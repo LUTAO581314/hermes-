@@ -1413,7 +1413,7 @@ function renderChannels() {
   bindEntityActions();
   document.getElementById("refresh-channels")?.addEventListener("click", refreshScreenData);
   document.getElementById("plan-channel")?.addEventListener("click", async () => {
-    await runAction("channel", () =>
+    const result = await runAction("channel", () =>
       api.post("/channels/send", {
         target_id: document.getElementById("channel-target").value,
         media_kind: document.getElementById("channel-media").value,
@@ -1421,6 +1421,12 @@ function renderChannels() {
         owner_confirmation: true,
       }),
     );
+    if (result?.channel_send_plan?.approval_request_id) {
+      document.getElementById("channel-text").value = "";
+      await loadChannels();
+      openChannelApprovalEntity(result.channel_send_plan.approval_request_id);
+      render();
+    }
   });
   el.body.querySelectorAll("[data-channel-review]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -1432,8 +1438,23 @@ function renderChannels() {
           note: "Reviewed from bairui console. External send remains disabled in current backend.",
         }),
       );
+      await loadChannels();
+      openChannelApprovalEntity(button.dataset.request);
+      render();
     });
   });
+  el.body.querySelectorAll("[data-channel-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openChannelApprovalEntity(button.dataset.channelOpen);
+      render();
+    });
+  });
+}
+
+function openChannelApprovalEntity(requestId) {
+  const approval = state.channelApprovals.find((item) => String(item.id) === String(requestId));
+  if (!approval) return;
+  state.selectedEntity = { type: "channel", title: approval.media_kind, status: approval.review_status || approval.status, ref: approval.id, raw: { ...approval, will_send: false } };
 }
 
 function renderChannelApproval(item) {
@@ -1448,6 +1469,7 @@ function renderChannelApproval(item) {
         <span class="chip">will_send false</span>
       </div>
       <div class="action-row">
+        <button class="ghost-btn" type="button" data-channel-open="${escapeHtml(item.id)}">View Draft</button>
         <button class="ghost-btn" type="button" data-channel-review="approve" data-request="${escapeHtml(item.id)}" ${reviewed ? "disabled" : ""}>Approve Record</button>
         <button class="ghost-btn" type="button" data-channel-review="reject" data-request="${escapeHtml(item.id)}" ${reviewed ? "disabled" : ""}>Reject</button>
       </div>
