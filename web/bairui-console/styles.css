@@ -772,6 +772,15 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.entity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
 .pipeline-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

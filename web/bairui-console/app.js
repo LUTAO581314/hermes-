@@ -284,6 +284,7 @@ function renderDashboard() {
       </section>
     </div>
     ${state.selectedEntity?.type === "job" ? renderSelectedEntityPanel() : ""}`;
+  bindEntityActions();
   document.getElementById("create-sample-job")?.addEventListener("click", async () => {
     await runAction("job", () => api.post("/jobs", { title: "Frontend console check", prompt: "Inspect bairui dashboard state", route: "operations" }));
   });
@@ -627,6 +628,7 @@ function renderMemory() {
       </section>
     </div>
     ${state.selectedEntity?.type === "memory" ? renderSelectedEntityPanel() : ""}`;
+  bindEntityActions();
   document.getElementById("refresh-memory")?.addEventListener("click", refreshScreenData);
   document.getElementById("batch-reject-memory")?.addEventListener("click", async () => {
     const candidateIds = pending.map((candidate) => candidate.id);
@@ -722,6 +724,7 @@ function renderEntity() {
   el.body.innerHTML = entity
     ? renderEntityCard(entity)
     : `<section class="panel pad"><h2 class="panel-title">Entity card</h2><div class="empty-state">Select a job, report, graph node, channel target, or avatar to inspect details.</div></section>`;
+  bindEntityActions();
 }
 
 function renderEntityCard(entity, heading = "Entity card") {
@@ -745,6 +748,7 @@ function renderEntityCard(entity, heading = "Entity card") {
         ${fields.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "-")}</strong></div>`).join("")}
       </div>
       ${renderEntityBody(entity)}
+      ${renderEntityActions(entity)}
     </section>`;
 }
 
@@ -773,6 +777,81 @@ function renderEntityBody(entity) {
   return `<div class="entity-body"><span>${escapeHtml(entity.type === "report" ? "Location" : "Content")}</span><p>${escapeHtml(body)}</p></div>`;
 }
 
+function renderEntityActions(entity) {
+  const raw = entity.raw || {};
+  if (entity.type === "memory" && raw.status === "pending_review") {
+    return `
+      <div class="entity-actions">
+        <button class="primary-btn" type="button" data-entity-action="memory-approve" data-entity-id="${escapeHtml(raw.id)}">Approve Memory</button>
+        <button class="ghost-btn" type="button" data-entity-action="memory-reject" data-entity-id="${escapeHtml(raw.id)}">Reject Memory</button>
+      </div>`;
+  }
+  if (entity.type === "channel" && (raw.review_status || raw.status) === "pending_review") {
+    return `
+      <div class="entity-actions">
+        <button class="primary-btn" type="button" data-entity-action="channel-approve" data-entity-id="${escapeHtml(raw.id)}">Approve Draft</button>
+        <button class="ghost-btn" type="button" data-entity-action="channel-reject" data-entity-id="${escapeHtml(raw.id)}">Reject Draft</button>
+      </div>`;
+  }
+  if (entity.type === "report" && raw.path) {
+    return `<div class="entity-actions"><button class="ghost-btn" type="button" data-entity-action="inspect-path" data-entity-id="${escapeHtml(raw.path)}">Inspect Path</button></div>`;
+  }
+  if (entity.type === "job") {
+    return `<div class="entity-actions"><button class="ghost-btn" type="button" data-entity-action="open-events" data-entity-id="${escapeHtml(raw.id)}">View Events</button></div>`;
+  }
+  return "";
+}
+
+function bindEntityActions(root = el.body) {
+  root.querySelectorAll("[data-entity-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await runEntityAction(button.dataset.entityAction, button.dataset.entityId);
+    });
+  });
+}
+
+async function runEntityAction(action, id) {
+  if (action === "memory-approve" || action === "memory-reject") {
+    const decision = action === "memory-approve" ? "approve" : "reject";
+    await runAction(`entity-${action}`, () =>
+      api.post("/document/parse/review-memory-candidate", {
+        candidate_id: id,
+        decision,
+        reviewer_ref: "owner",
+        note: `Entity card ${decision}.`,
+      }),
+    );
+    await loadMemory();
+    state.selectedEntity = findResourceEntity("document_memory_candidate", id) || state.selectedEntity;
+    render();
+    return;
+  }
+  if (action === "channel-approve" || action === "channel-reject") {
+    const decision = action === "channel-approve" ? "approve" : "reject";
+    await runAction(`entity-${action}`, () =>
+      api.post("/channels/approvals/review", {
+        request_id: id,
+        decision,
+        reviewer_ref: "owner",
+        note: "Reviewed from entity card. External send remains disabled in current backend.",
+      }),
+    );
+    await loadChannels();
+    state.selectedEntity = findResourceEntity("channel_approval_request", id) || state.selectedEntity;
+    render();
+    return;
+  }
+  if (action === "open-events") {
+    state.screen = "events";
+    await refreshScreenData();
+    return;
+  }
+  if (action === "inspect-path") {
+    state.selectedEntity = { type: "report", title: "Report path", status: "source_ready", ref: id, raw: { path: id } };
+    render();
+  }
+}
+
 function entityIcon(type) {
   return ({ job: "T", report: "R", memory: "M", channel: "C", source: "S" }[type] || "E");
 }
@@ -798,6 +877,7 @@ function renderReports() {
       </section>
     </div>
     ${state.selectedEntity?.type === "report" ? renderSelectedEntityPanel() : ""}`;
+  bindEntityActions();
   document.getElementById("write-report")?.addEventListener("click", async () => {
     const title = prompt("Report title", "bairui Operator Note");
     const body = prompt("Report body", "Operator note from bairui console.");
@@ -856,6 +936,7 @@ function renderChannels() {
       </section>
     </div>
     ${state.selectedEntity?.type === "channel" ? renderSelectedEntityPanel() : ""}`;
+  bindEntityActions();
   document.getElementById("refresh-channels")?.addEventListener("click", refreshScreenData);
   document.getElementById("plan-channel")?.addEventListener("click", async () => {
     await runAction("channel", () =>
