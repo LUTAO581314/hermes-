@@ -74,6 +74,7 @@ const state = {
   channelTargets: [],
   channelDiagnostics: [],
   channelApprovals: [],
+  channelApprovalReviews: [],
   codegraph: null,
   codegraphRepos: [],
   codegraphQuery: null,
@@ -1806,7 +1807,24 @@ function renderChannels() {
   setScreenHead("Channels", "approval-controlled outbound plans");
   el.actions.innerHTML = `<button class="ghost-btn" id="refresh-channels" type="button">Refresh</button>`;
   const firstTarget = state.channelTargets[0]?.id || "";
+  const pendingApprovals = state.channelApprovals.filter((item) => (item.review_status || "pending_review") === "pending_review");
+  const reviewedApprovals = state.channelApprovals.length - pendingApprovals.length;
   el.body.innerHTML = `
+    <section class="panel pad channel-safety-overview">
+      <div class="conversation-head">
+        <div>
+          <h2 class="panel-title">Outbound safety</h2>
+          <p class="muted compact-copy">Channels create local owner-review records only. Current backend never dispatches an external message.</p>
+        </div>
+        ${pill("approval_required", "will_send=false")}
+      </div>
+      ${renderCountStrip({
+        targets: state.channelTargets.length,
+        diagnostics: state.channelDiagnostics.length,
+        pending_review: pendingApprovals.length,
+        reviewed: reviewedApprovals,
+      })}
+    </section>
     <div class="channels-layout">
       <section class="panel pad">
         <h2 class="panel-title">Status</h2>
@@ -1814,21 +1832,32 @@ function renderChannels() {
         ${renderWarnings(state.channels?.channels?.blockers || [], state.channels?.channels?.warnings || [])}
         <h3 class="sub-title">Targets</h3>
         ${state.channelTargets.map((target) => renderObjectCard(target, ["id", "label", "channel_type", "status"])).join("") || `<div class="empty-state">No targets configured.</div>`}
+        <h3 class="sub-title">Diagnostics</h3>
+        ${state.channelDiagnostics.map(renderChannelDiagnostic).join("") || `<div class="empty-state">No diagnostics loaded.</div>`}
       </section>
       <section class="panel pad">
         <h2 class="panel-title">Plan outbound action</h2>
+        <div class="safety-strip">
+          <span class="chip">requires owner review</span>
+          <span class="chip">records approval request</span>
+          <span class="chip">will_send=false</span>
+        </div>
         <label class="form-label">Target</label>
         <select class="field" id="channel-target">${state.channelTargets.map((target) => `<option value="${escapeHtml(target.id)}">${escapeHtml(target.label || target.id)}</option>`).join("")}</select>
         <label class="form-label">Media</label>
         <select class="field" id="channel-media"><option>text</option><option>image</option><option>video</option><option>file</option></select>
+        <label class="form-label">Attachment path</label>
+        <input class="field" id="channel-attachment" placeholder="Required for image, video, or file media" />
         <label class="form-label">Message</label>
         <textarea class="textarea" id="channel-text" rows="5" placeholder="Draft message for owner approval"></textarea>
         <button class="primary-btn top-gap" id="plan-channel" type="button" ${!firstTarget ? "disabled" : ""}>Create Approval Plan</button>
         ${state.errors.channel ? `<p class="error-text">${escapeHtml(state.errors.channel)}</p>` : ""}
       </section>
       <section class="panel pad">
-        <h2 class="panel-title">Approvals</h2>
-        ${state.channelApprovals.map(renderChannelApproval).join("") || `<div class="empty-state">No approval requests yet. Planning an action records a review item; it does not send externally.</div>`}
+        <h2 class="panel-title">Approval queue</h2>
+        ${pendingApprovals.map(renderChannelApproval).join("") || `<div class="empty-state">No pending approvals. Planning an action records a review item; it does not send externally.</div>`}
+        <h3 class="sub-title">Review records</h3>
+        ${renderChannelReviewRecords()}
       </section>
     </div>
     ${state.selectedEntity?.type === "channel" ? renderSelectedEntityPanel() : ""}`;
@@ -1840,6 +1869,7 @@ function renderChannels() {
         target_id: document.getElementById("channel-target").value,
         media_kind: document.getElementById("channel-media").value,
         text: document.getElementById("channel-text").value,
+        attachment_path: document.getElementById("channel-attachment").value,
         owner_confirmation: true,
       }),
     );
@@ -1896,6 +1926,45 @@ function renderChannelApproval(item) {
         <button class="ghost-btn" type="button" data-channel-review="reject" data-request="${escapeHtml(item.id)}" ${reviewed ? "disabled" : ""}>Reject</button>
       </div>
     </article>`;
+}
+
+function renderChannelDiagnostic(item) {
+  return `
+    <article class="mini-card">
+      <div class="step-title"><span>${escapeHtml(item.label || item.id || "target")}</span>${pill(item.status || "missing_config")}</div>
+      <div class="agent-meta">
+        <span class="chip">${escapeHtml(item.channel_type || "")}</span>
+        <span class="chip">${item.requires_owner_confirmation ? "owner review" : "review warning"}</span>
+        <span class="chip">${escapeHtml((item.supports || []).join(", ") || "no media")}</span>
+      </div>
+      ${renderWarnings(item.blockers || [], item.warnings || [])}
+    </article>`;
+}
+
+function renderChannelReviewRecords() {
+  const reviewsByRequest = new Map(state.channelApprovalReviews.map((item) => [String(item.request_id || ""), item]));
+  const rows = state.channelApprovals
+    .filter((item) => reviewsByRequest.has(String(item.id)))
+    .map((item) => ({ approval: item, review: reviewsByRequest.get(String(item.id)) }))
+    .slice(0, 8);
+  if (!rows.length) return `<div class="empty-state">No review records yet. Approved and rejected drafts stay local and never send externally.</div>`;
+  return rows
+    .map(
+      ({ approval, review }) => `
+        <button class="object-card button-card" type="button" data-channel-open="${escapeHtml(approval.id)}">
+          <div class="object-card-top">
+            <span class="object-kind">${escapeHtml(review.decision || "reviewed")}</span>
+            ${pill(review.status || "reviewed")}
+          </div>
+          <strong>${escapeHtml(approval.message_preview || approval.reason || approval.media_kind || "channel draft")}</strong>
+          <div class="agent-meta">
+            <span class="chip mono">${escapeHtml(shortId(approval.id))}</span>
+            <span class="chip">${escapeHtml(review.reviewer_ref || "owner")}</span>
+            <span class="chip">will_send false</span>
+          </div>
+        </button>`,
+    )
+    .join("");
 }
 
 function renderAvatar() {
@@ -2374,16 +2443,18 @@ async function loadReports() {
 }
 
 async function loadChannels() {
-  const [channels, targets, diagnostics, approvals] = await Promise.all([
+  const [channels, targets, diagnostics, approvals, reviews] = await Promise.all([
     safe(() => api.get("/channels/status"), state.channels, "channels-status"),
     safe(() => api.get("/channels/targets").then((data) => data.channel_targets || []), state.channelTargets, "channels-targets"),
     safe(() => api.get("/channels/diagnostics").then((data) => data.channel_diagnostics || []), state.channelDiagnostics, "channels-diagnostics"),
     safe(() => api.get("/channels/approvals").then((data) => data.channel_approvals || []), state.channelApprovals, "channels-approvals"),
+    safe(() => api.get("/channels/approvals/reviews").then((data) => data.channel_approval_reviews || []), state.channelApprovalReviews, "channels-reviews"),
   ]);
   state.channels = channels;
   state.channelTargets = targets || [];
   state.channelDiagnostics = diagnostics || [];
   state.channelApprovals = approvals || [];
+  state.channelApprovalReviews = reviews || [];
 }
 
 async function loadAgents() {

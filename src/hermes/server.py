@@ -66,6 +66,7 @@ from .channels import (
     channel_targets,
     diagnose_channel_targets,
     list_channel_approvals,
+    list_channel_approval_reviews,
     plan_channel_send,
     review_channel_approval,
 )
@@ -272,6 +273,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/channels/approvals":
             self._send({"service": PUBLIC_SERVICE, "channel_approvals": list(list_channel_approvals(settings))})
+            return
+        if self.path == "/channels/approvals/reviews":
+            self._send({"service": PUBLIC_SERVICE, "channel_approval_reviews": list_channel_approval_reviews(settings.data_dir)})
             return
         if self.path == "/memory/status":
             self._send({"service": PUBLIC_SERVICE, "memory": as_payload(everos_status(settings))})

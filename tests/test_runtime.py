@@ -183,6 +183,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("/channels/targets", screens["channels"]["read"])
         self.assertIn("/channels/diagnostics", screens["channels"]["read"])
         self.assertIn("/channels/approvals", screens["channels"]["read"])
+        self.assertIn("/channels/approvals/reviews", screens["channels"]["read"])
         self.assertIn("channel_send", contract["forms"])
         self.assertIn("channel_approval_review", contract["forms"])
         self.assertIn("/document/parse/session-list", screens["document_ingest"]["read"])
@@ -198,6 +199,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("/channels/send", channel_paths)
         self.assertIn("/channels/diagnostics", channel_paths)
         self.assertIn("/channels/approvals", channel_paths)
+        self.assertIn("/channels/approvals/reviews", channel_paths)
         self.assertIn("/channels/approvals/review", channel_paths)
         self.assertIn("avatar", api_groups)
         self.assertIn("/avatar/status", {endpoint["path"] for endpoint in api_groups["avatar"]["endpoints"]})
@@ -859,6 +861,44 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(after_review, ())
         self.assertEqual(reviews[-1]["decision"], "approve")
         self.assertEqual(reviews[-1]["will_send"], False)
+
+    def test_channel_approval_reviews_http_endpoint_lists_review_records(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "BAIRUI_CHANNELS_ENABLED": "1",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                server = ThreadingHTTPServer(("127.0.0.1", 0), HermesHandler)
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    plan_status, _, plan_body = _http_post(
+                        server.server_port,
+                        "/channels/send",
+                        {"target_id": "owner_review", "text": "review endpoint item", "media_kind": "text"},
+                    )
+                    request_id = json.loads(plan_body.decode("utf-8"))["channel_send"]["approval_request_id"]
+                    review_status, _, review_body = _http_post(
+                        server.server_port,
+                        "/channels/approvals/review",
+                        {"request_id": request_id, "decision": "reject", "reviewer_ref": "owner", "note": "test"},
+                    )
+                    reviews_status, _, reviews_body = _http_get(server.server_port, "/channels/approvals/reviews")
+                    reviews = json.loads(reviews_body.decode("utf-8"))["channel_approval_reviews"]
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+
+        self.assertEqual(plan_status, 202)
+        self.assertEqual(review_status, 200)
+        self.assertEqual(reviews_status, 200)
+        self.assertEqual(reviews[-1]["request_id"], request_id)
+        self.assertEqual(reviews[-1]["decision"], "reject")
+        self.assertFalse(reviews[-1]["will_send"])
 
     def test_channel_approval_review_rejects_duplicate_review(self):
         with tempfile.TemporaryDirectory() as tmp:
