@@ -40,6 +40,16 @@ function Ensure-EnvValue($Name, $Value) {
     Add-Content -LiteralPath ".env" -Value "$Name=$Value"
 }
 
+function Set-EnvValue($Name, $Value) {
+    $content = Get-Content -LiteralPath ".env" -Raw
+    if ($content -match "(?m)^$([regex]::Escape($Name))=") {
+        $content = $content -replace "(?m)^$([regex]::Escape($Name))=.*$", "$Name=$Value"
+        Set-Content -LiteralPath ".env" -Value $content -NoNewline
+        return
+    }
+    Add-Content -LiteralPath ".env" -Value "$Name=$Value"
+}
+
 function Wait-Endpoint($Label, $Path) {
     $deadline = (Get-Date).AddSeconds($ReadinessTimeoutSeconds)
     $url = "$HermesLocalUrl$Path"
@@ -66,6 +76,7 @@ function Write-ReadinessFile {
     foreach ($item in @(
         @{ Name = "health"; Path = "/health" },
         @{ Name = "ready"; Path = "/ready" },
+        @{ Name = "capabilities"; Path = "/capabilities" },
         @{ Name = "runtime_readiness"; Path = "/runtime/readiness" }
     )) {
         $url = "$HermesLocalUrl$($item.Path)"
@@ -86,6 +97,26 @@ function Write-ReadinessFile {
         }
     }
 
+    $demoFlowUrl = "$HermesLocalUrl/demo/flow"
+    try {
+        $demoFlow = Invoke-RestMethod -Uri $demoFlowUrl -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 30
+        $endpoints["demo_flow"] = [ordered]@{
+            status = "completed"
+            url = $demoFlowUrl
+            body = $demoFlow
+        }
+        if ($demoFlow.demo_flow.status -ne "completed") {
+            $overall = "partial"
+        }
+    } catch {
+        $overall = "blocked"
+        $endpoints["demo_flow"] = [ordered]@{
+            status = "error"
+            url = $demoFlowUrl
+            error = $_.Exception.Message
+        }
+    }
+
     $runtime = $endpoints["runtime_readiness"].body.runtime_readiness
     if ($runtime -and $runtime.status -eq "blocked") {
         $overall = "blocked"
@@ -97,14 +128,15 @@ function Write-ReadinessFile {
         status = $overall
         generated_at_unix = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
         base_url = $HermesLocalUrl
+        console_url = "$HermesLocalUrl/console"
         endpoints = $endpoints
     } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $ReadinessFile -Encoding UTF8
 }
 
 Write-Step "Preparing bairui runtime environment"
 Ensure-EnvFile
-Ensure-EnvValue "POSTGRES_DB" "moxi"
-Ensure-EnvValue "POSTGRES_USER" "moxi"
+Set-EnvValue "POSTGRES_DB" "bairui"
+Set-EnvValue "POSTGRES_USER" "bairui"
 
 $envContent = Get-Content -LiteralPath ".env" -Raw
 if ($envContent -match "(?m)^POSTGRES_PASSWORD=\s*$" -or $envContent -notmatch "(?m)^POSTGRES_PASSWORD=") {
@@ -123,7 +155,7 @@ Ensure-EnvValue "SONIC_PORT" "1491"
 New-Item -ItemType Directory -Force -Path "src", "tests", "data/postgres", "data/sonic", "logs", "obsidian-vault" | Out-Null
 
 if ($Mode -eq "domain" -and [string]::IsNullOrWhiteSpace($Domain)) {
-    throw "Domain mode requires -Domain, for example: -Mode domain -Domain moxi.example.com"
+    throw "Domain mode requires -Domain, for example: -Mode domain -Domain bairui.example.com"
 }
 
 Write-Step "Starting PostgreSQL and bairui"
@@ -140,4 +172,6 @@ Write-Host "bairui health:       $HermesLocalUrl/health"
 Write-Host "bairui ready:        $HermesLocalUrl/ready"
 Write-Host "bairui capabilities: $HermesLocalUrl/capabilities"
 Write-Host "Runtime readiness:   $HermesLocalUrl/runtime/readiness"
+Write-Host "bairui console:      $HermesLocalUrl/console"
+Write-Host "Demo Flow evidence:  $ReadinessFile -> endpoints.demo_flow"
 Write-Host "Readiness file:      $ReadinessFile"

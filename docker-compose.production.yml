@@ -1,19 +1,19 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: moxi-postgres
+    container_name: bairui-postgres
     env_file:
       - .env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-moxi}
-      POSTGRES_USER: ${POSTGRES_USER:-moxi}
+      POSTGRES_DB: ${POSTGRES_DB:-bairui}
+      POSTGRES_USER: ${POSTGRES_USER:-bairui}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-moxi} -d ${POSTGRES_DB:-moxi}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bairui} -d ${POSTGRES_DB:-bairui}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -21,12 +21,12 @@ services:
 
   hermes-runtime:
     build: .
-    container_name: moxi-hermes-runtime
+    container_name: bairui-runtime
     env_file:
       - .env
     environment:
       HERMES_HOST: 0.0.0.0
-      HERMES_DATABASE_URL: postgresql://${POSTGRES_USER:-moxi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-moxi}
+      HERMES_DATABASE_URL: postgresql://${POSTGRES_USER:-bairui}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-bairui}
     ports:
       - "127.0.0.1:${HERMES_PORT:-8787}:8787"
     depends_on:

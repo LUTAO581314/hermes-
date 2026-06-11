@@ -40,6 +40,17 @@ ensure_env_value() {
   fi
 }
 
+set_env_value() {
+  local name="$1"
+  local value="$2"
+  if grep -qE "^${name}=" .env; then
+    sed -i.bak "s|^${name}=.*$|${name}=${value}|" .env
+    rm -f .env.bak
+  else
+    printf '%s=%s\n' "$name" "$value" >> .env
+  fi
+}
+
 fetch_url() {
   local url="$1"
   if command -v curl >/dev/null 2>&1; then
@@ -84,6 +95,7 @@ target = sys.argv[2]
 paths = {
     "health": "/health",
     "ready": "/ready",
+    "capabilities": "/capabilities",
     "runtime_readiness": "/runtime/readiness",
 }
 payload = {
@@ -112,6 +124,33 @@ for name, path in paths.items():
             "error": str(exc),
         }
 
+demo_flow_url = base_url + "/demo/flow"
+try:
+    request = urllib.request.Request(
+        demo_flow_url,
+        data=b"{}",
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        body = response.read().decode("utf-8")
+        data = json.loads(body) if body else {}
+        payload["endpoints"]["demo_flow"] = {
+            "status": "completed",
+            "http_status": response.status,
+            "url": demo_flow_url,
+            "body": data,
+        }
+        if data.get("demo_flow", {}).get("status") != "completed":
+            overall = "partial"
+except Exception as exc:
+    overall = "blocked"
+    payload["endpoints"]["demo_flow"] = {
+        "status": "error",
+        "url": demo_flow_url,
+        "error": str(exc),
+    }
+
 runtime = payload["endpoints"].get("runtime_readiness", {}).get("body", {}).get("runtime_readiness")
 if isinstance(runtime, dict) and runtime.get("status") == "blocked":
     overall = "blocked"
@@ -119,6 +158,7 @@ elif overall == "ready" and isinstance(runtime, dict) and runtime.get("status") 
     overall = "partial"
 
 payload["status"] = overall
+payload["console_url"] = base_url + "/console"
 with open(target, "w", encoding="utf-8") as handle:
     json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
     handle.write("\n")
@@ -127,8 +167,8 @@ PY
 
 step "Preparing bairui runtime environment"
 ensure_env_file
-ensure_env_value "POSTGRES_DB" "moxi"
-ensure_env_value "POSTGRES_USER" "moxi"
+set_env_value "POSTGRES_DB" "bairui"
+set_env_value "POSTGRES_USER" "bairui"
 
 if ! grep -qE '^POSTGRES_PASSWORD=.+$' .env; then
   ensure_env_value "POSTGRES_PASSWORD" "$(new_secret)"
@@ -147,7 +187,7 @@ ensure_env_value "SONIC_PORT" "1491"
 mkdir -p src tests data/postgres data/sonic logs obsidian-vault
 
 if [[ "$MODE" == "domain" && -z "$DOMAIN" ]]; then
-  echo "Domain mode requires DOMAIN, for example: MODE=domain DOMAIN=moxi.example.com scripts/deploy-usable.sh" >&2
+  echo "Domain mode requires DOMAIN, for example: MODE=domain DOMAIN=bairui.example.com scripts/deploy-usable.sh" >&2
   exit 1
 fi
 
@@ -171,4 +211,6 @@ printf 'bairui health:       %s/health\n' "$HERMES_LOCAL_URL"
 printf 'bairui ready:        %s/ready\n' "$HERMES_LOCAL_URL"
 printf 'bairui capabilities: %s/capabilities\n' "$HERMES_LOCAL_URL"
 printf 'Runtime readiness:   %s/runtime/readiness\n' "$HERMES_LOCAL_URL"
+printf 'bairui console:      %s/console\n' "$HERMES_LOCAL_URL"
+printf 'Demo Flow evidence:  %s -> endpoints.demo_flow\n' "$READINESS_FILE"
 printf 'Readiness file:      %s\n' "$READINESS_FILE"

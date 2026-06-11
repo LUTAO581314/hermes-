@@ -34,7 +34,7 @@ jobs:
           cp .env.example .env
           sed -i 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=ci-placeholder/' .env
           sed -i 's/^SONIC_PASSWORD=$/SONIC_PASSWORD=ci-placeholder/' .env
-          docker compose -f docker-compose.production.yml config >/tmp/moxi-compose.yml
+          docker compose -f docker-compose.production.yml config >/tmp/bairui-compose.yml
 
       - name: Run smoke test
         shell: pwsh

@@ -120,21 +120,48 @@ python -m src.hermes document parse workbench-next --ingest-id <ingest_id>
 python -m src.hermes document parse workbench-run-until-blocked --ingest-id <ingest_id>
 python -m src.hermes runtime-readiness
 python -m src.hermes demo seed
+python -m src.hermes demo flow
 python -m src.hermes serve
 ```
 
-## Local Demo Walkthrough
+## Quickstart: Local Product Demo
 
-Seed safe demo data before opening the console:
+From a clean checkout:
+
+```bash
+python -m pip install -r requirements.txt
+python -m src.hermes demo flow
+python -m src.hermes serve
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8787/console
+```
+
+For Windows PowerShell verification:
+
+```powershell
+.\scripts\smoke-test.ps1
+```
+
+The smoke test runs the product closure demo flow in a temporary data directory.
+It verifies Command -> Report, Memory Review, Channels approval, CodeGraph, and
+the safety gates that prevent external sends and automatic long-term memory
+writes.
+
+To seed only static walkthrough records before opening the console:
 
 ```bash
 python -m src.hermes demo seed
 python -m src.hermes serve
 ```
 
-Then open `/console`. The demo seed creates one job, one draft report, one memory
-candidate, and one channel approval draft. It does not send external messages or
-write long-term memory.
+The demo seed creates one job, one draft report, one memory candidate, and one
+channel approval draft. It does not send external messages or write long-term
+memory. The Dashboard also has a `Run Demo Flow` button that calls the real
+`POST /demo/flow` backend contract and shows checkpoint evidence.
 
 ## Multi-Agent Command Boundary
 
@@ -180,6 +207,15 @@ Local usable deployment remains:
 ```bash
 bash scripts/deploy-usable.sh
 ```
+
+Windows usable deployment:
+
+```powershell
+.\scripts\deploy-usable.ps1 -Mode local
+```
+
+Both scripts print the `/console` URL and write `data/readiness.json`, including
+health, readiness, runtime readiness, capabilities, and Demo Flow evidence.
 
 Commercial Linux service assets live under `infra/hermes`:
 

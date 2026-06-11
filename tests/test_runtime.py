@@ -720,6 +720,33 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".product-error", styles)
         self.assertIn(".error-guide-grid", styles)
 
+    def test_quickstart_and_deploy_docs_reference_console_demo_flow_and_readiness(self):
+        readme = Path("README.md").read_text(encoding="utf-8")
+        deployment = Path("docs/12-one-click-deployment.md").read_text(encoding="utf-8")
+        deploy_ps1 = Path("scripts/deploy-usable.ps1").read_text(encoding="utf-8")
+        deploy_sh = Path("scripts/deploy-usable.sh").read_text(encoding="utf-8")
+        env_example = Path(".env.example").read_text(encoding="utf-8")
+        compose = Path("docker-compose.production.yml").read_text(encoding="utf-8")
+        server_env = Path("infra/hermes/env.example").read_text(encoding="utf-8")
+
+        combined_docs = readme + "\n" + deployment
+        self.assertIn("python -m src.hermes demo flow", combined_docs)
+        self.assertIn("http://127.0.0.1:8787/console", combined_docs)
+        self.assertIn("endpoints.demo_flow", deployment)
+        self.assertIn("no_external_send", deployment)
+        self.assertIn("no_auto_memory_write", deployment)
+        self.assertIn("Set-EnvValue \"POSTGRES_DB\" \"bairui\"", deploy_ps1)
+        self.assertIn('set_env_value "POSTGRES_DB" "bairui"', deploy_sh)
+        self.assertIn("/demo/flow", deploy_ps1)
+        self.assertIn("/demo/flow", deploy_sh)
+        self.assertIn("/console", deploy_ps1)
+        self.assertIn("/console", deploy_sh)
+        self.assertIn("POSTGRES_DB=bairui", env_example)
+        self.assertIn("POSTGRES_USER=bairui", env_example)
+        self.assertIn("container_name: bairui-postgres", compose)
+        self.assertIn("container_name: bairui-runtime", compose)
+        self.assertIn("postgresql://bairui:", server_env)
+
     def test_avatar_engine_status_uses_advanced_runtime_contract(self):
         state = avatar_engine_status(load_settings())
         self.assertEqual(state.package, "pixi-live2d-display-advanced")

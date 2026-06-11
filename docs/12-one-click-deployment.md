@@ -2,7 +2,7 @@
 
 ## 1. Decision
 
-MOXI must support one-command deployment to a usable stage.
+bairui must support one-command deployment to a usable stage.
 
 The product is not commercially credible if it requires the owner or customer to
 manually assemble services from scattered notes. One-command deployment is a
@@ -25,8 +25,10 @@ Usable stage means:
 - `/ready` is reachable;
 - `/capabilities` is reachable;
 - `/runtime/readiness` is reachable;
+- `/console` is reachable;
+- `POST /demo/flow` completes and proves the local product closure path;
 - `data/readiness.json` is written with the health, readiness, and runtime
-  readiness endpoint bodies;
+  readiness, capabilities, and Demo Flow endpoint bodies;
 - the deploy script prints the local access URLs;
 - unsupported public callbacks are clearly disabled or marked unavailable.
 
@@ -47,7 +49,7 @@ Local production:
 Domain server production preparation:
 
 ```powershell
-.\scripts\deploy-usable.ps1 -Mode domain -Domain moxi.example.com
+.\scripts\deploy-usable.ps1 -Mode domain -Domain bairui.example.com
 ```
 
 ### Linux / macOS / Server Shell
@@ -67,7 +69,7 @@ sh infra/hermes/scripts/deploy-hermes.sh
 Domain server production preparation:
 
 ```bash
-MODE=domain DOMAIN=moxi.example.com bash scripts/deploy-usable.sh
+MODE=domain DOMAIN=bairui.example.com bash scripts/deploy-usable.sh
 ```
 
 ## 4. Deployment Stack
@@ -79,6 +81,8 @@ The one-command usable deployment starts:
 - Hermes runtime from the local source tree;
 - Sonic from `docker-compose.production.yml` with `infra/sonic/config.cfg`;
 - persistent directories under `data/`, `logs/`, and `obsidian-vault/`.
+- the bairui console at `/console`.
+- the Demo Flow verification contract at `/demo/flow`.
 
 The first deploy target is usable backend readiness. Nginx, HTTPS, DNS,
 platform callbacks, EverOS, TrendRadar, SearXNG, and MiroFish are added as
@@ -98,7 +102,7 @@ Other projects feel one-click because they usually provide:
 - final access URL printing;
 - clear failure messages.
 
-MOXI must provide the same experience, but with stricter production boundaries:
+bairui must provide the same experience, but with stricter production boundaries:
 
 - no committed secrets;
 - no accidental public exposure;
@@ -115,11 +119,27 @@ http://127.0.0.1:8787/health
 http://127.0.0.1:8787/ready
 http://127.0.0.1:8787/capabilities
 http://127.0.0.1:8787/runtime/readiness
+http://127.0.0.1:8787/console
 data/readiness.json
 ```
 
 The deploy command must fail loudly when Docker, Docker Compose, `.env.example`,
-health checks, or readiness polling are unavailable.
+health checks, readiness polling, or Demo Flow verification are unavailable.
+
+`data/readiness.json` must include:
+
+- `status`;
+- `base_url`;
+- `console_url`;
+- `endpoints.health`;
+- `endpoints.ready`;
+- `endpoints.capabilities`;
+- `endpoints.runtime_readiness`;
+- `endpoints.demo_flow`.
+
+`endpoints.demo_flow.body.demo_flow.checkpoints.no_external_send` and
+`endpoints.demo_flow.body.demo_flow.checkpoints.no_auto_memory_write` must remain
+`true`.
 
 ## 7. Roadmap To Full One-Click Production
 
