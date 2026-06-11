@@ -879,6 +879,7 @@ function renderCommand() {
             <button class="ghost-btn mini" type="button" id="agent-events-next" ${state.agentEventsPage?.pagination?.next_offset === null || state.agentEventsPage?.pagination?.next_offset === undefined ? "disabled" : ""}>Next</button>
           </div>
         </div>
+        ${renderCommandResourceClosure()}
         ${renderProductError("agent-session")}
         ${renderProductError("agent-title")}
         ${renderProductError("agent-message")}
@@ -1109,40 +1110,12 @@ function renderPromotionAction(event, target, label) {
 
 function promotionForEventTarget(eventId, target) {
   const transient = state.promotionResults[eventId] || [];
-  const persisted = state.agentPromotions
-    .filter((promotion) => promotion.event_id === eventId && promotion.target === target)
-    .map((promotion) => ({
-      target: promotion.target,
-      status: "planned",
-      detail: "Promotion recorded for owner review.",
-      promotion_id: promotion.id,
-      created_resource: {
-        type: promotion.resource_type,
-        id: promotion.resource_id,
-        status: promotion.resource_status,
-        review_required: promotion.review_required,
-        source: promotion.source || {},
-      },
-    }));
+  const persisted = state.agentPromotions.filter((promotion) => promotion.event_id === eventId && promotion.target === target).map(normalizeAgentPromotion);
   return [...transient, ...persisted].at(-1) || null;
 }
 
 function renderPromotionResults(eventId) {
-  const persisted = state.agentPromotions
-    .filter((promotion) => promotion.event_id === eventId)
-    .map((promotion) => ({
-      target: promotion.target,
-      status: "planned",
-      detail: "Promotion recorded for owner review.",
-      duplicate: false,
-      created_resource: {
-        type: promotion.resource_type,
-        id: promotion.resource_id,
-        status: promotion.resource_status,
-        review_required: promotion.review_required,
-        source: promotion.source || {},
-      },
-    }));
+  const persisted = state.agentPromotions.filter((promotion) => promotion.event_id === eventId).map(normalizeAgentPromotion);
   const byTarget = new Map();
   [...persisted, ...(state.promotionResults[eventId] || [])].forEach((promotion) => byTarget.set(promotion.target, promotion));
   const results = [...byTarget.values()];
@@ -1154,12 +1127,14 @@ function renderPromotionResults(eventId) {
           const resource = promotion.created_resource || {};
           return `
             <div class="promotion-result">
-              <div>
+              <div class="promotion-result-main">
                 ${pill(resource.status || promotion.status || "planned")}
                 <span class="chip">${escapeHtml(promotion.target)}</span>
                 <span class="chip">${escapeHtml(promotion.duplicate ? "reused" : "created")}</span>
+                <span class="chip">${escapeHtml(resource.review_required ? "owner_review" : "no_external_action")}</span>
                 <span class="chip mono">${escapeHtml(shortId(resource.id))}</span>
                 <span class="chip mono">src ${escapeHtml(shortId(resource.source?.source_ref || ""))}</span>
+                <span class="chip mono">promotion ${escapeHtml(shortId(promotion.promotion_id || ""))}</span>
               </div>
               <button class="ghost-btn mini" type="button" data-open-promotion="${escapeHtml(resource.type)}" data-resource-id="${escapeHtml(resource.id)}">View</button>
             </div>`;
@@ -1169,28 +1144,7 @@ function renderPromotionResults(eventId) {
 }
 
 function renderAgentPromotionLedger() {
-  const persisted = state.agentPromotions.map((promotion) => ({
-    target: promotion.target,
-    status: "planned",
-    duplicate: false,
-    detail: "Promotion recorded for owner review.",
-    promotion_id: promotion.id,
-    created_resource: {
-      type: promotion.resource_type,
-      id: promotion.resource_id,
-      status: promotion.resource_status,
-      review_required: promotion.review_required,
-      source: promotion.source || {},
-    },
-  }));
-  const transient = Object.values(state.promotionResults).flat();
-  const byResource = new Map();
-  [...persisted, ...transient].forEach((promotion) => {
-    const resource = promotion.created_resource || {};
-    const key = `${resource.type || promotion.resource_type}:${resource.id || promotion.resource_id}:${promotion.target || ""}`;
-    if (!key.includes("undefined")) byResource.set(key, promotion);
-  });
-  const rows = [...byResource.values()].slice(-8).reverse();
+  const rows = allPromotionRecords().slice(-8).reverse();
   if (!rows.length) {
     return `<section class="promotion-ledger top-gap"><div class="empty-state compact">Promotion ledger is empty. Promote an agent event to create a traceable resource.</div></section>`;
   }
@@ -1216,6 +1170,7 @@ function renderAgentPromotionLedger() {
                     <span class="chip">${escapeHtml(promotion.target || source.target || "")}</span>
                     <span class="chip">${escapeHtml(resource.review_required || promotion.review_required ? "owner_review" : "no_external_action")}</span>
                     <span class="chip mono">event ${escapeHtml(shortId(source.source_ref || promotion.event_id || ""))}</span>
+                    <span class="chip mono">promotion ${escapeHtml(shortId(promotion.promotion_id || ""))}</span>
                   </div>
                   <strong>${escapeHtml(resource.type || promotion.resource_type || "resource")} ${escapeHtml(shortId(resource.id || promotion.resource_id || ""))}</strong>
                   <p>${escapeHtml(promotion.detail || "Promotion recorded for owner review.")}</p>
@@ -1228,6 +1183,63 @@ function renderAgentPromotionLedger() {
     </section>`;
 }
 
+function renderCommandResourceClosure() {
+  const rows = allPromotionRecords();
+  const counts = {
+    resources: rows.length,
+    jobs: rows.filter((item) => item.created_resource?.type === "job").length,
+    reports: rows.filter((item) => item.created_resource?.type === "report").length,
+    reviews: rows.filter((item) => item.created_resource?.review_required).length,
+    reused: rows.filter((item) => item.duplicate).length,
+  };
+  return `
+    <section class="command-resource-closure">
+      <div class="conversation-head">
+        <div>
+          <h3 class="sub-title">Resource closure</h3>
+          <p class="muted compact-copy">Every promoted agent event keeps event_id + target idempotency, source_ref, promotion_id, and owner review status visible.</p>
+        </div>
+        ${pill(rows.length ? "ready" : "partial", rows.length ? "traceable" : "no resources")}
+      </div>
+      ${renderCountStrip(counts)}
+      <div class="promotion-trace-strip">
+        <span class="chip">idempotency=event_id+target</span>
+        <span class="chip">will_execute_external_action=false</span>
+        <span class="chip">memory/channel require owner review</span>
+      </div>
+    </section>`;
+}
+
+function normalizeAgentPromotion(promotion) {
+  return {
+    target: promotion.target,
+    status: promotion.status || "planned",
+    detail: promotion.detail || "Promotion recorded for owner review.",
+    duplicate: Boolean(promotion.duplicate),
+    promotion_id: promotion.promotion_id || promotion.id || "",
+    will_execute_external_action: promotion.will_execute_external_action === true,
+    created_resource: promotion.created_resource || {
+      type: promotion.resource_type,
+      id: promotion.resource_id,
+      status: promotion.resource_status,
+      review_required: promotion.review_required,
+      source: promotion.source || {},
+    },
+  };
+}
+
+function allPromotionRecords() {
+  const byResource = new Map();
+  const persisted = state.agentPromotions.map(normalizeAgentPromotion);
+  const transient = Object.values(state.promotionResults).flat().map(normalizeAgentPromotion);
+  [...persisted, ...transient].forEach((promotion) => {
+    const resource = promotion.created_resource || {};
+    const key = `${resource.type || ""}:${resource.id || ""}:${promotion.target || ""}`;
+    if (resource.id) byResource.set(key, promotion);
+  });
+  return [...byResource.values()];
+}
+
 async function openPromotionResource(resourceType, resourceId) {
   const target = promotionScreenFor(resourceType);
   if (target === "dashboard") await loadDashboard();
@@ -1235,9 +1247,7 @@ async function openPromotionResource(resourceType, resourceId) {
   if (target === "memory") await loadMemory();
   if (target === "channels") await loadChannels();
   const entity = findResourceEntity(resourceType, resourceId);
-  const promotion = Object.values(state.promotionResults)
-    .flat()
-    .find((item) => String(item.created_resource?.id || "") === String(resourceId));
+  const promotion = allPromotionRecords().find((item) => String(item.created_resource?.id || "") === String(resourceId));
   state.selectedEntity = enrichPromotionEntity(
     entity || {
       type: entityTypeForResource(resourceType),

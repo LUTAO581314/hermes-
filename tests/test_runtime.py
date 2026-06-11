@@ -739,6 +739,24 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".composer-toggle", styles)
         self.assertIn(".ghost-btn.active", styles)
 
+    def test_command_console_surfaces_promotion_resource_closure(self):
+        app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
+        styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("function renderCommandResourceClosure", app_js)
+        self.assertIn("function normalizeAgentPromotion", app_js)
+        self.assertIn("function allPromotionRecords", app_js)
+        self.assertIn("event_id + target idempotency", app_js)
+        self.assertIn("idempotency=event_id+target", app_js)
+        self.assertIn("will_execute_external_action=false", app_js)
+        self.assertIn("promotion_id", app_js)
+        self.assertIn("source_ref", app_js)
+        self.assertIn('promotion.duplicate ? "reused" : "created"', app_js)
+        self.assertIn("memory/channel require owner review", app_js)
+        self.assertIn(".command-resource-closure", styles)
+        self.assertIn(".promotion-trace-strip", styles)
+        self.assertIn(".promotion-result-main", styles)
+
     def test_activation_console_renders_guided_steps_and_safety_boundaries(self):
         app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
         styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")

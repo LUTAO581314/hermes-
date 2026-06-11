@@ -950,6 +950,22 @@ h1 {
   margin-top: 10px;
 }
 
+.command-resource-closure {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: var(--radius-sm);
+  background: rgba(53, 230, 199, 0.026);
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.promotion-trace-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .promotion-result {
   display: flex;
   align-items: center;
@@ -959,6 +975,13 @@ h1 {
   border-radius: var(--radius-sm);
   background: rgba(103, 168, 255, 0.045);
   padding: 7px;
+}
+
+.promotion-result-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
 }
 
 .promotion-ledger {
