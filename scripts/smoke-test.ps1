@@ -1,3 +1,8 @@
+param(
+    [switch]$FullAcceptance,
+    [string]$AcceptanceOutputPath = ""
+)
+
 $ErrorActionPreference = "Stop"
 
 $required = @(
@@ -53,8 +58,23 @@ finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+$acceptance = $null
+if ($FullAcceptance) {
+    $acceptanceArgs = @()
+    if ($AcceptanceOutputPath) {
+        $acceptanceArgs += "-OutputPath"
+        $acceptanceArgs += $AcceptanceOutputPath
+    }
+    $acceptanceRaw = & (Join-Path $PSScriptRoot "product-acceptance.ps1") @acceptanceArgs | Out-String
+    $acceptance = $acceptanceRaw | ConvertFrom-Json
+    if ($acceptance.status -ne "passed") {
+        throw "Full acceptance failed: $acceptanceRaw"
+    }
+}
+
 [pscustomobject]@{
     status = "ok"
-    mode = "product-closure"
-    message = "bairui runtime foundation and demo flow are present."
+    mode = $(if ($FullAcceptance) { "product-closure+acceptance" } else { "product-closure" })
+    message = $(if ($FullAcceptance) { "bairui runtime foundation, demo flow, and product acceptance scenarios are present." } else { "bairui runtime foundation and demo flow are present." })
+    acceptance_status = $(if ($acceptance) { $acceptance.status } else { "not_run" })
 }

@@ -144,6 +144,7 @@ For Windows PowerShell verification:
 
 ```powershell
 .\scripts\smoke-test.ps1
+.\scripts\smoke-test.ps1 -FullAcceptance
 .\scripts\product-acceptance.ps1
 ```
 
@@ -151,6 +152,9 @@ The smoke test runs the product closure demo flow in a temporary data directory.
 It verifies Command -> Report, Memory Review, Channels approval, CodeGraph, and
 the safety gates that prevent external sends and automatic long-term memory
 writes.
+
+Use `-FullAcceptance` when preparing a demo or release candidate. The default
+smoke command remains fast for CI and local sanity checks.
 
 The product acceptance script expands the same real backend flow into five
 demo scenarios: research task, document knowledge base, customer draft

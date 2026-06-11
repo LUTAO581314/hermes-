@@ -15,6 +15,13 @@ Optional JSON report:
 .\scripts\product-acceptance.ps1 -OutputPath artifacts\product-acceptance.json
 ```
 
+The same acceptance can be run through the smoke entry point:
+
+```powershell
+.\scripts\smoke-test.ps1 -FullAcceptance
+.\scripts\smoke-test.ps1 -FullAcceptance -AcceptanceOutputPath artifacts\product-acceptance.json
+```
+
 The script runs `python -m src.hermes demo flow` in an isolated temporary data
 directory and verifies these product scenarios:
 
@@ -35,4 +42,5 @@ Safety gates that must stay true:
 - promotion idempotency is `event_id + target`
 
 Use this script before an internal demo. Use `scripts/smoke-test.ps1` for the
-faster CI-style repository health check.
+faster CI-style repository health check, and add `-FullAcceptance` when the
+demo needs scenario-level proof.
