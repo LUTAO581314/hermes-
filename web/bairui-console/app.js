@@ -64,6 +64,7 @@ const state = {
   memoryReviews: [],
   reports: [],
   sourceRefs: [],
+  documentPlanDraft: { input_path: "", title: "", output_dir: "", backend: "", language: "", device: "cpu" },
   channels: null,
   channelTargets: [],
   channelDiagnostics: [],
@@ -763,11 +764,47 @@ function renderDocuments() {
   const selected = state.documentSession;
   el.actions.innerHTML = `
     <button class="ghost-btn" id="refresh-documents" type="button">Refresh</button>
+    <button class="primary-btn" id="create-document-plan" type="button">Create Plan</button>
     <button class="primary-btn" id="run-next-document" type="button" ${!state.selectedIngestId ? "disabled" : ""}>Run Next</button>
-    <button class="ghost-btn" id="run-until-blocked" type="button" ${!state.selectedIngestId ? "disabled" : ""}>Run Until Blocked</button>`;
+    <button class="ghost-btn" id="run-until-blocked" type="button" ${!state.selectedIngestId ? "disabled" : ""}>Run Until Blocked</button>
+    <button class="ghost-btn" id="open-document-memory" type="button" ${!selected?.review_queue?.pending_count ? "disabled" : ""}>Review Memory</button>`;
   el.body.innerHTML = `
     <div class="documents-layout">
       <section class="panel pad">
+        <h2 class="panel-title">Create ingest</h2>
+        <div class="document-plan-form">
+          <label class="form-label">Document path</label>
+          <input class="field" id="doc-input-path" placeholder="C:\\path\\to\\file.pdf" value="${escapeHtml(state.documentPlanDraft.input_path)}" />
+          <label class="form-label">Title</label>
+          <input class="field" id="doc-title" placeholder="bairui knowledge brief" value="${escapeHtml(state.documentPlanDraft.title)}" />
+          <div class="form-grid two-cols">
+            <label>
+              <span class="form-label">Backend</span>
+              <select class="field" id="doc-backend">
+                ${["", "pipeline", "vlm-transformers", "hybrid-http-client"].map((value) => `<option value="${escapeHtml(value)}" ${state.documentPlanDraft.backend === value ? "selected" : ""}>${escapeHtml(value || "auto")}</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              <span class="form-label">Device</span>
+              <select class="field" id="doc-device">
+                ${["cpu", "cuda"].map((value) => `<option value="${escapeHtml(value)}" ${state.documentPlanDraft.device === value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <div class="form-grid two-cols">
+            <label>
+              <span class="form-label">Language</span>
+              <input class="field" id="doc-language" placeholder="zh / en / auto" value="${escapeHtml(state.documentPlanDraft.language)}" />
+            </label>
+            <label>
+              <span class="form-label">Output directory</span>
+              <input class="field" id="doc-output-dir" placeholder="optional" value="${escapeHtml(state.documentPlanDraft.output_dir)}" />
+            </label>
+          </div>
+          <p class="muted compact-copy">Creates a local ingest plan only. Parsing and memory writes still require explicit workflow and review steps.</p>
+          ${state.errors.documents || state.errors["doc-plan"] ? `<p class="error-text">${escapeHtml(state.errors.documents || state.errors["doc-plan"])}</p>` : ""}
+        </div>
+        <hr class="rule" />
         <h2 class="panel-title">Ingest sessions</h2>
         <div class="step-list">
           ${state.documentSessions
@@ -785,7 +822,7 @@ function renderDocuments() {
             .join("") || `<div class="empty-state">No ingest sessions yet. Create an ingest plan from the API or CLI, then refresh.</div>`}
         </div>
       </section>
-      <section class="panel pad">
+      <section class="panel pad document-pipeline-panel">
         <h2 class="panel-title">${escapeHtml(selected?.title || "Pipeline")}</h2>
         ${
           selected
@@ -796,6 +833,12 @@ function renderDocuments() {
           <div class="top-gap">${renderWarnings(selected.blockers, selected.warnings)}</div>
           <h3 class="sub-title">Next actions</h3>
           ${renderActionList(selected.workbench?.next_actions || (selected.primary_action ? [selected.primary_action] : []))}
+          <div class="action-row top-gap">
+            <button class="ghost-btn" type="button" data-document-action="source-refs">Generate Source Refs</button>
+            <button class="ghost-btn" type="button" data-document-action="ingest-report">Generate Report</button>
+            <button class="ghost-btn" type="button" data-document-action="open-reports">Open Reports</button>
+            <button class="ghost-btn" type="button" data-document-action="open-memory" ${!selected.review_queue?.pending_count ? "disabled" : ""}>Open Review Queue</button>
+          </div>
         `
             : `<div class="empty-state">Select a session to inspect pipeline state, blockers, review queue, and report readiness.</div>`
         }
@@ -807,9 +850,18 @@ function renderDocuments() {
             ? `
           ${renderCountStrip(selected.counts || {})}
           <h3 class="sub-title">Latest report</h3>
-          ${selected.report ? renderObjectCard(selected.report, ["title", "status", "path"]) : `<div class="empty-state">No report generated yet.</div>`}
+          ${
+            selected.report
+              ? `<button class="object-card button-card" type="button" data-document-report="${escapeHtml(selected.report.id || selected.report.path || "")}">
+                  ${renderObjectCardInner(selected.report, ["title", "status", "path"])}
+                </button>`
+              : `<div class="empty-state">No report generated yet. Generate source refs first, then create a report.</div>`
+          }
           <h3 class="sub-title">Review queue</h3>
-          ${selected.review_queue?.pending_count ? pill("needs_review", `${selected.review_queue.pending_count} pending`) : pill("ready", "no pending review")}
+          <div class="review-route">
+            ${selected.review_queue?.pending_count ? pill("needs_review", `${selected.review_queue.pending_count} pending`) : pill("ready", "no pending review")}
+            <button class="ghost-btn mini" type="button" data-document-action="open-memory" ${!selected.review_queue?.pending_count ? "disabled" : ""}>Review</button>
+          </div>
         `
             : `<div class="empty-state">Session details appear here after selection.</div>`
         }
@@ -823,13 +875,85 @@ function renderDocuments() {
     });
   });
   document.getElementById("refresh-documents")?.addEventListener("click", refreshScreenData);
+  document.getElementById("create-document-plan")?.addEventListener("click", createDocumentPlan);
   document.getElementById("run-next-document")?.addEventListener("click", () => runDocumentStep("/document/parse/workbench-next", "doc-next"));
   document.getElementById("run-until-blocked")?.addEventListener("click", () => runDocumentStep("/document/parse/workbench-run-until-blocked", "doc-run"));
+  document.getElementById("open-document-memory")?.addEventListener("click", openDocumentMemoryReview);
+  el.body.querySelectorAll("[data-document-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await runDocumentAction(button.dataset.documentAction);
+    });
+  });
+  el.body.querySelectorAll("[data-document-report]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await loadReports();
+      const reportId = button.dataset.documentReport;
+      state.selectedEntity =
+        state.reports
+          .map((item) => ({ type: "report", title: item.title, status: item.status, ref: item.id || item.path, raw: item }))
+          .find((item) => String(item.ref) === String(reportId) || String(item.raw?.path) === String(reportId)) || state.selectedEntity;
+      state.screen = "reports";
+      render();
+    });
+  });
 }
 
 async function runDocumentStep(path, key) {
   if (!state.selectedIngestId) return;
-  await runAction(key, () => api.post(path, { ingest_id: state.selectedIngestId, max_steps: 10 }), refreshScreenData);
+  const result = await runAction(key, () => api.post(path, { ingest_id: state.selectedIngestId, max_steps: 10 }), refreshScreenData);
+  const status = result?.document_workbench_step?.status || result?.document_workbench_run?.status || "";
+  if (status === "needs_review") await openDocumentMemoryReview();
+}
+
+async function createDocumentPlan() {
+  const draft = readDocumentPlanDraft();
+  state.documentPlanDraft = draft;
+  if (!draft.input_path.trim()) {
+    state.errors.documents = "Document path is required.";
+    renderDocuments();
+    return;
+  }
+  state.errors.documents = "";
+  const result = await runAction("doc-plan", () => api.post("/document/parse/ingest-plan", draft), refreshScreenData);
+  state.selectedIngestId = result?.document_ingest?.id || state.selectedIngestId;
+  state.documentPlanDraft = { input_path: "", title: "", output_dir: "", backend: "", language: "", device: "cpu" };
+  await refreshScreenData();
+}
+
+function readDocumentPlanDraft() {
+  return {
+    input_path: document.getElementById("doc-input-path")?.value || "",
+    title: document.getElementById("doc-title")?.value || "",
+    output_dir: document.getElementById("doc-output-dir")?.value || "",
+    backend: document.getElementById("doc-backend")?.value || "",
+    language: document.getElementById("doc-language")?.value || "",
+    device: document.getElementById("doc-device")?.value || "cpu",
+  };
+}
+
+async function runDocumentAction(action) {
+  if (action === "open-memory") {
+    await openDocumentMemoryReview();
+    return;
+  }
+  if (action === "open-reports") {
+    state.screen = "reports";
+    await refreshScreenData();
+    return;
+  }
+  if (!state.selectedIngestId) return;
+  if (action === "source-refs") {
+    await runAction("doc-source-refs", () => api.post("/document/parse/source-refs", { ingest_id: state.selectedIngestId }), refreshScreenData);
+    return;
+  }
+  if (action === "ingest-report") {
+    await runAction("doc-ingest-report", () => api.post("/document/parse/ingest-report", { ingest_id: state.selectedIngestId }), refreshScreenData);
+  }
+}
+
+async function openDocumentMemoryReview() {
+  state.screen = "memory";
+  await refreshScreenData();
 }
 
 function renderMemory() {
@@ -1443,7 +1567,11 @@ function renderCountStrip(counts) {
 }
 
 function renderObjectCard(item, keys) {
-  return `<article class="object-card">${keys.map((key) => `<div><span>${escapeHtml(key)}</span><strong>${escapeHtml(item?.[key] ?? "")}</strong></div>`).join("")}</article>`;
+  return `<article class="object-card">${renderObjectCardInner(item, keys)}</article>`;
+}
+
+function renderObjectCardInner(item, keys) {
+  return keys.map((key) => `<div><span>${escapeHtml(key)}</span><strong>${escapeHtml(item?.[key] ?? "")}</strong></div>`).join("");
 }
 
 function render() {

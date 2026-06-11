@@ -197,6 +197,8 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                     {"id": "create_ingest_plan", "method": "POST", "path": "/document/parse/ingest-plan", "schema": "document_ingest_plan"},
                     {"id": "advance_next_step", "method": "POST", "path": "/document/parse/workbench-next", "schema": "document_workbench_step"},
                     {"id": "advance_until_blocked", "method": "POST", "path": "/document/parse/workbench-run-until-blocked", "schema": "document_workbench_run"},
+                    {"id": "create_source_refs", "method": "POST", "path": "/document/parse/source-refs", "schema": "document_workbench_step"},
+                    {"id": "create_ingest_report", "method": "POST", "path": "/document/parse/ingest-report", "schema": "document_workbench_step"},
                 ),
             },
             {
@@ -473,6 +475,8 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                     {"method": "POST", "path": "/document/parse/workbench-state"},
                     {"method": "POST", "path": "/document/parse/workbench-next"},
                     {"method": "POST", "path": "/document/parse/workbench-run-until-blocked"},
+                    {"method": "POST", "path": "/document/parse/source-refs"},
+                    {"method": "POST", "path": "/document/parse/ingest-report"},
                 ),
             },
             {

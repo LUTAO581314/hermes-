@@ -348,6 +348,26 @@ h1 {
   gap: 14px;
 }
 
+.document-plan-form {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.document-pipeline-panel {
+  min-height: 360px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.form-grid.two-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .graph-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -978,6 +998,17 @@ h1 {
   gap: 8px;
 }
 
+.review-route {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
 .object-card {
   display: grid;
   gap: 8px;
@@ -986,6 +1017,21 @@ h1 {
   padding: 10px;
   margin-bottom: 8px;
   background: rgba(255, 255, 255, 0.025);
+}
+
+.button-card {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--motion), background var(--motion), transform var(--motion);
+}
+
+.button-card:hover,
+.button-card:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: rgba(53, 230, 199, 0.045);
 }
 
 .object-card div {
@@ -1194,7 +1240,8 @@ h1 {
   .documents-layout,
   .channels-layout,
   .graph-layout,
-  .grid.three {
+  .grid.three,
+  .form-grid.two-cols {
     grid-template-columns: 1fr;
   }
 }
