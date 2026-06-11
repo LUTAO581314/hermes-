@@ -720,17 +720,67 @@ function renderEntity() {
   setScreenHead("Entity Detail", "object card");
   const entity = state.selectedEntity;
   el.body.innerHTML = entity
-    ? `<section class="panel pad entity-card">
-        <h2 class="panel-title">${escapeHtml(entity.title || entity.type)}</h2>
-        <div class="agent-meta">${pill(entity.status || "partial")}<span class="chip">${escapeHtml(entity.type)}</span><span class="chip mono">${escapeHtml(shortId(entity.ref))}</span></div>
-        <pre class="mono muted code-block">${escapeHtml(JSON.stringify(entity.raw || entity, null, 2))}</pre>
-      </section>`
+    ? renderEntityCard(entity)
     : `<section class="panel pad"><h2 class="panel-title">Entity card</h2><div class="empty-state">Select a job, report, graph node, channel target, or avatar to inspect details.</div></section>`;
+}
+
+function renderEntityCard(entity, heading = "Entity card") {
+  const raw = entity.raw || {};
+  const fields = entityFields(entity);
+  return `
+    <section class="panel pad entity-card selected-entity-panel">
+      <div class="entity-card-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(heading)}</p>
+          <h2>${escapeHtml(entity.title || raw.title || entity.type)}</h2>
+          <div class="agent-meta">
+            ${pill(entity.status || raw.status || "created")}
+            <span class="chip">${escapeHtml(entity.type)}</span>
+            <span class="chip mono">${escapeHtml(shortId(entity.ref || raw.id || raw.path))}</span>
+          </div>
+        </div>
+        <div class="entity-mark">${escapeHtml(entityIcon(entity.type))}</div>
+      </div>
+      <div class="entity-field-grid">
+        ${fields.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "-")}</strong></div>`).join("")}
+      </div>
+      ${renderEntityBody(entity)}
+    </section>`;
+}
+
+function entityFields(entity) {
+  const raw = entity.raw || {};
+  if (entity.type === "job") return [["Route", raw.route], ["Status", raw.status], ["Job ID", raw.id], ["Created", raw.created_at]];
+  if (entity.type === "report") return [["Status", raw.status], ["Source", raw.source_type || "document"], ["Reference", raw.source_ref || raw.ingest_id], ["Path", raw.path]];
+  if (entity.type === "memory") return [["Candidate", raw.candidate_type], ["Confidence", raw.confidence], ["Source", raw.source_path], ["Created", raw.created_at]];
+  if (entity.type === "channel") return [["Target", raw.target_id], ["Channel", raw.channel_type], ["Media", raw.media_kind], ["Review", raw.review_status || raw.status]];
+  return [["Status", entity.status || raw.status], ["Reference", entity.ref || raw.id], ["Type", entity.type], ["Created", raw.created_at]];
+}
+
+function renderEntityBody(entity) {
+  const raw = entity.raw || {};
+  const body =
+    entity.type === "job"
+      ? raw.input
+      : entity.type === "memory"
+        ? raw.text
+        : entity.type === "channel"
+          ? raw.message_preview || raw.reason
+          : entity.type === "report"
+            ? raw.path
+            : JSON.stringify(raw, null, 2);
+  if (!body) return "";
+  return `<div class="entity-body"><span>${escapeHtml(entity.type === "report" ? "Location" : "Content")}</span><p>${escapeHtml(body)}</p></div>`;
+}
+
+function entityIcon(type) {
+  return ({ job: "T", report: "R", memory: "M", channel: "C", source: "S" }[type] || "E");
 }
 
 function renderSelectedEntityPanel() {
   const entity = state.selectedEntity;
   if (!entity) return "";
+  return `<div class="top-gap">${renderEntityCard(entity, "Selected resource")}</div>`;
   return `
     <section class="panel pad selected-entity-panel top-gap">
       <div class="conversation-head">
