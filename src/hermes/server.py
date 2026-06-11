@@ -9,6 +9,17 @@ from typing import Any
 from urllib.parse import unquote
 
 from . import __version__
+from .agents import (
+    add_agent_user_message,
+    as_payload as agent_payload,
+    create_agent_session,
+    get_agent,
+    list_agent_events,
+    list_agent_sessions,
+    list_agents,
+    promote_agent_event,
+    run_agent_round,
+)
 from .adapters.everos import (
     add_memory,
     as_payload,
@@ -186,6 +197,27 @@ class HermesHandler(BaseHTTPRequestHandler):
         if self.path == "/jobs":
             self._send({"service": PUBLIC_SERVICE, "jobs": list_jobs(settings.data_dir)})
             return
+        if self.path == "/agents":
+            self._send({"service": PUBLIC_SERVICE, "agents": [agent_payload(agent) for agent in list_agents(settings)]})
+            return
+        if self.path.startswith("/agents/session/") and self.path.endswith("/events"):
+            session_id = self.path.removeprefix("/agents/session/").removesuffix("/events").strip("/")
+            self._send({"service": PUBLIC_SERVICE, "agent_events": list_agent_events(settings, session_id=session_id)})
+            return
+        if self.path.startswith("/agents/") and not self.path.startswith("/agents/session"):
+            agent_id = self.path.removeprefix("/agents/").strip("/")
+            agent = get_agent(settings, agent_id)
+            if agent is None:
+                self._send({"error": "not_found", "path": self.path}, status=404)
+                return
+            self._send({"service": PUBLIC_SERVICE, "agent": agent_payload(agent)})
+            return
+        if self.path == "/agents/sessions":
+            self._send({"service": PUBLIC_SERVICE, "agent_sessions": list_agent_sessions(settings)})
+            return
+        if self.path == "/agents/events":
+            self._send({"service": PUBLIC_SERVICE, "agent_events": list_agent_events(settings)})
+            return
         if self.path == "/document/ingests":
             self._send({"service": PUBLIC_SERVICE, "document_ingests": list_document_ingests(settings.data_dir)})
             return
@@ -304,6 +336,46 @@ class HermesHandler(BaseHTTPRequestHandler):
             )
             status = 200 if result.status == "completed" else 503
             self._send({"service": PUBLIC_SERVICE, "chat": result.__dict__}, status=status)
+            return
+
+        if self.path == "/agents/session":
+            agent_ids = payload.get("agent_ids", ())
+            if not isinstance(agent_ids, list):
+                self._send({"error": "invalid_request", "message": "agent_ids must be a list"}, status=400)
+                return
+            session = create_agent_session(settings, str(payload.get("title", "")), tuple(str(agent_id) for agent_id in agent_ids))
+            self._send({"service": PUBLIC_SERVICE, "agent_session": agent_payload(session)}, status=201)
+            return
+
+        if self.path.startswith("/agents/session/") and self.path.endswith("/message"):
+            session_id = self.path.removeprefix("/agents/session/").removesuffix("/message").strip("/")
+            result = add_agent_user_message(settings, session_id, str(payload.get("content", "")))
+            status = 200 if result["status"] == "completed" else 400
+            if result["status"] == "not_found":
+                status = 404
+            self._send({"service": PUBLIC_SERVICE, "agent_message": result}, status=status)
+            return
+
+        if self.path.startswith("/agents/session/") and self.path.endswith("/round"):
+            session_id = self.path.removeprefix("/agents/session/").removesuffix("/round").strip("/")
+            result = run_agent_round(settings, session_id, str(payload.get("prompt", "")))
+            status = 200 if result["status"] in {"completed", "partial"} else 400
+            if result["status"] == "not_found":
+                status = 404
+            self._send({"service": PUBLIC_SERVICE, "agent_round": result}, status=status)
+            return
+
+        if self.path.startswith("/agents/session/") and self.path.endswith("/events"):
+            session_id = self.path.removeprefix("/agents/session/").removesuffix("/events").strip("/")
+            self._send({"service": PUBLIC_SERVICE, "agent_events": list_agent_events(settings, session_id=session_id)})
+            return
+
+        if self.path.startswith("/agents/session/") and self.path.endswith("/promote"):
+            result = promote_agent_event(settings, str(payload.get("event_id", "")), str(payload.get("target", "")))
+            status = 200 if result["status"] == "planned" else 400
+            if result["status"] == "not_found":
+                status = 404
+            self._send({"service": PUBLIC_SERVICE, "agent_promotion": result}, status=status)
             return
 
         if self.path == "/channels/send":

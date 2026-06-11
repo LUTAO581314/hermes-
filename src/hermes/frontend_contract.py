@@ -151,8 +151,13 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
             {
                 "id": "chat",
                 "title": "Command",
-                "read": ("/capabilities", "/memory/status"),
-                "actions": ({"id": "send_chat", "method": "POST", "path": "/chat", "schema": "chat_message"},),
+                "read": ("/agents", "/agents/sessions", "/agents/events", "/capabilities", "/memory/status"),
+                "actions": (
+                    {"id": "create_agent_session", "method": "POST", "path": "/agents/session", "schema": "agent_session_create"},
+                    {"id": "run_agent_round", "method": "POST", "path": "/agents/session/{session_id}/round", "schema": "agent_round"},
+                    {"id": "promote_agent_event", "method": "POST", "path": "/agents/session/{session_id}/promote", "schema": "agent_promotion"},
+                    {"id": "send_chat", "method": "POST", "path": "/chat", "schema": "chat_message"},
+                ),
             },
             {
                 "id": "document_ingest",
@@ -242,6 +247,23 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                     {"name": "title", "type": "text", "required": False, "label": "Title"},
                     {"name": "prompt", "type": "textarea", "required": True, "label": "Task"},
                     {"name": "route", "type": "select", "required": False, "label": "Route", "options": ("general", "research", "document", "operations")},
+                )
+            },
+            "agent_session_create": {
+                "fields": (
+                    {"name": "title", "type": "text", "required": False, "label": "Title"},
+                    {"name": "agent_ids", "type": "id_list", "required": False, "label": "Agent IDs"},
+                )
+            },
+            "agent_round": {
+                "fields": (
+                    {"name": "prompt", "type": "textarea", "required": True, "label": "Prompt"},
+                )
+            },
+            "agent_promotion": {
+                "fields": (
+                    {"name": "event_id", "type": "id", "required": True, "label": "Event ID"},
+                    {"name": "target", "type": "select", "required": True, "label": "Target", "options": ("job", "report", "memory_review", "channel_draft")},
                 )
             },
             "document_ingest_plan": {
@@ -358,6 +380,20 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                     {"method": "GET", "path": "/audit"},
                     {"method": "GET", "path": "/events", "content_type": "text/event-stream"},
                     {"method": "GET", "path": "/platform/heartbeat"},
+                ),
+            },
+            {
+                "id": "agents",
+                "stability": "experimental",
+                "endpoints": (
+                    {"method": "GET", "path": "/agents"},
+                    {"method": "GET", "path": "/agents/{id}"},
+                    {"method": "GET", "path": "/agents/sessions"},
+                    {"method": "GET", "path": "/agents/events"},
+                    {"method": "POST", "path": "/agents/session"},
+                    {"method": "POST", "path": "/agents/session/{session_id}/message"},
+                    {"method": "POST", "path": "/agents/session/{session_id}/round"},
+                    {"method": "POST", "path": "/agents/session/{session_id}/promote"},
                 ),
             },
             {

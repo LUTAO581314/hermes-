@@ -44,6 +44,10 @@ const state = {
   jobs: [],
   audit: [],
   events: [],
+  agents: [],
+  agentSessions: [],
+  selectedAgentSessionId: "",
+  agentEvents: [],
   avatarStatus: null,
   avatarManifest: null,
   runtimeStatus: {},
@@ -284,35 +288,60 @@ function renderDashboard() {
 
 function renderCommand() {
   setScreenHead("Command", "multi-agent workspace");
-  const agents = [
-    ["Coordinator", "coord", "model-main", "draft", "ready"],
-    ["Research", "research", "model-a", "read-only", "ready"],
-    ["Document", "doc", "model-b", "draft", "partial"],
-    ["Memory", "mem", "model-c", "approval", "needs_review"],
-    ["Channel", "chan", "model-d", "approval", "approval_required"],
-  ];
+  const agents = state.agents.length ? state.agents : [];
+  const session = state.agentSessions.find((item) => item.id === state.selectedAgentSessionId) || state.agentSessions.at(-1);
+  if (session && !state.selectedAgentSessionId) state.selectedAgentSessionId = session.id;
+  el.actions.innerHTML = `
+    <button class="ghost-btn" id="refresh-agents" type="button">Refresh</button>
+    <button class="primary-btn" id="create-agent-session" type="button">New Session</button>
+    <button class="ghost-btn" id="run-agent-round" type="button" ${!state.selectedAgentSessionId ? "disabled" : ""}>Run Round</button>`;
   el.body.innerHTML = `
     <div class="agent-layout">
       <section class="panel pad">
         <h2 class="panel-title">Agent roster</h2>
         <div class="agent-roster">
-          ${agents.map(([name, role, model, permission, status]) => renderAgentRow(name, role, model, permission, status)).join("")}
+          ${agents.map((agent) => renderAgentRow(agent.display_name, agent.role, agent.model, agent.permission, agent.status, agent.avatar_initials)).join("") || `<div class="empty-state">No agent roster loaded yet.</div>`}
         </div>
       </section>
       <section class="panel pad">
-        <h2 class="panel-title">Conversation</h2>
+        <h2 class="panel-title">Conversation ${session ? `<span class="chip mono">${escapeHtml(shortId(session.id))}</span>` : ""}</h2>
         <div class="conversation">
-          ${renderMessage("Coordinator", "coord", "model-main", "draft", "ready", "I can route work to research, document, memory, channel, or operator agents. Multi-agent backend sessions are planned; this UI is ready for them.")}
-          ${renderMessage("Memory", "mem", "model-c", "approval", "approval_required", "Long-term memory changes must be reviewed before promotion. I can prepare candidates, but owner approval stays required.")}
+          ${
+            state.agentEvents.length
+              ? state.agentEvents.map((event) => renderMessage(agentName(event.agent_id), event.role || event.agent_id, event.model, event.permission, event.status, event.content || event.error)).join("")
+              : `<div class="empty-state">Create a session and run a round to record governed agent events.</div>`
+          }
         </div>
       </section>
     </div>`;
+  document.getElementById("refresh-agents")?.addEventListener("click", refreshScreenData);
+  document.getElementById("create-agent-session")?.addEventListener("click", async () => {
+    const result = await runAction("agent-session", () =>
+      api.post("/agents/session", {
+        title: "bairui command session",
+        agent_ids: agents.map((agent) => agent.id),
+      }),
+    );
+    state.selectedAgentSessionId = result?.agent_session?.id || state.selectedAgentSessionId;
+    await loadAgents();
+    render();
+  });
+  document.getElementById("run-agent-round")?.addEventListener("click", async () => {
+    const promptText = el.commandInput.value.trim() || "Inspect current bairui workspace state.";
+    await runAction("agent-round", () => api.post(`/agents/session/${state.selectedAgentSessionId}/round`, { prompt: promptText }));
+    await loadAgents();
+    render();
+  });
 }
 
-function renderAgentRow(name, role, model, permission, status) {
+function agentName(agentId) {
+  return state.agents.find((agent) => agent.id === agentId)?.display_name || agentId || "Agent";
+}
+
+function renderAgentRow(name, role, model, permission, status, initials = "") {
   return `
     <div class="agent-row">
-      <div class="agent-avatar">${escapeHtml(role.slice(0, 2))}</div>
+      <div class="agent-avatar">${escapeHtml(initials || role.slice(0, 2))}</div>
       <div>
         <div class="agent-name">${escapeHtml(name)}</div>
         <div class="agent-meta">
@@ -903,6 +932,7 @@ async function refreshScreenData() {
   if (["channels", "entity"].includes(state.screen)) await loadChannels();
   if (["settings", "intel", "codegraph"].includes(state.screen)) await loadRuntimeStatus();
   if (state.screen === "codegraph") await loadCodeGraph();
+  if (state.screen === "command") await loadAgents();
   if (state.screen === "events") {
     state.audit = await safe(() => api.get("/audit").then((data) => data.audit || []), state.audit, "audit");
   }
@@ -959,6 +989,19 @@ async function loadChannels() {
   state.channelTargets = targets || [];
   state.channelDiagnostics = diagnostics || [];
   state.channelApprovals = approvals || [];
+}
+
+async function loadAgents() {
+  const [agents, sessions] = await Promise.all([
+    safe(() => api.get("/agents").then((data) => data.agents || []), state.agents, "agents"),
+    safe(() => api.get("/agents/sessions").then((data) => data.agent_sessions || []), state.agentSessions, "agent-sessions"),
+  ]);
+  state.agents = agents || [];
+  state.agentSessions = sessions || [];
+  if (!state.selectedAgentSessionId && state.agentSessions.length) state.selectedAgentSessionId = state.agentSessions.at(-1).id;
+  if (state.selectedAgentSessionId) {
+    state.agentEvents = await safe(() => api.get(`/agents/session/${state.selectedAgentSessionId}/events`).then((data) => data.agent_events || []), state.agentEvents, "agent-events");
+  }
 }
 
 async function loadRuntimeStatus() {

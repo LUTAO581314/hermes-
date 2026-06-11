@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from src.hermes.capabilities import collect_capabilities
 from src.hermes.avatar import avatar_engine_status, build_avatar_manifest, set_avatar_state, validate_avatar_model
+from src.hermes.agents import create_agent_session, list_agent_events, list_agents, promote_agent_event, run_agent_round
 from src.hermes.channels import (
     channel_status,
     channel_targets,
@@ -118,6 +119,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("model_gateway", names)
         self.assertIn("bairui_avatar_runtime", names)
         self.assertIn("bairui_codegraph", names)
+        self.assertIn("bairui_agents", names)
 
     def test_frontend_contract_lists_stable_product_surfaces(self):
         contract = build_frontend_contract(load_settings(), "test-version")
@@ -127,6 +129,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         operation_paths = {endpoint["path"] for endpoint in api_groups["operations"]["endpoints"]}
         channel_paths = {endpoint["path"] for endpoint in api_groups["channels"]["endpoints"]}
         codegraph_paths = {endpoint["path"] for endpoint in api_groups["codegraph"]["endpoints"]}
+        agent_paths = {endpoint["path"] for endpoint in api_groups["agents"]["endpoints"]}
         serialized = json.dumps(contract, ensure_ascii=False)
         forbidden = (
             "Hermes",
@@ -184,6 +187,9 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("/codegraph/status", screens["codegraph"]["read"])
         self.assertIn("codegraph_repo_register", contract["forms"])
         self.assertIn("/codegraph/query", codegraph_paths)
+        self.assertIn("agent_session_create", contract["forms"])
+        self.assertIn("/agents", screens["chat"]["read"])
+        self.assertIn("/agents/session/{session_id}/round", agent_paths)
         self.assertIn("needs_review", contract["state_values"])
         self.assertIn("approval_required", contract["state_values"])
         self.assertIn("speaking", contract["state_values"])
@@ -261,6 +267,35 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(scan_payload["codegraph_scan"]["status"], "completed")
         self.assertEqual(query_code, 0)
         self.assertEqual(query_payload["codegraph_query"]["results"][0]["name"], "boot")
+
+    def test_agents_roster_and_round_keep_permissions_visible(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "HERMES_DATA_DIR": str(Path(tmp) / "data"),
+                "HERMES_LOG_DIR": str(Path(tmp) / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault"),
+                "BAIRUI_MODEL_BASE_URL": "",
+                "BAIRUI_MODEL_API_KEY": "",
+                "BAIRUI_MODEL_NAME": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                settings = load_settings()
+                agents = list_agents(settings)
+                session = create_agent_session(settings, "ops", ("coordinator", "memory", "operator"))
+                result = run_agent_round(settings, session.id, "summarize current state")
+                events = list_agent_events(settings, session_id=session.id)
+                promotion = promote_agent_event(settings, events[-1]["id"], "job")
+
+        by_id = {agent.id: agent for agent in agents}
+        self.assertEqual(by_id["coordinator"].status, "missing_config")
+        self.assertEqual(by_id["memory"].permission, "approval_required")
+        self.assertEqual(result["status"], "completed")
+        statuses = {event["agent_id"]: event["status"] for event in events}
+        self.assertEqual(statuses["coordinator"], "missing_config")
+        self.assertEqual(statuses["memory"], "approval_required")
+        self.assertEqual(statuses["operator"], "completed")
+        self.assertEqual(promotion["status"], "planned")
+        self.assertFalse(promotion["will_execute_external_action"])
 
     def test_console_static_assets_are_served_by_backend(self):
         with tempfile.TemporaryDirectory() as tmp:

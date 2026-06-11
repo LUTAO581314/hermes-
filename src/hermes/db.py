@@ -114,6 +114,31 @@ create table if not exists codegraph_imports (
 
 create index if not exists idx_codegraph_symbols_repo_name on codegraph_symbols (repo_id, name);
 create index if not exists idx_codegraph_files_repo_path on codegraph_files (repo_id, relative_path);
+
+create table if not exists agent_sessions (
+    id text primary key,
+    title text not null,
+    agent_ids jsonb not null default '[]'::jsonb,
+    status text not null,
+    created_at timestamptz not null,
+    updated_at timestamptz not null
+);
+
+create table if not exists agent_events (
+    id text primary key,
+    session_id text not null,
+    agent_id text not null,
+    type text not null,
+    status text not null,
+    role text not null,
+    model text not null,
+    permission text not null,
+    content text not null,
+    error text not null default '',
+    created_at timestamptz not null
+);
+
+create index if not exists idx_agent_events_session on agent_events (session_id, created_at);
 """
 
 

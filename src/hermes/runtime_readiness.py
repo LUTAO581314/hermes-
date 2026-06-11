@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 from .avatar import avatar_engine_status
+from .agents import list_agents
 from .adapters.everos import status as everos_status
 from .adapters.funasr import status as funasr_status
 from .adapters.mineru import status as mineru_status
@@ -48,6 +49,7 @@ def collect_runtime_readiness(settings: Settings) -> dict[str, object]:
     sonic = sonic_status(settings)
     avatar = avatar_engine_status(settings)
     codegraph = codegraph_status(settings)
+    agents = list_agents(settings)
 
     items = (
         RuntimeReadinessItem("everos_memory", everos.status, True, everos.detail, everos.source_path, everos.license),
@@ -59,6 +61,7 @@ def collect_runtime_readiness(settings: Settings) -> dict[str, object]:
         RuntimeReadinessItem("sonic_local_index", sonic.status, False, sonic.detail, sonic.source, sonic.license),
         RuntimeReadinessItem("bairui_avatar_runtime", avatar.status, False, avatar.detail, avatar.source, avatar.license),
         RuntimeReadinessItem("bairui_codegraph", codegraph.status, False, codegraph.detail, codegraph.root, "owned"),
+        RuntimeReadinessItem("bairui_agents", "ready", False, f"{len(agents)} governed agent profiles are available", "bairui", "owned"),
     )
 
     blockers = tuple(f"{item.name}: {item.detail}" for item in items if item.required_for_usable and item.status in BLOCKING_STATES)

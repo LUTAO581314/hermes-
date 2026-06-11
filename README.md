@@ -122,6 +122,21 @@ python -m src.hermes runtime-readiness
 python -m src.hermes serve
 ```
 
+## Multi-Agent Command Boundary
+
+The command workspace has a governed multi-agent backend contract:
+
+- `GET /agents`
+- `POST /agents/session`
+- `POST /agents/session/{session_id}/round`
+- `GET /agents/session/{session_id}/events`
+- `POST /agents/session/{session_id}/promote`
+
+Agents expose role, model, permission, and readiness state. Missing model
+configuration disables model-backed agents without hiding approval-required or
+operator-safe states. Memory and channel agents can propose review items, but
+external sends and memory writes remain owner-reviewed.
+
 ## Frontend Contract
 
 - `GET /frontend/contract`

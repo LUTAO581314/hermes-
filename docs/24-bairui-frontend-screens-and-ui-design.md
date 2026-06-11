@@ -576,7 +576,7 @@ API binding:
 - `GET /events`
 - Current backend has one generic chat action. Multi-agent UI can start in
   partial mode by rendering a single default bairui agent.
-- Recommended backend additions:
+- Backend contract now available:
   - `GET /agents`
   - `GET /agents/{id}`
   - `POST /agents/session`
@@ -1612,7 +1612,8 @@ Backend state:
   frontend pass must render multi-agent as partial mode.
 - First implementation can show a single default bairui coordinator and a
   disabled "multi-agent roster coming from backend contract" state.
-- Full implementation requires agent/session endpoints.
+- Full implementation should deepen agent/session persistence, model routing,
+  and tool orchestration behind the available endpoints.
 
 Recommended backend additions:
 

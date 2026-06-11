@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .avatar import avatar_engine_status
+from .agents import list_agents
 from .adapters.everos import status as everos_status
 from .adapters.funasr import status as funasr_status
 from .adapters.mineru import status as mineru_status
@@ -45,6 +46,7 @@ def collect_capabilities(settings: Settings) -> list[dict[str, str]]:
     sonic = sonic_status(settings)
     avatar = avatar_engine_status(settings)
     codegraph = codegraph_status(settings)
+    agents = list_agents(settings)
     caps = [
         Capability("health_api", "ready", "HTTP health endpoint is available"),
         Capability("readiness_api", "ready", "HTTP readiness endpoint is available"),
@@ -119,5 +121,6 @@ def collect_capabilities(settings: Settings) -> list[dict[str, str]]:
             source=codegraph.root,
             license="owned",
         ),
+        Capability("bairui_agents", "ready", f"{len(agents)} governed agent profiles are available", source="bairui", license="owned"),
     ]
     return [asdict(cap) for cap in caps]
