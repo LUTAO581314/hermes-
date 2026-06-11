@@ -15,6 +15,12 @@ Optional JSON report:
 .\scripts\product-acceptance.ps1 -OutputPath artifacts\product-acceptance.json
 ```
 
+Configuration diagnostics can be checked separately:
+
+```powershell
+.\scripts\config-doctor.ps1
+```
+
 The same acceptance can be run through the smoke entry point:
 
 ```powershell
@@ -32,6 +38,7 @@ directory and verifies these product scenarios:
 | Customer communication draft | Channel draft is planned and reviewed while `will_send=false`. |
 | Code understanding | CodeGraph registers, scans, queries, and reports that code structure is separate from long-term memory. |
 | Runtime diagnostics | Dashboard, Settings, and Events have audit evidence from the completed demo flow. |
+| Safe configuration diagnostics | `python -m src.hermes config-status` reports required paths and secret states without returning secret values. |
 
 Safety gates that must stay true:
 
@@ -43,4 +50,5 @@ Safety gates that must stay true:
 
 Use this script before an internal demo. Use `scripts/smoke-test.ps1` for the
 faster CI-style repository health check, and add `-FullAcceptance` when the
-demo needs scenario-level proof.
+demo needs scenario-level proof. Use `scripts/config-doctor.ps1` when you need
+the same operator-safe configuration check without opening the browser.

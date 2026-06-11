@@ -146,6 +146,7 @@ For Windows PowerShell verification:
 .\scripts\smoke-test.ps1
 .\scripts\smoke-test.ps1 -FullAcceptance
 .\scripts\product-acceptance.ps1
+.\scripts\config-doctor.ps1
 ```
 
 The smoke test runs the product closure demo flow in a temporary data directory.
@@ -160,6 +161,9 @@ The product acceptance script expands the same real backend flow into five
 demo scenarios: research task, document knowledge base, customer draft
 approval, code understanding, and runtime diagnostics. It can also write a JSON
 report with `-OutputPath artifacts\product-acceptance.json`.
+
+Use `scripts/config-doctor.ps1` when you need an operator-safe configuration
+diagnostic from the CLI without opening the browser.
 
 To seed only static walkthrough records before opening the console:
 

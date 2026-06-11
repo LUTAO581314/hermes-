@@ -11,6 +11,9 @@ $previousEnv = @{
     HERMES_OBSIDIAN_VAULT_DIR = $env:HERMES_OBSIDIAN_VAULT_DIR
     BAIRUI_CODEGRAPH_ROOT = $env:BAIRUI_CODEGRAPH_ROOT
     BAIRUI_CHANNELS_ENABLED = $env:BAIRUI_CHANNELS_ENABLED
+    BAIRUI_MODEL_BASE_URL = $env:BAIRUI_MODEL_BASE_URL
+    BAIRUI_MODEL_API_KEY = $env:BAIRUI_MODEL_API_KEY
+    BAIRUI_MODEL_NAME = $env:BAIRUI_MODEL_NAME
 }
 
 function New-ScenarioResult {
@@ -39,6 +42,9 @@ try {
     $env:HERMES_OBSIDIAN_VAULT_DIR = Join-Path $tmp "vault"
     $env:BAIRUI_CODEGRAPH_ROOT = Join-Path $tmp "codegraph"
     $env:BAIRUI_CHANNELS_ENABLED = "1"
+    $env:BAIRUI_MODEL_BASE_URL = "https://models.example.test/v1"
+    $env:BAIRUI_MODEL_API_KEY = "dummy"
+    $env:BAIRUI_MODEL_NAME = "bairui-acceptance-model"
 
     $flowRaw = python -m src.hermes demo flow
     if ($LASTEXITCODE -ne 0) {
@@ -49,19 +55,27 @@ try {
     if ($null -eq $demo) {
         throw "demo flow did not return demo_flow payload: $flowRaw"
     }
+    $configRaw = python -m src.hermes config-status
+    if ($LASTEXITCODE -notin @(0, 1)) {
+        throw "config-status exited with code $LASTEXITCODE`: $configRaw"
+    }
+    $configPayload = $configRaw | ConvertFrom-Json
+    $configStatus = $configPayload.config_status
 
     $researchPassed = $demo.checkpoints.command_session -eq $true -and $demo.checkpoints.report_created -eq $true -and @("planned", "duplicate") -contains $demo.promotions.report.status
     $knowledgePassed = $demo.checkpoints.memory_review_recorded -eq $true -and $demo.memory.will_write_long_term_memory -eq $false -and @("rejected", "already_reviewed") -contains $demo.memory.review.status
     $customerDraftPassed = $demo.checkpoints.channel_review_recorded -eq $true -and $demo.channel.plan.will_send -eq $false -and $demo.channel.review.will_send -eq $false
     $codePassed = $demo.checkpoints.codegraph_query_ready -eq $true -and "$($demo.codegraph.memory_boundary)" -match "does not write long-term memory"
     $diagnosticsPassed = $demo.status -eq "completed" -and $demo.audit_marker.payload.will_send -eq $false -and $demo.audit_marker.payload.will_write_long_term_memory -eq $false
+    $configurationPassed = @("ready", "partial") -contains $configStatus.status -and "$($configStatus.secret_policy)" -match "never returned"
 
     $scenarios = @(
         (New-ScenarioResult "research_task" "Command research task to report" $researchPassed "Command session, agent report promotion, and Reports output are present." "Open Command, promote a completed agent message to Report, then inspect Reports."),
         (New-ScenarioResult "document_knowledge_base" "Document knowledge to memory review" $knowledgePassed "Demo memory candidate is reviewed and long-term memory write remains false." "Open Documents, create candidates, then approve or reject in Memory Review."),
         (New-ScenarioResult "customer_draft" "Customer communication draft approval" $customerDraftPassed "Channel draft is planned and reviewed with will_send=false." "Open Channels and review drafts; current backend records review only."),
         (New-ScenarioResult "code_understanding" "CodeGraph source understanding" $codePassed "CodeGraph registers, scans, queries, and reports memory separation." "Open CodeGraph, register a repository, scan, query, and run impact analysis."),
-        (New-ScenarioResult "runtime_diagnostics" "Dashboard Settings Events diagnostics" $diagnosticsPassed "Audit marker and safety gates are recorded for diagnostic screens." "Open Dashboard, Settings, and Events to inspect readiness and audit evidence.")
+        (New-ScenarioResult "runtime_diagnostics" "Dashboard Settings Events diagnostics" $diagnosticsPassed "Audit marker and safety gates are recorded for diagnostic screens." "Open Dashboard, Settings, and Events to inspect readiness and audit evidence."),
+        (New-ScenarioResult "configuration_status" "Safe configuration diagnostics" $configurationPassed "Config status runs from CLI and reports only safe secret states." "Run scripts\config-doctor.ps1 or open Settings before a demo.")
     )
 
     $safety = [pscustomobject]@{
@@ -87,6 +101,11 @@ try {
             channel_review_count = $demo.channel.review_count
             memory_review_count = $demo.memory.review_count
             codegraph_status = $demo.codegraph.status
+        }
+        configuration = [pscustomobject]@{
+            status = $configStatus.status
+            blocker_count = @($configStatus.blockers).Count
+            secret_policy = $configStatus.secret_policy
         }
         temp_root = $tmp
     }

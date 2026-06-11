@@ -90,6 +90,7 @@ from .codegraph import (
     scan_codegraph_repo,
 )
 from .config import ensure_runtime_dirs, load_settings
+from .config_status import build_config_status
 from .db import database_status, run_migrations
 from .demo import seed_demo_data
 from .demo_flow import run_demo_flow
@@ -171,6 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("migrate", help="Run PostgreSQL schema migrations")
     subcommands.add_parser("heartbeat", help="Print the platform heartbeat payload")
     subcommands.add_parser("paths", help="Print runtime paths and key configuration")
+    subcommands.add_parser("config-status", help="Print operator-safe configuration diagnostics")
     subcommands.add_parser("runtime-readiness", help="Print unified vendor runtime readiness")
     demo_parser = subcommands.add_parser("demo", help="Create demo data for local product walkthroughs")
     demo_subcommands = demo_parser.add_subparsers(dest="demo_command")
@@ -539,6 +541,11 @@ def run(argv: list[str] | None = None) -> int:
             }
         )
         return 0
+
+    if command == "config-status":
+        status = build_config_status(settings)
+        print_json({"service": "bairui", "config_status": status})
+        return 0 if status["status"] in {"ready", "partial"} else 1
 
     if command == "runtime-readiness":
         print_json({"service": "bairui", "runtime_readiness": collect_runtime_readiness(settings)})

@@ -787,6 +787,30 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertNotIn("http-secret-key", raw)
         self.assertIn("api_key", raw)
 
+    def test_cli_config_status_prints_safe_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "BAIRUI_CODEGRAPH_ROOT": str(root / "codegraph"),
+                "BAIRUI_MODEL_BASE_URL": "https://models.example.test/v1",
+                "BAIRUI_MODEL_API_KEY": "cli-secret-key",
+                "BAIRUI_MODEL_NAME": "bairui-demo-model",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["config-status"])
+
+        payload = print_json.call_args.args[0]
+        raw = json.dumps(payload, ensure_ascii=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["service"], "bairui")
+        self.assertIn(payload["config_status"]["status"], {"ready", "partial"})
+        self.assertNotIn("cli-secret-key", raw)
+        self.assertIn("secrets are reported only as configured or missing", payload["config_status"]["secret_policy"])
+
     def test_command_console_composer_maps_to_agent_contracts(self):
         app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
         styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
@@ -1080,16 +1104,20 @@ class RuntimeFoundationTests(unittest.TestCase):
         doc = Path("docs/25-product-demo-acceptance.md").read_text(encoding="utf-8")
         script = Path("scripts/product-acceptance.ps1").read_text(encoding="utf-8")
         smoke = Path("scripts/smoke-test.ps1").read_text(encoding="utf-8")
+        doctor = Path("scripts/config-doctor.ps1").read_text(encoding="utf-8")
 
         self.assertIn(".\\scripts\\product-acceptance.ps1", readme)
         self.assertIn(".\\scripts\\smoke-test.ps1 -FullAcceptance", readme)
+        self.assertIn(".\\scripts\\config-doctor.ps1", readme)
         self.assertIn("python -m src.hermes demo flow", script)
+        self.assertIn("python -m src.hermes config-status", script)
         self.assertIn("product_acceptance", script)
         self.assertIn("research_task", script)
         self.assertIn("document_knowledge_base", script)
         self.assertIn("customer_draft", script)
         self.assertIn("code_understanding", script)
         self.assertIn("runtime_diagnostics", script)
+        self.assertIn("configuration_status", script)
         self.assertIn("no_external_send", script)
         self.assertIn("no_auto_memory_write", script)
         self.assertIn("will_send -eq $false", script)
@@ -1106,6 +1134,9 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("Customer communication draft", doc)
         self.assertIn("Code understanding", doc)
         self.assertIn("Runtime diagnostics", doc)
+        self.assertIn("Safe configuration diagnostics", doc)
+        self.assertIn("python -m src.hermes config-status", doctor)
+        self.assertIn("[switch]$AllowBlocked", doctor)
 
     def test_avatar_engine_status_uses_advanced_runtime_contract(self):
         state = avatar_engine_status(load_settings())
