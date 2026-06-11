@@ -65,6 +65,7 @@ const state = {
   agentPromotions: [],
   agentEventOffset: 0,
   agentEventLimit: 20,
+  agentComposerMode: "round",
   promotionResults: {},
   avatarStatus: null,
   avatarManifest: null,
@@ -785,6 +786,7 @@ function renderCommand() {
           </div>
           ${pill(state.errors["agent-round"] ? "blocked" : "ready", state.errors["agent-round"] ? "blocked" : "governed")}
         </div>
+        ${renderAgentComposer(session, selectedCount)}
         <div class="command-session-tools">
           <input class="field" id="agent-session-title" placeholder="Session title" value="${escapeHtml(session?.title || "")}" ${!session ? "disabled" : ""} />
           <div class="pager-actions">
@@ -793,6 +795,12 @@ function renderCommand() {
             <button class="ghost-btn mini" type="button" id="agent-events-next" ${state.agentEventsPage?.pagination?.next_offset === null || state.agentEventsPage?.pagination?.next_offset === undefined ? "disabled" : ""}>Next</button>
           </div>
         </div>
+        ${renderProductError("agent-session")}
+        ${renderProductError("agent-title")}
+        ${renderProductError("agent-message")}
+        ${renderProductError("agent-round")}
+        ${renderProductError("agent-promote")}
+        ${renderProductError("agent-retry")}
         <div class="conversation">
           ${
             state.agentEvents.length
@@ -810,6 +818,12 @@ function renderCommand() {
       if (input.checked) next.add(input.dataset.agentToggle);
       else next.delete(input.dataset.agentToggle);
       state.selectedAgentIds = [...next];
+      renderCommand();
+    });
+  });
+  el.body.querySelectorAll("[data-agent-composer]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.agentComposerMode = button.dataset.agentComposer || "round";
       renderCommand();
     });
   });
@@ -860,9 +874,7 @@ function renderCommand() {
       render();
       return;
     }
-    await runAction("agent-message", () => api.post(`/agents/session/${state.selectedAgentSessionId}/message`, { content }), loadAgents);
-    el.commandInput.value = "";
-    render();
+    await submitAgentCommand(content, { mode: "message" });
   });
   document.getElementById("agent-events-prev")?.addEventListener("click", async () => {
     const previous = state.agentEventsPage?.pagination?.previous_offset;
@@ -893,11 +905,34 @@ function renderCommand() {
   });
   document.getElementById("run-agent-round")?.addEventListener("click", async () => {
     const promptText = el.commandInput.value.trim() || "Inspect current bairui workspace state.";
-    await runAction("agent-round", () => api.post(`/agents/session/${state.selectedAgentSessionId}/round`, { prompt: promptText }));
-    state.agentEventOffset = 0;
-    await loadAgents();
-    render();
+    await submitAgentCommand(promptText, { mode: "round" });
   });
+}
+
+function renderAgentComposer(session, selectedCount) {
+  const mode = state.agentComposerMode || "round";
+  const activeAgents = selectedAgentLabels(session).join(", ") || "selected agents";
+  return `
+    <section class="agent-composer-card" aria-label="Command composer">
+      <div>
+        <div class="section-label">Composer target</div>
+        <div class="agent-meta">
+          <span class="chip">${escapeHtml(activeAgents)}</span>
+          <span class="chip">${escapeHtml(String(selectedCount || 0))} selected</span>
+          <span class="chip">event source tracked</span>
+        </div>
+      </div>
+      <div class="composer-toggle" role="group" aria-label="Command mode">
+        <button class="ghost-btn mini ${mode === "message" ? "active" : ""}" type="button" data-agent-composer="message">Append Only</button>
+        <button class="ghost-btn mini ${mode === "round" ? "active" : ""}" type="button" data-agent-composer="round">Run Round</button>
+      </div>
+      <div class="composer-safety">
+        ${pill("ready", "no external send")}
+        ${pill("ready", "no auto memory write")}
+        ${pill(session ? "ready" : "partial", session ? "session ready" : "session will be created")}
+      </div>
+      <p class="muted compact-copy">Use the bottom command bar. Append Only records the owner message; Run Round records the owner message and calls the governed multi-agent backend.</p>
+    </section>`;
 }
 
 function agentPageLabel() {
@@ -914,6 +949,11 @@ function agentName(agentId) {
 
 function agentProfile(agentId) {
   return state.agents.find((agent) => agent.id === agentId) || {};
+}
+
+function selectedAgentLabels(session) {
+  const ids = session?.agent_ids?.length ? session.agent_ids : state.selectedAgentIds;
+  return ids.slice(0, 4).map((id) => agentName(id));
 }
 
 function renderAgentRow(agent) {
@@ -2719,6 +2759,39 @@ async function loadAgents() {
   }
 }
 
+async function ensureAgentSession() {
+  if (state.selectedAgentSessionId) return state.selectedAgentSessionId;
+  const agents = state.agents.length ? state.agents : await safe(() => api.get("/agents").then((data) => data.agents || []), [], "agents");
+  state.agents = agents || state.agents;
+  const agentIds = state.selectedAgentIds.length ? state.selectedAgentIds : state.agents.map((agent) => agent.id);
+  const result = await runAction("agent-session", () =>
+    api.post("/agents/session", {
+      title: "bairui command session",
+      agent_ids: agentIds,
+    }),
+  );
+  state.selectedAgentSessionId = result?.agent_session?.id || "";
+  state.selectedAgentIds = result?.agent_session?.agent_ids || state.selectedAgentIds;
+  return state.selectedAgentSessionId;
+}
+
+async function submitAgentCommand(promptText, options = {}) {
+  const text = String(promptText || "").trim();
+  if (!text) return;
+  const sessionId = await ensureAgentSession();
+  if (!sessionId) return;
+  const mode = options.mode || state.agentComposerMode || "round";
+  if (mode === "message") {
+    await runAction("agent-message", () => api.post(`/agents/session/${sessionId}/message`, { content: text }), loadAgents);
+  } else {
+    await runAction("agent-round", () => api.post(`/agents/session/${sessionId}/round`, { prompt: text }));
+    state.agentEventOffset = 0;
+    await loadAgents();
+  }
+  el.commandInput.value = "";
+  render();
+}
+
 async function loadRuntimeStatus() {
   const [memory, voice, document, intel, simulation, search, index, codegraph] = await Promise.all([
     safe(() => api.get("/memory/status"), state.runtimeStatus.memory, "memory-status"),
@@ -2775,25 +2848,11 @@ el.commandSend.addEventListener("click", async () => {
   const promptText = el.commandInput.value.trim();
   if (!promptText) return;
   if (state.screen === "command") {
-    if (!state.selectedAgentSessionId) {
-      const agents = state.agents.length ? state.agents : await safe(() => api.get("/agents").then((data) => data.agents || []), [], "agents");
-      state.agents = agents || state.agents;
-      const result = await runAction("agent-session", () =>
-        api.post("/agents/session", {
-          title: "bairui command session",
-          agent_ids: state.selectedAgentIds.length ? state.selectedAgentIds : state.agents.map((agent) => agent.id),
-        }),
-      );
-      state.selectedAgentSessionId = result?.agent_session?.id || "";
-      state.selectedAgentIds = result?.agent_session?.agent_ids || state.selectedAgentIds;
-    }
-    if (!state.selectedAgentSessionId) return;
-    await runAction("agent-round", () => api.post(`/agents/session/${state.selectedAgentSessionId}/round`, { prompt: promptText }));
-    await loadAgents();
+    await submitAgentCommand(promptText);
   } else {
     await runAction("command", () => api.post("/jobs", { title: "Command request", prompt: promptText, route: "general" }));
+    el.commandInput.value = "";
   }
-  el.commandInput.value = "";
 });
 
 el.commandInput.addEventListener("keydown", (event) => {

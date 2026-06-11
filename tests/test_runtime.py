@@ -720,6 +720,25 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".product-error", styles)
         self.assertIn(".error-guide-grid", styles)
 
+    def test_command_console_composer_maps_to_agent_contracts(self):
+        app_js = Path("web/bairui-console/app.js").read_text(encoding="utf-8")
+        styles = Path("web/bairui-console/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('agentComposerMode: "round"', app_js)
+        self.assertIn("function renderAgentComposer", app_js)
+        self.assertIn("function ensureAgentSession", app_js)
+        self.assertIn("function submitAgentCommand", app_js)
+        self.assertIn('data-agent-composer="message"', app_js)
+        self.assertIn('data-agent-composer="round"', app_js)
+        self.assertIn("Append Only records the owner message", app_js)
+        self.assertIn("no external send", app_js)
+        self.assertIn("no auto memory write", app_js)
+        self.assertIn('/agents/session/${sessionId}/message', app_js)
+        self.assertIn('/agents/session/${sessionId}/round', app_js)
+        self.assertIn(".agent-composer-card", styles)
+        self.assertIn(".composer-toggle", styles)
+        self.assertIn(".ghost-btn.active", styles)
+
     def test_quickstart_and_deploy_docs_reference_console_demo_flow_and_readiness(self):
         readme = Path("README.md").read_text(encoding="utf-8")
         deployment = Path("docs/12-one-click-deployment.md").read_text(encoding="utf-8")

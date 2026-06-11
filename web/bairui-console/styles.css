@@ -779,6 +779,38 @@ h1 {
   margin: 10px 0 12px;
 }
 
+.agent-composer-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: var(--radius-sm);
+  background: rgba(53, 230, 199, 0.032);
+  padding: 10px;
+  margin: 10px 0 12px;
+}
+
+.composer-toggle,
+.composer-safety {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.composer-safety {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+.ghost-btn.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: rgba(53, 230, 199, 0.08);
+}
+
 .pager-actions {
   display: flex;
   gap: 6px;
