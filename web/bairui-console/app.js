@@ -11,7 +11,8 @@ const api = {
       body: JSON.stringify(payload),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data?.message || `${path} ${response.status}`);
+    const message = data?.message || data?.chat?.error || data?.error || `${path} ${response.status}`;
+    if (!response.ok) throw new Error(message);
     return data;
   },
 };
@@ -40,6 +41,7 @@ const state = {
   ready: null,
   readiness: null,
   platform: null,
+  license: null,
   capabilities: [],
   jobs: [],
   audit: [],
@@ -74,6 +76,7 @@ const state = {
   codegraphRepos: [],
   codegraphQuery: null,
   codegraphImpact: null,
+  activationProbe: null,
   demoSeed: null,
   selectedEntity: null,
   selectedStep: "brand_lock",
@@ -230,11 +233,12 @@ function renderActivation() {
         <h2 class="panel-title">${escapeHtml(selected?.title || "Activation detail")}</h2>
         <div class="agent-meta">${pill(selectedState)}<span class="chip">${escapeHtml(selected?.blocking ? "blocking" : "guided")}</span></div>
         <p class="muted">${escapeHtml(selected?.complete_when || "Load backend contract to inspect activation.")}</p>
+        ${renderActivationEvidence(selected?.id || "")}
         ${renderActivationDiagnostics(selected, selectedState)}
         <div class="grid">
           ${(selected?.read || []).map((path) => `<span class="status-pill">${escapeHtml(path)}</span>`).join("")}
         </div>
-        ${selected?.action ? `<div class="activation-action-card"><span>Action</span><strong>${escapeHtml(selected.action.method || "POST")} ${escapeHtml(selected.action.path || "")}</strong><p>${escapeHtml(selected.action.id || "")}</p></div>` : ""}
+        ${renderActivationAction(selected)}
         <hr class="rule">
         ${renderReadinessBlockers()}
       </section>
@@ -252,6 +256,7 @@ function renderActivation() {
     render();
     await refreshScreenData();
   });
+  document.getElementById("activation-run-action")?.addEventListener("click", () => runActivationStepAction(selected));
 }
 
 function inferStepState(step) {
@@ -290,6 +295,36 @@ function lookupStatus(map, fragment) {
   return key ? map[key] : "";
 }
 
+function renderActivationEvidence(stepId) {
+  const db = state.ready?.database || state.platform?.heartbeat?.database || {};
+  const license = state.license?.license || {};
+  const heartbeat = state.platform?.heartbeat || {};
+  const model = state.capabilities.find((item) => item.name === "model_gateway") || {};
+  const base = [
+    ["Health", state.health?.status || "loading", state.health?.version || "service pending"],
+    ["Database", db.status || "missing_config", db.error || db.detail || "PostgreSQL readiness"],
+    ["License", license.status || state.ready?.license || "missing_config", license.error || license.license_id || license.path || "license file"],
+    ["Platform", heartbeat.health_status || state.ready?.platform || "missing_config", heartbeat.server_id || state.ready?.server_id || "server id pending"],
+  ];
+  const extra =
+    stepId === "model_gateway"
+      ? [["Model Gateway", model.status || "missing_config", state.activationProbe?.detail || model.detail || "Run probe to verify /chat."]]
+      : [];
+  return `
+    <div class="activation-evidence">
+      ${[...base, ...extra]
+        .map(
+          ([label, status, detail]) => `
+            <div class="evidence-card">
+              <span>${escapeHtml(label)}</span>
+              ${pill(status)}
+              <p>${escapeHtml(detail)}</p>
+            </div>`,
+        )
+        .join("")}
+    </div>`;
+}
+
 function renderActivationDiagnostics(step, stepState) {
   if (!step) return "";
   const next = activationNextAction(step.id, stepState);
@@ -310,7 +345,61 @@ function renderActivationDiagnostics(step, stepState) {
     </div>`;
 }
 
+function renderActivationAction(step) {
+  if (!step?.action) return "";
+  const isProbe = step.action.id === "send_chat_probe";
+  const loading = state.loading.has("activation-probe");
+  const probe = state.activationProbe;
+  const status = probe?.status || (state.errors["activation-probe"] ? "missing_config" : "ready");
+  return `
+    <div class="activation-action-card">
+      <div class="conversation-head">
+        <div>
+          <span>Action</span>
+          <strong>${escapeHtml(step.action.method || "POST")} ${escapeHtml(step.action.path || "")}</strong>
+          <p>${escapeHtml(step.action.id || "")}</p>
+        </div>
+        ${isProbe ? `<button class="primary-btn mini" id="activation-run-action" type="button" ${loading ? "disabled" : ""}>${loading ? "Probing" : "Run Probe"}</button>` : ""}
+      </div>
+      ${
+        isProbe && (probe || state.errors["activation-probe"])
+          ? `<div class="probe-result">${pill(status)}<p>${escapeHtml(probe?.detail || state.errors["activation-probe"])}</p></div>`
+          : ""
+      }
+    </div>`;
+}
+
+async function runActivationStepAction(step) {
+  if (step?.action?.id !== "send_chat_probe") return;
+  setBusy("activation-probe", true);
+  state.errors["activation-probe"] = "";
+  state.activationProbe = null;
+  render();
+  try {
+    const result = await api.post("/chat", {
+      system: "You are a bairui activation probe. Reply with a short readiness confirmation.",
+      prompt: "Confirm bairui model gateway readiness in one short sentence.",
+    });
+    const chat = result?.chat || {};
+    state.activationProbe = {
+      status: chat.status || "completed",
+      detail: [chat.provider, chat.model, chat.content || chat.error].filter(Boolean).join(" | "),
+    };
+    await refresh();
+  } catch (error) {
+    state.errors["activation-probe"] = error.message;
+    state.activationProbe = { status: "missing_config", detail: error.message };
+  } finally {
+    setBusy("activation-probe", false);
+    render();
+  }
+}
+
 function activationNextAction(stepId, stepState) {
+  if (stepId === "model_gateway") {
+    if (stepState === "ready") return { title: "Run gateway probe", detail: "Send a minimal /chat request and confirm the configured model answers." };
+    return { title: "Configure model gateway", detail: "Set BAIRUI_MODEL_BASE_URL, BAIRUI_MODEL_API_KEY, and BAIRUI_MODEL_NAME, then run the probe." };
+  }
   if (stepState === "blocked" || stepState === "missing_config") {
     return { title: "Fix missing configuration", detail: "Open the linked workbench and complete the visible missing_config items." };
   }
@@ -1879,7 +1968,7 @@ async function safe(fn, fallback, key = "") {
 }
 
 async function refresh() {
-  const [contract, health, ready, readiness, capabilities, jobs, audit, avatarStatus, avatarManifest, platform] = await Promise.all([
+  const [contract, health, ready, readiness, capabilities, jobs, audit, avatarStatus, avatarManifest, platform, license] = await Promise.all([
     safe(() => api.get("/frontend/contract").then((data) => data.frontend_contract), state.contract),
     safe(() => api.get("/health"), state.health),
     safe(() => api.get("/ready"), state.ready),
@@ -1890,8 +1979,9 @@ async function refresh() {
     safe(() => api.get("/avatar/status"), state.avatarStatus),
     safe(() => api.get("/avatar/manifest"), state.avatarManifest),
     safe(() => api.get("/platform/heartbeat"), state.platform),
+    safe(() => api.get("/license"), state.license),
   ]);
-  Object.assign(state, { contract, health, ready, readiness, capabilities, jobs, audit, avatarStatus, avatarManifest, platform });
+  Object.assign(state, { contract, health, ready, readiness, capabilities, jobs, audit, avatarStatus, avatarManifest, platform, license });
   await refreshScreenData();
   render();
 }
