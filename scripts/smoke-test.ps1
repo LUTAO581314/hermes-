@@ -29,8 +29,32 @@ foreach ($path in $required) {
     }
 }
 
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("bairui-smoke-" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $tmp | Out-Null
+try {
+    $env:HERMES_DATA_DIR = Join-Path $tmp "data"
+    $env:HERMES_LOG_DIR = Join-Path $tmp "logs"
+    $env:HERMES_OBSIDIAN_VAULT_DIR = Join-Path $tmp "vault"
+    $env:BAIRUI_CODEGRAPH_ROOT = Join-Path $tmp "codegraph"
+    $env:BAIRUI_CHANNELS_ENABLED = "1"
+    $flowRaw = python -m src.hermes demo flow
+    $flow = $flowRaw | ConvertFrom-Json
+    if ($flow.demo_flow.status -ne "completed") {
+        throw "Demo flow did not complete: $($flowRaw)"
+    }
+    if ($flow.demo_flow.checkpoints.no_external_send -ne $true) {
+        throw "Demo flow external-send checkpoint failed."
+    }
+    if ($flow.demo_flow.checkpoints.no_auto_memory_write -ne $true) {
+        throw "Demo flow memory safety checkpoint failed."
+    }
+}
+finally {
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 [pscustomobject]@{
     status = "ok"
-    mode = "runtime-foundation"
-    message = "bairui runtime foundation is present."
+    mode = "product-closure"
+    message = "bairui runtime foundation and demo flow are present."
 }

@@ -24,6 +24,7 @@ from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings
 from src.hermes.db import SCHEMA_SQL, database_status
 from src.hermes.demo import seed_demo_data
+from src.hermes.demo_flow import run_demo_flow
 from src.hermes.document_pipeline import build_document_ingest_session_summary, build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, list_document_ingest_session_summaries, list_pending_document_memory_reviews, register_document_artifacts, review_document_memory_candidate, review_document_memory_candidates_batch, run_document_ingest, run_document_workbench_until_blocked
 from src.hermes.events import audit_event_to_frontend_event, build_sse_frame, list_frontend_events
 from src.hermes.frontend_contract import build_frontend_contract
@@ -591,6 +592,51 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertFalse(first["demo_seed"]["audit_marker"]["payload"]["will_write_long_term_memory"])
         self.assertEqual(len(jobs), 1)
         self.assertEqual(len(approvals), 1)
+
+    def test_demo_flow_runs_product_closure_without_external_actions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "BAIRUI_CODEGRAPH_ROOT": str(root / "codegraph"),
+                "BAIRUI_CHANNELS_ENABLED": "1",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                result = run_demo_flow(load_settings())
+
+        self.assertEqual(result["status"], "completed")
+        self.assertTrue(all(result["checkpoints"].values()))
+        self.assertEqual(result["promotions"]["report"]["status"], "planned")
+        self.assertEqual(result["channel"]["plan"]["status"], "approval_required")
+        self.assertFalse(result["channel"]["plan"]["will_send"])
+        self.assertEqual(result["channel"]["review"]["status"], "reviewed")
+        self.assertFalse(result["channel"]["review"]["will_send"])
+        self.assertEqual(result["memory"]["review"]["status"], "rejected")
+        self.assertFalse(result["memory"]["will_write_long_term_memory"])
+        self.assertEqual(result["codegraph"]["query"]["status"], "completed")
+        self.assertIn("does not write long-term memory", result["codegraph"]["memory_boundary"])
+
+    def test_cli_demo_flow_exits_success_when_checkpoints_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "BAIRUI_CODEGRAPH_ROOT": str(root / "codegraph"),
+                "BAIRUI_CHANNELS_ENABLED": "1",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["demo", "flow"])
+                    payload = print_json.call_args.args[0]["demo_flow"]
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["status"], "completed")
+        self.assertTrue(payload["checkpoints"]["no_external_send"])
+        self.assertTrue(payload["checkpoints"]["no_auto_memory_write"])
 
     def test_console_static_assets_are_served_by_backend(self):
         with tempfile.TemporaryDirectory() as tmp:

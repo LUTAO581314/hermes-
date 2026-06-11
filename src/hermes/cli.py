@@ -92,6 +92,7 @@ from .codegraph import (
 from .config import ensure_runtime_dirs, load_settings
 from .db import database_status, run_migrations
 from .demo import seed_demo_data
+from .demo_flow import run_demo_flow
 from .document_pipeline import (
     build_document_ingest_session_summary,
     build_document_workbench_state,
@@ -175,6 +176,9 @@ def build_parser() -> argparse.ArgumentParser:
     demo_subcommands = demo_parser.add_subparsers(dest="demo_command")
     demo_seed = demo_subcommands.add_parser("seed", help="Seed demo jobs, reports, memory candidates, and channel approvals")
     demo_seed.add_argument("--force", action="store_true", help="Create another demo set even if demo data already exists")
+    demo_flow = demo_subcommands.add_parser("flow", help="Run the local product closure demo flow")
+    demo_flow.add_argument("--workspace", default="", help="Optional local source workspace for CodeGraph demo")
+    demo_flow.add_argument("--force-seed", action="store_true", help="Create another demo seed before running the flow")
 
     channels_parser = subcommands.add_parser("channels", help="Operate governed outbound channel plans")
     channels_subcommands = channels_parser.add_subparsers(dest="channels_command")
@@ -545,6 +549,10 @@ def run(argv: list[str] | None = None) -> int:
         if demo_command == "seed":
             print_json({"service": "bairui", "demo_seed": seed_demo_data(settings, force=args.force)})
             return 0
+        if demo_command == "flow":
+            result = run_demo_flow(settings, workspace=args.workspace, force_seed=args.force_seed)
+            print_json({"service": "bairui", "demo_flow": result})
+            return 0 if result["status"] == "completed" else 1
         parser.error(f"unknown demo command: {demo_command}")
         return 2
 
