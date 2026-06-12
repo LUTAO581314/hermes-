@@ -156,6 +156,36 @@ function firstNonEmpty(...values) {
   return values.find((value) => value !== undefined && value !== null && String(value).trim() !== "") || "";
 }
 
+function exportTimestamp() {
+  return new Date().toISOString().replaceAll(":", "").replaceAll(".", "").replace("T", "-").replace("Z", "Z");
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportConsoleData(kind, payload) {
+  downloadJson(`bairui-${kind}-${exportTimestamp()}.json`, {
+    product: "bairui",
+    export_kind: kind,
+    exported_at: new Date().toISOString(),
+    safety: {
+      secrets_included: false,
+      external_send_performed: false,
+      long_term_memory_auto_write: false,
+    },
+    payload,
+  });
+}
+
 function setBusy(key, active) {
   if (active) state.loading.add(key);
   else state.loading.delete(key);
@@ -2056,6 +2086,7 @@ function renderMemory() {
   }));
   el.actions.innerHTML = `
     <button class="ghost-btn" id="refresh-memory" type="button">Refresh</button>
+    <button class="ghost-btn" id="export-memory" type="button">Export Memory</button>
     <button class="ghost-btn" id="batch-reject-memory" type="button" ${!pending.length ? "disabled" : ""}>Reject Pending</button>`;
   el.body.innerHTML = `
     <div class="grid two">
@@ -2084,6 +2115,7 @@ function renderMemory() {
     ${state.selectedEntity?.type === "memory" ? renderSelectedEntityPanel() : ""}`;
   bindEntityActions();
   document.getElementById("refresh-memory")?.addEventListener("click", refreshScreenData);
+  document.getElementById("export-memory")?.addEventListener("click", exportMemoryData);
   document.getElementById("batch-reject-memory")?.addEventListener("click", async () => {
     const candidateIds = pending.map((candidate) => candidate.id);
     const result = await runAction("memory-batch", () =>
@@ -2130,6 +2162,17 @@ function renderMemory() {
       persistUiState();
       await refreshScreenData();
     });
+  });
+}
+
+function exportMemoryData() {
+  exportConsoleData("memory-review", {
+    selected_ingest_id: state.selectedIngestId || "",
+    pending_queue: state.memoryQueue || null,
+    candidates: state.memoryCandidates || [],
+    reviews: state.memoryReviews || [],
+    selected_entity: state.selectedEntity?.type === "memory" ? state.selectedEntity : null,
+    note: "Memory candidates are exported for review. This export does not approve, reject, or write long-term memory.",
   });
 }
 
@@ -2703,7 +2746,7 @@ function renderSelectedEntityPanel() {
 
 function renderReports() {
   setScreenHead("Reports", "deliverables and evidence");
-  el.actions.innerHTML = `<button class="primary-btn" id="write-report" type="button">Write Manual Report</button><button class="ghost-btn" id="refresh-reports" type="button">Refresh</button>`;
+  el.actions.innerHTML = `<button class="primary-btn" id="write-report" type="button">Write Manual Report</button><button class="ghost-btn" id="export-reports" type="button">Export Reports</button><button class="ghost-btn" id="refresh-reports" type="button">Refresh</button>`;
   const selectedReport = state.selectedEntity?.type === "report" ? state.selectedEntity.raw || {} : null;
   el.body.innerHTML = `
     ${renderReportDeliveryOverview()}
@@ -2748,6 +2791,7 @@ function renderReports() {
     `;
   bindEntityActions();
   document.getElementById("refresh-reports")?.addEventListener("click", refreshScreenData);
+  document.getElementById("export-reports")?.addEventListener("click", exportReportsData);
   document.getElementById("write-report")?.addEventListener("click", async () => {
     const title = prompt("Report title", "bairui Operator Note");
     const body = prompt("Report body", "Operator note from bairui console.");
@@ -2794,6 +2838,16 @@ function renderReports() {
       persistUiState();
       render();
     });
+  });
+}
+
+function exportReportsData() {
+  exportConsoleData("reports", {
+    reports: state.reports || [],
+    source_refs: state.sourceRefs || [],
+    selected_report: state.selectedEntity?.type === "report" ? state.selectedEntity.raw || state.selectedEntity : null,
+    selected_source: state.selectedEntity?.type === "source" ? state.selectedEntity.raw || state.selectedEntity : null,
+    note: "Reports are exported with source references for audit and handoff. Local file contents are not embedded by this frontend export.",
   });
 }
 
@@ -3872,6 +3926,7 @@ function renderEvents() {
   setScreenHead("Events", "audit timeline");
   el.actions.innerHTML = `
     <button class="primary-btn" id="refresh-events" type="button">Refresh Audit</button>
+    <button class="ghost-btn" id="export-events" type="button">Export Events</button>
     <button class="ghost-btn" id="events-open-settings" type="button">Open Settings</button>
     <button class="ghost-btn" id="events-open-command" type="button">Open Command</button>`;
   const rows = filteredAuditTimeline();
@@ -3908,6 +3963,7 @@ function renderEvents() {
     state.audit = await safe(() => api.get("/audit").then((data) => data.audit || []), state.audit, "audit");
     render();
   });
+  document.getElementById("export-events")?.addEventListener("click", exportEventsData);
   document.getElementById("events-open-settings")?.addEventListener("click", async () => {
     state.screen = "settings";
     persistUiState();
@@ -3926,6 +3982,17 @@ function renderEvents() {
     });
   });
   bindAuditCards();
+}
+
+function exportEventsData() {
+  exportConsoleData("events", {
+    audit_filter: state.auditFilter || "all",
+    audit: state.audit || [],
+    filtered_audit: filteredAuditTimeline(),
+    live_events: state.events || [],
+    selected_audit: state.selectedEntity?.type === "audit" ? state.selectedEntity.raw || state.selectedEntity : null,
+    note: "Event export combines durable audit records and this browser session's live SSE messages.",
+  });
 }
 
 function renderEventSummary() {
