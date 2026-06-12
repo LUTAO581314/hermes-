@@ -23,6 +23,8 @@ FIELD_TO_ENV = {
 
 SECRET_FIELDS = {"model_api_key", "database_url", "owner_token"}
 PATH_FIELDS = {"document_output_dir", "memory_vault_dir", "avatar_assets_dir", "codegraph_root"}
+HIGH_RISK_FIELDS = {"database_url", "owner_token", "memory_vault_dir", "channel_targets_json", "codegraph_root"}
+DANGEROUS_CONFIRMATION_PHRASE = "APPLY BAIRUI CONFIG"
 
 
 def apply_local_config(settings: Settings, payload: dict[str, Any]) -> dict[str, Any]:
@@ -33,8 +35,10 @@ def apply_local_config(settings: Settings, payload: dict[str, Any]) -> dict[str,
         return {"status": "invalid_request", "message": "values must be an object"}
 
     create_dirs = bool(payload.get("create_dirs", True))
+    danger_confirmation = str(payload.get("danger_confirmation", "")).strip()
     existing = _read_existing(settings)
     applied: dict[str, str] = {}
+    pending: dict[str, str] = {}
     errors: list[dict[str, str]] = []
 
     for field, env_key in FIELD_TO_ENV.items():
@@ -55,19 +59,33 @@ def apply_local_config(settings: Settings, payload: dict[str, Any]) -> dict[str,
             if not isinstance(parsed, list):
                 errors.append({"field": field, "message": "channel_targets_json must be a JSON array"})
                 continue
-        if field in PATH_FIELDS and value and create_dirs:
-            try:
-                Path(value).expanduser().mkdir(parents=True, exist_ok=True)
-            except OSError as exc:
-                errors.append({"field": field, "message": f"could not create directory: {exc}"})
-                continue
-        existing[env_key] = value
+        pending[env_key] = value
         applied[field] = "configured" if field in SECRET_FIELDS and value else value
 
     if errors:
         return {"status": "invalid_request", "errors": errors, "applied": _safe_applied(applied)}
     if not applied:
         return {"status": "no_changes", "applied": {}}
+    dangerous_fields = sorted(field for field in applied if field in HIGH_RISK_FIELDS)
+    if dangerous_fields and danger_confirmation != DANGEROUS_CONFIRMATION_PHRASE:
+        return {
+            "status": "confirmation_required",
+            "message": "High-risk configuration changes require typed confirmation before they are saved.",
+            "dangerous_fields": dangerous_fields,
+            "confirmation_phrase": DANGEROUS_CONFIRMATION_PHRASE,
+            "applied": _safe_applied(applied),
+            "restart_required": True,
+            "secret_policy": "secret values were not saved and are not returned",
+        }
+
+    for field, value in ((field, str(values.get(field, "")).strip()) for field in applied if field in PATH_FIELDS):
+        if value and create_dirs:
+            try:
+                Path(value).expanduser().mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                return {"status": "invalid_request", "errors": [{"field": field, "message": f"could not create directory: {exc}"}], "applied": _safe_applied(applied)}
+
+    existing.update(pending)
 
     path = local_config_path(settings.data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -76,7 +94,8 @@ def apply_local_config(settings: Settings, payload: dict[str, Any]) -> dict[str,
         "status": "saved",
         "path": str(path.expanduser().resolve()),
         "applied": _safe_applied(applied),
-        "restart_required": False,
+        "dangerous_fields": dangerous_fields,
+        "restart_required": bool(dangerous_fields),
         "secret_policy": "secret values were saved locally but are not returned",
     }
 

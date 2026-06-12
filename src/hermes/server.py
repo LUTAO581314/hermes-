@@ -329,7 +329,23 @@ class HermesHandler(BaseHTTPRequestHandler):
                 return
             result = apply_local_config(settings, payload)
             next_settings = load_settings()
-            status = 200 if result["status"] in {"saved", "no_changes"} else 400
+            create_audit_event(
+                settings.data_dir,
+                "config.apply.confirmation_required" if result["status"] == "confirmation_required" else "config.apply",
+                actor_type="owner",
+                actor_ref="local_console",
+                resource_type="configuration",
+                resource_ref="local-config",
+                risk_level="high" if result.get("dangerous_fields") else "medium",
+                payload={
+                    "status": result.get("status"),
+                    "applied": result.get("applied", {}),
+                    "dangerous_fields": result.get("dangerous_fields", []),
+                    "restart_required": result.get("restart_required", False),
+                    "secret_echo": False,
+                },
+            )
+            status = 200 if result["status"] in {"saved", "no_changes"} else 409 if result["status"] == "confirmation_required" else 400
             self._send({"service": PUBLIC_SERVICE, "config_apply": result, "config_status": build_config_status(next_settings)}, status=status)
             return
 

@@ -22,7 +22,7 @@ from src.hermes.channels import (
 from src.hermes.codegraph import codegraph_impact, codegraph_overview, codegraph_status, query_codegraph, register_codegraph_repo, scan_codegraph_repo
 from src.hermes.cli import build_parser, run
 from src.hermes.config import load_settings, local_config_path
-from src.hermes.config_apply import apply_local_config
+from src.hermes.config_apply import DANGEROUS_CONFIRMATION_PHRASE, apply_local_config
 from src.hermes.config_status import build_config_status
 from src.hermes.db import SCHEMA_SQL, database_status
 from src.hermes.demo import seed_demo_data
@@ -818,6 +818,7 @@ class RuntimeFoundationTests(unittest.TestCase):
                 result = apply_local_config(
                     settings,
                     {
+                        "danger_confirmation": DANGEROUS_CONFIRMATION_PHRASE,
                         "values": {
                             "model_base_url": "https://models.example.test/v1",
                             "model_api_key": "local-secret-key",
@@ -842,6 +843,50 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertTrue(documents_exists)
         self.assertTrue(avatars_exists)
         self.assertTrue(codegraph_exists)
+
+    def test_apply_local_config_requires_confirmation_for_dangerous_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+            }
+            with patch.dict(os.environ, env, clear=False):
+                settings = load_settings()
+                result = apply_local_config(
+                    settings,
+                    {
+                        "values": {
+                            "database_url": "postgresql://bairui:secret@example.test/bairui",
+                            "owner_token": "new-owner-secret",
+                        }
+                    },
+                )
+                exists_after_block = local_config_path(settings.data_dir).exists()
+                confirmed = apply_local_config(
+                    settings,
+                    {
+                        "danger_confirmation": DANGEROUS_CONFIRMATION_PHRASE,
+                        "values": {
+                            "database_url": "postgresql://bairui:secret@example.test/bairui",
+                            "owner_token": "new-owner-secret",
+                        },
+                    },
+                )
+
+        raw = json.dumps(result, ensure_ascii=False)
+        confirmed_raw = json.dumps(confirmed, ensure_ascii=False)
+        self.assertEqual(result["status"], "confirmation_required")
+        self.assertEqual(result["confirmation_phrase"], DANGEROUS_CONFIRMATION_PHRASE)
+        self.assertEqual(result["applied"]["database_url"], "configured")
+        self.assertFalse(exists_after_block)
+        self.assertNotIn("new-owner-secret", raw)
+        self.assertNotIn("secret@example", raw)
+        self.assertEqual(confirmed["status"], "saved")
+        self.assertTrue(confirmed["restart_required"])
+        self.assertEqual(confirmed["applied"]["owner_token"], "configured")
+        self.assertNotIn("new-owner-secret", confirmed_raw)
 
     def test_config_apply_http_endpoint_is_secret_safe(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -883,6 +928,66 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(payload["config_apply"]["applied"]["model_api_key"], "configured")
         self.assertNotIn("http-local-secret", raw)
         self.assertEqual(payload["config_status"]["items"][0]["fields"]["api_key"], "configured")
+
+    def test_config_apply_http_endpoint_requires_danger_confirmation_and_audits_safely(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "BAIRUI_MODEL_BASE_URL": "",
+                "BAIRUI_MODEL_API_KEY": "",
+                "BAIRUI_MODEL_NAME": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                server = ThreadingHTTPServer(("127.0.0.1", 0), HermesHandler)
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    blocked_status, _, blocked_body = _http_post(
+                        server.server_port,
+                        "/config/apply",
+                        {
+                            "values": {
+                                "database_url": "postgresql://bairui:db-secret@example.test/bairui",
+                                "owner_token": "http-owner-secret",
+                            }
+                        },
+                    )
+                    saved_status, _, saved_body = _http_post(
+                        server.server_port,
+                        "/config/apply",
+                        {
+                            "danger_confirmation": DANGEROUS_CONFIRMATION_PHRASE,
+                            "values": {
+                                "database_url": "postgresql://bairui:db-secret@example.test/bairui",
+                                "owner_token": "http-owner-secret",
+                            },
+                        },
+                    )
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+                audits = list_audit_events(load_settings().data_dir)
+
+        blocked = json.loads(blocked_body.decode("utf-8"))
+        saved = json.loads(saved_body.decode("utf-8"))
+        blocked_raw = json.dumps(blocked, ensure_ascii=False)
+        saved_raw = json.dumps(saved, ensure_ascii=False)
+        audit_raw = json.dumps(audits, ensure_ascii=False)
+        self.assertEqual(blocked_status, 409)
+        self.assertEqual(blocked["config_apply"]["status"], "confirmation_required")
+        self.assertEqual(blocked["config_apply"]["confirmation_phrase"], DANGEROUS_CONFIRMATION_PHRASE)
+        self.assertIn("database_url", blocked["config_apply"]["dangerous_fields"])
+        self.assertEqual(saved_status, 200)
+        self.assertEqual(saved["config_apply"]["status"], "saved")
+        self.assertTrue(saved["config_apply"]["restart_required"])
+        self.assertIn("config.apply.confirmation_required", [audit["action"] for audit in audits])
+        self.assertIn("config.apply", [audit["action"] for audit in audits])
+        self.assertNotIn("http-owner-secret", blocked_raw + saved_raw + audit_raw)
+        self.assertNotIn("db-secret", blocked_raw + saved_raw + audit_raw)
 
     def test_config_apply_requires_owner_token_when_configured(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1202,7 +1307,11 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("function ownerAuthHeaders", app_js)
         self.assertIn('id="settings-owner-token-local"', app_js)
         self.assertIn('id="settings-owner-token-new"', app_js)
+        self.assertIn('id="settings-danger-confirmation"', app_js)
         self.assertIn("async function saveOwnerTokenLocal", app_js)
+        self.assertIn("Dangerous change needs confirmation", app_js)
+        self.assertIn("APPLY BAIRUI CONFIG", app_js)
+        self.assertIn("dangerous_fields=", app_js)
         self.assertIn("Owner token values never echo and are not included in exports.", app_js)
         self.assertIn("secret_echo=false", app_js)
         self.assertIn("no external send, no automatic long-term memory write, no dangerous operation without review", app_js)

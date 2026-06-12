@@ -51,7 +51,7 @@ function createApiError(path, status, data = {}) {
   const error = new Error(message);
   error.path = path;
   error.status = status;
-  error.code = data?.error || data?.chat?.status || data?.status || "";
+  error.code = data?.error || data?.config_apply?.status || data?.chat?.status || data?.status || "";
   error.payload = data;
   return error;
 }
@@ -412,6 +412,13 @@ function productErrorGuide(error, key = "") {
     guide.title = "Already reviewed";
     guide.reason = "This review item has already been handled.";
     guide.next = "Refresh the queue and open the latest review record.";
+  }
+  if (status === 409 && code === "confirmation_required") {
+    guide.title = "Dangerous change needs confirmation";
+    guide.reason = "The requested configuration touches admin-level or restart-sensitive fields.";
+    guide.next = "Type the exact confirmation phrase shown in Settings, then save again.";
+    guide.fix = "Review dangerous_fields, type APPLY BAIRUI CONFIG, and retry only if this is an intentional owner action.";
+    guide.safety = "The backend did not save the high-risk configuration because confirmation was missing.";
   }
   if (key.startsWith("codegraph")) {
     guide.next = "Register a source repository, select it, scan it, then run query or impact again.";
@@ -3493,6 +3500,10 @@ function renderSettingsConfigForm() {
         <span class="form-label">Channel targets JSON</span>
         <textarea class="textarea" id="settings-channel-targets-json" rows="4" placeholder='[{"id":"owner","label":"Owner","channel_type":"personal_chat"}]'></textarea>
       </label>
+      <label>
+        <span class="form-label">Dangerous change confirmation</span>
+        <input class="field" id="settings-danger-confirmation" placeholder="Type APPLY BAIRUI CONFIG for owner token, PostgreSQL, memory, channel, or CodeGraph changes" />
+      </label>
       <label class="settings-create-dirs">
         <input id="settings-create-dirs" type="checkbox" checked />
         <span>Create missing local directories when possible</span>
@@ -3516,6 +3527,8 @@ function renderSettingsConfigApplyResult() {
         <span class="chip">restart_required=${escapeHtml(String(result.restart_required === true))}</span>
         <span class="chip">secret_echo=false</span>
       </div>
+      ${result.dangerous_fields?.length ? `<p class="muted compact-copy">dangerous_fields=${escapeHtml(result.dangerous_fields.join(", "))}</p>` : ""}
+      ${result.confirmation_phrase ? `<p class="muted compact-copy">confirmation_phrase=${escapeHtml(result.confirmation_phrase)}</p>` : ""}
       <p>${escapeHtml(result.path || result.secret_policy || "Configuration saved.")}</p>
     </div>`;
 }
@@ -3536,12 +3549,29 @@ async function saveSettingsConfig() {
   };
   const payload = {
     create_dirs: document.getElementById("settings-create-dirs")?.checked !== false,
+    danger_confirmation: document.getElementById("settings-danger-confirmation")?.value || "",
     values: Object.fromEntries(Object.entries(values).filter(([, value]) => String(value || "").trim() !== "")),
   };
-  const result = await runAction("config-apply", () => api.post("/config/apply", payload), async () => {});
-  state.configApplyResult = result?.config_apply || null;
-  state.configStatus = result?.config_status ? { config_status: result.config_status } : state.configStatus;
-  await refreshScreenData();
+  setBusy("config-apply", true);
+  state.errors["config-apply"] = "";
+  state.errorDetails["config-apply"] = null;
+  render();
+  try {
+    const result = await api.post("/config/apply", payload);
+    state.configApplyResult = result?.config_apply || null;
+    state.configStatus = result?.config_status ? { config_status: result.config_status } : state.configStatus;
+    await refreshScreenData();
+  } catch (error) {
+    state.configApplyResult = error?.payload?.config_apply || null;
+    state.configStatus = error?.payload?.config_status ? { config_status: error.payload.config_status } : state.configStatus;
+    const detail = productErrorGuide(error, "config-apply");
+    state.errors["config-apply"] = detail.summary;
+    state.errorDetails["config-apply"] = detail;
+    render();
+  } finally {
+    setBusy("config-apply", false);
+    render();
+  }
 }
 
 function renderSettingsConfigCenter() {
