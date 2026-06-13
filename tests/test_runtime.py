@@ -11,6 +11,7 @@ from unittest.mock import patch
 from src.hermes.capabilities import collect_capabilities
 from src.hermes.avatar import avatar_engine_status, build_avatar_manifest, set_avatar_state, validate_avatar_model
 from src.hermes.agents import add_agent_user_message, create_agent_session, list_agent_events, list_agent_events_page, list_agent_promotions, list_agent_sessions, list_agents, promote_agent_event, retry_agent_event, run_agent_round, update_agent_session
+from src.hermes.admin_session import build_admin_session_status
 from src.hermes.channels import (
     channel_status,
     channel_targets,
@@ -65,10 +66,10 @@ from src.hermes.storage import (
 )
 
 
-def _http_get(port: int, path: str) -> tuple[int, dict[str, str], bytes]:
+def _http_get(port: int, path: str, headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], bytes]:
     connection = HTTPConnection("127.0.0.1", port, timeout=5)
     try:
-        connection.request("GET", path)
+        connection.request("GET", path, headers=headers or {})
         response = connection.getresponse()
         body = response.read()
         headers = {key.lower(): value for key, value in response.getheaders()}
@@ -1056,6 +1057,50 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(allowed_payload["config_apply"]["status"], "saved")
         self.assertNotIn("owner-secret-token", allowed_raw)
 
+    def test_admin_session_reports_local_owner_identity_without_secret_echo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "BAIRUI_OWNER_TOKEN": "owner-secret-token",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                locked = build_admin_session_status(load_settings())
+                authenticated = build_admin_session_status(load_settings(), {"X-Bairui-Owner-Token": "owner-secret-token"})
+                server = ThreadingHTTPServer(("127.0.0.1", 0), HermesHandler)
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    locked_status, _, locked_body = _http_get(server.server_port, "/admin/session")
+                    auth_status, _, auth_body = _http_get(
+                        server.server_port,
+                        "/admin/session",
+                        headers={"Authorization": "Bearer owner-secret-token"},
+                    )
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+                with patch("src.hermes.cli.print_json") as print_json:
+                    cli_code = run(["admin-session"])
+
+        locked_payload = json.loads(locked_body.decode("utf-8"))
+        auth_payload = json.loads(auth_body.decode("utf-8"))
+        raw = json.dumps({"locked": locked_payload, "auth": auth_payload, "cli": print_json.call_args.args[0]}, ensure_ascii=False)
+        self.assertEqual(locked.status, "locked")
+        self.assertFalse(locked.authenticated)
+        self.assertEqual(authenticated.status, "authenticated")
+        self.assertTrue(authenticated.authenticated)
+        self.assertEqual(locked_status, 200)
+        self.assertEqual(auth_status, 200)
+        self.assertEqual(locked_payload["admin_session"]["status"], "locked")
+        self.assertEqual(auth_payload["admin_session"]["status"], "authenticated")
+        self.assertEqual(cli_code, 0)
+        self.assertEqual(print_json.call_args.args[0]["admin_session"]["identity"], "local_owner")
+        self.assertNotIn("owner-secret-token", raw)
+
     def test_owner_token_gate_protects_write_apis_when_configured(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1520,6 +1565,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("function renderSettingsConfigFields", app_js)
         self.assertIn("function renderSettingsConfigChecklist", app_js)
         self.assertIn("function renderSettingsConfigForm", app_js)
+        self.assertIn("function renderSettingsAdminSession", app_js)
         self.assertIn("async function saveSettingsConfig", app_js)
         self.assertIn("async function copyText", app_js)
         self.assertIn("function renderSettingsNextActions", app_js)
@@ -1550,6 +1596,9 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn('api.get("/health")', app_js)
         self.assertIn('api.get("/ready")', app_js)
         self.assertIn('api.get("/config/status")', app_js)
+        self.assertIn('api.get("/admin/session")', app_js)
+        self.assertIn("Local admin identity", app_js)
+        self.assertIn("owner token value is never returned", app_js)
         self.assertIn('id="settings-copy-checklist"', app_js)
         self.assertIn("A copyable operator checklist generated from the same safe config diagnostics.", app_js)
         self.assertIn('renderProductError("settings-copy-checklist")', app_js)
@@ -1559,6 +1608,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn('renderProductError("config-status")', app_js)
         self.assertIn('renderProductError("settings-refresh")', app_js)
         self.assertIn(".settings-gate-grid", styles)
+        self.assertIn(".settings-admin-session", styles)
         self.assertIn(".settings-config-center", styles)
         self.assertIn(".settings-config-form", styles)
         self.assertIn(".settings-apply-result", styles)

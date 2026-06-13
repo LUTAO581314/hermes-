@@ -69,6 +69,7 @@ from .adapters.trendradar import (
     build_schedule_command,
     status as trendradar_status,
 )
+from .admin_session import as_payload as admin_session_payload, build_admin_session_status
 from .capabilities import collect_capabilities
 from .backup import build_backup_plan, build_restore_plan, backup_status
 from .channels import (
@@ -183,6 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("heartbeat", help="Print the platform heartbeat payload")
     subcommands.add_parser("paths", help="Print runtime paths and key configuration")
     subcommands.add_parser("config-status", help="Print operator-safe configuration diagnostics")
+    subcommands.add_parser("admin-session", help="Print local owner admin session status without exposing secrets")
     subcommands.add_parser("runtime-readiness", help="Print unified vendor runtime readiness")
     subcommands.add_parser("diagnostics", help="Print a redacted customer support diagnostic bundle")
     subcommands.add_parser("metrics", help="Print aggregated runtime metrics")
@@ -575,6 +577,11 @@ def run(argv: list[str] | None = None) -> int:
         status = build_config_status(settings)
         print_json({"service": "bairui", "config_status": status})
         return 0 if status["status"] in {"ready", "partial"} else 1
+
+    if command == "admin-session":
+        session = build_admin_session_status(settings)
+        print_json({"service": "bairui", "admin_session": admin_session_payload(session)})
+        return 0 if session.status in {"authenticated", "locked", "missing_config"} else 1
 
     if command == "runtime-readiness":
         print_json({"service": "bairui", "runtime_readiness": collect_runtime_readiness(settings)})

@@ -25,6 +25,7 @@ from .agents import (
     run_agent_round,
     update_agent_session,
 )
+from .admin_session import as_payload as admin_session_payload, build_admin_session_status
 from .adapters.everos import (
     add_memory,
     as_payload,
@@ -191,6 +192,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/config/status":
             self._send({"service": PUBLIC_SERVICE, "config_status": build_config_status(settings)})
+            return
+        if self.path == "/admin/session":
+            self._send({"service": PUBLIC_SERVICE, "admin_session": admin_session_payload(build_admin_session_status(settings, self.headers))})
             return
         if self.path == "/runtime/readiness":
             self._send({"service": PUBLIC_SERVICE, "runtime_readiness": collect_runtime_readiness(settings)})

@@ -2439,6 +2439,7 @@ h1 {
 }
 
 .settings-gate-grid,
+.settings-admin-session,
 .settings-runtime-matrix {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2446,7 +2447,12 @@ h1 {
   margin-top: 12px;
 }
 
+.settings-admin-session {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .settings-gate-grid div,
+.settings-admin-session div,
 .settings-runtime-matrix div,
 .settings-boundary-list div,
 .settings-next-actions div {
@@ -2458,6 +2464,7 @@ h1 {
 }
 
 .settings-gate-grid span,
+.settings-admin-session span,
 .settings-boundary-list span,
 .settings-next-actions span {
   display: block;
@@ -2467,6 +2474,7 @@ h1 {
 }
 
 .settings-gate-grid strong,
+.settings-admin-session strong,
 .settings-runtime-matrix strong,
 .settings-boundary-list strong,
 .settings-next-actions strong {
@@ -2478,6 +2486,7 @@ h1 {
 }
 
 .settings-gate-grid p,
+.settings-admin-session p,
 .settings-runtime-matrix p,
 .settings-boundary-list p {
   margin: 7px 0 0;

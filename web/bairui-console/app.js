@@ -80,6 +80,7 @@ const state = {
   ready: null,
   readiness: null,
   platform: null,
+  adminSession: null,
   license: null,
   configStatus: null,
   capabilities: [],
@@ -3562,6 +3563,7 @@ function renderSettings() {
         ${pill(readiness.status || state.ready?.status || "partial")}
       </div>
       ${renderSettingsGateGrid()}
+      ${renderSettingsAdminSession()}
       ${renderSettingsNextActions(readiness)}
     </section>
     <div class="grid two">
@@ -3866,9 +3868,11 @@ function renderSettingsConfigFields(fields) {
 function renderSettingsGateGrid() {
   const license = state.license?.license || {};
   const heartbeat = state.platform?.heartbeat || {};
+  const admin = state.adminSession?.admin_session || {};
   const gates = [
     { label: "HTTP health", status: state.health?.status || "missing_config", detail: "GET /health" },
     { label: "Deploy readiness", status: state.ready?.status || "partial", detail: "GET /ready" },
+    { label: "Local admin", status: admin.status || "missing_config", detail: admin.authenticated ? "owner browser authenticated" : "owner token gate" },
     { label: "License", status: license.status || state.ready?.license || "missing_config", detail: "license status only; secrets never echo" },
     { label: "Platform heartbeat", status: heartbeat.status || state.ready?.platform || "missing_config", detail: "server identity and platform link check" },
   ];
@@ -3884,6 +3888,28 @@ function renderSettingsGateGrid() {
             </div>`,
         )
         .join("")}
+    </div>`;
+}
+
+function renderSettingsAdminSession() {
+  const admin = state.adminSession?.admin_session || {};
+  return `
+    <div class="settings-admin-session">
+      <div>
+        ${pill(admin.status || "missing_config")}
+        <strong>Local admin identity</strong>
+        <p>${escapeHtml(admin.next_step || "Set BAIRUI_OWNER_TOKEN and save the owner token locally before customer trial operation.")}</p>
+      </div>
+      <div>
+        <span>identity</span>
+        <strong>${escapeHtml(admin.identity || "local_owner")}</strong>
+        <p>${escapeHtml(admin.auth_method || "owner_token_header")}</p>
+      </div>
+      <div>
+        <span>write API gate</span>
+        <strong>${escapeHtml(admin.write_api_protected ? "protected" : "not configured")}</strong>
+        <p>${escapeHtml(admin.secret_policy || "owner token value is never returned")}</p>
+      </div>
     </div>`;
 }
 
@@ -4962,8 +4988,9 @@ async function submitAgentCommand(promptText, options = {}) {
 }
 
 async function loadRuntimeStatus() {
-  const [configStatus, memory, voice, document, intel, simulation, search, index, codegraph] = await Promise.all([
+  const [configStatus, adminSession, memory, voice, document, intel, simulation, search, index, codegraph] = await Promise.all([
     safe(() => api.get("/config/status"), state.configStatus, "config-status"),
+    safe(() => api.get("/admin/session"), state.adminSession, "admin-session"),
     safe(() => api.get("/memory/status"), state.runtimeStatus.memory, "memory-status"),
     safe(() => api.get("/voice/asr/status"), state.runtimeStatus.voice, "voice-status"),
     safe(() => api.get("/document/parse/status"), state.runtimeStatus.document, "document-status"),
@@ -4974,6 +5001,7 @@ async function loadRuntimeStatus() {
     safe(() => api.get("/codegraph/status"), state.runtimeStatus.codegraph, "codegraph-status"),
   ]);
   state.configStatus = configStatus;
+  state.adminSession = adminSession;
   state.runtimeStatus = { memory, voice, document, intel, simulation, search, index, codegraph };
 }
 
