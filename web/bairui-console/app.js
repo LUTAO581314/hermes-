@@ -2884,6 +2884,13 @@ function renderReports() {
       render();
     });
   });
+  el.body.querySelectorAll("[data-report-export]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const report = state.reports.find((item) => String(item.id || item.path) === String(button.dataset.reportExport)) || selectedReport;
+      if (!report) return;
+      exportSelectedReportDelivery(report);
+    });
+  });
 }
 
 function exportReportsData() {
@@ -2949,8 +2956,10 @@ function renderReportDetailPanel(report) {
       <div class="report-actions">
         <button class="ghost-btn mini" type="button" data-entity-action="inspect-path" data-entity-id="${escapeHtml(path)}" ${!path ? "disabled" : ""}>Inspect Path</button>
         <button class="ghost-btn mini" type="button" data-report-open-sources="${escapeHtml(report.id || report.path || "")}" ${!related.length ? "disabled" : ""}>Show Sources</button>
+        <button class="ghost-btn mini" type="button" data-report-export="${escapeHtml(report.id || report.path || "")}">Export Delivery</button>
       </div>
       ${renderEntitySourceChain({ type: "report", raw: report })}
+      ${renderReportDeliveryEvidence(report)}
     </section>`;
 }
 
@@ -2990,6 +2999,42 @@ function relatedSourcesForReport(report) {
       (report.source_ref && item.source_ref === report.source_ref) ||
       (report.id && metadata.report_id === report.id)
     );
+  });
+}
+
+function renderReportDeliveryEvidence(report) {
+  const related = relatedSourcesForReport(report);
+  const audit = reportAuditEvidence(report);
+  return `
+    <div class="report-delivery-evidence">
+      <div><span>handoff payload</span><strong>report + sources + audit</strong><p>Export keeps local file contents out and records trace metadata only.</p></div>
+      <div><span>source coverage</span><strong>${escapeHtml(String(related.length))}</strong><p>Related source refs are linked by ingest id, source ref, or report id.</p></div>
+      <div><span>audit evidence</span><strong>${escapeHtml(String(audit.length))}</strong><p>Linked audit events prove when the deliverable was created or reviewed.</p></div>
+    </div>`;
+}
+
+function reportAuditEvidence(report) {
+  return entityAuditMatches({
+    type: "report",
+    title: report.title || "Report",
+    status: report.status || "draft",
+    ref: report.id || report.path || report.source_ref || "",
+    raw: report,
+  });
+}
+
+function exportSelectedReportDelivery(report) {
+  exportConsoleData("report-delivery", {
+    report,
+    related_source_refs: relatedSourcesForReport(report),
+    audit_evidence: reportAuditEvidence(report),
+    handoff: {
+      includes_local_file_contents: false,
+      includes_secrets: false,
+      external_send_performed: false,
+      long_term_memory_auto_write: false,
+      evidence_basis: "report metadata, source refs, and linked audit events",
+    },
   });
 }
 
@@ -4652,6 +4697,22 @@ async function loadReports() {
   ]);
   state.reports = reports || [];
   state.sourceRefs = refs || [];
+  hydrateSelectedReportEntity();
+}
+
+function hydrateSelectedReportEntity() {
+  if (state.selectedEntity?.type !== "report") return;
+  const ref = String(state.selectedEntity.ref || state.selectedEntity.raw?.id || state.selectedEntity.raw?.path || "");
+  if (!ref) return;
+  const report = state.reports.find((item) => String(item.id || "") === ref || String(item.path || "") === ref);
+  if (!report) return;
+  state.selectedEntity = {
+    type: "report",
+    title: report.title || state.selectedEntity.title,
+    status: report.status || state.selectedEntity.status,
+    ref: report.id || report.path || ref,
+    raw: report,
+  };
 }
 
 async function loadChannels() {

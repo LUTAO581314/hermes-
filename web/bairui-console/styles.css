@@ -1470,6 +1470,44 @@ h1 {
   margin-top: 10px;
 }
 
+.report-delivery-evidence {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.report-delivery-evidence div {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: var(--radius-sm);
+  background: rgba(53, 230, 199, 0.032);
+  padding: 9px;
+}
+
+.report-delivery-evidence span {
+  display: block;
+  color: var(--muted);
+  font: 10px/1.2 var(--font-mono);
+  text-transform: uppercase;
+}
+
+.report-delivery-evidence strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.report-delivery-evidence p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .channel-safety-overview {
   margin-bottom: 14px;
 }
