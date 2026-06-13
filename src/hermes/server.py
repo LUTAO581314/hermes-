@@ -87,6 +87,7 @@ from .config_status import build_config_status
 from .db import database_status, run_migrations
 from .demo import seed_demo_data
 from .demo_flow import run_demo_flow
+from .diagnostics import build_diagnostic_bundle
 from .document_pipeline import (
     build_document_ingest_session_summary,
     build_document_workbench_state,
@@ -192,6 +193,9 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/runtime/readiness":
             self._send({"service": PUBLIC_SERVICE, "runtime_readiness": collect_runtime_readiness(settings)})
+            return
+        if self.path == "/diagnostics/bundle":
+            self._send({"service": PUBLIC_SERVICE, "diagnostic_bundle": build_diagnostic_bundle(settings)})
             return
         if self.path == "/avatar/status":
             self._send({"service": PUBLIC_SERVICE, "avatar": avatar_payload(avatar_engine_status(settings))})

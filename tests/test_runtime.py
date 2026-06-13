@@ -27,6 +27,7 @@ from src.hermes.config_status import build_config_status
 from src.hermes.db import SCHEMA_SQL, database_status
 from src.hermes.demo import seed_demo_data
 from src.hermes.demo_flow import run_demo_flow
+from src.hermes.diagnostics import build_diagnostic_bundle
 from src.hermes.document_pipeline import build_document_ingest_session_summary, build_document_workbench_state, create_document_ingest_report, create_document_source_refs, execute_document_workbench_next, generate_document_memory_candidates, index_document_artifacts, list_document_ingest_session_summaries, list_pending_document_memory_reviews, register_document_artifacts, review_document_memory_candidate, review_document_memory_candidates_batch, run_document_ingest, run_document_workbench_until_blocked
 from src.hermes.events import audit_event_to_frontend_event, build_sse_frame, list_frontend_events
 from src.hermes.frontend_contract import build_frontend_contract
@@ -1121,6 +1122,70 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(PATH_SCOPE_POLICY, payload["checklist"]["markdown"])
         self.assertNotIn("owner-secret-token", raw)
 
+    def test_diagnostic_bundle_is_redacted_and_counts_runtime_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "BAIRUI_MODEL_BASE_URL": "https://models.example.test/v1",
+                "BAIRUI_MODEL_API_KEY": "diagnostic-api-secret",
+                "BAIRUI_MODEL_NAME": "bairui-demo-model",
+                "BAIRUI_OWNER_TOKEN": "diagnostic-owner-secret",
+                "HERMES_DATABASE_URL": "postgresql://bairui:diagnostic-db-secret@example.test/bairui",
+                "BAIRUI_LICENSE_SECRET": "diagnostic-license-secret",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                settings = load_settings()
+                create_job(settings.data_dir, title="Diagnostics job", prompt="collect evidence", route="ops")
+                bundle = build_diagnostic_bundle(settings)
+
+        raw = json.dumps(bundle, ensure_ascii=False)
+        self.assertEqual(bundle["service"], "bairui")
+        self.assertEqual(bundle["bundle_type"], "diagnostic")
+        self.assertEqual(bundle["external_send_performed"], False)
+        self.assertEqual(bundle["long_term_memory_auto_write"], False)
+        self.assertGreaterEqual(bundle["counts"]["audit"], 1)
+        self.assertIn("job.created", bundle["audit_summary"]["actions"])
+        self.assertIn("data_dir", bundle["file_inventory"])
+        self.assertIn("secret", bundle["secret_policy"])
+        self.assertNotIn("diagnostic-api-secret", raw)
+        self.assertNotIn("diagnostic-owner-secret", raw)
+        self.assertNotIn("diagnostic-db-secret", raw)
+        self.assertNotIn("diagnostic-license-secret", raw)
+
+    def test_diagnostic_bundle_http_endpoint_and_cli_are_available(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "BAIRUI_MODEL_API_KEY": "http-diagnostic-secret",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                server = ThreadingHTTPServer(("127.0.0.1", 0), HermesHandler)
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    status, _, body = _http_get(server.server_port, "/diagnostics/bundle")
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+                with patch("src.hermes.cli.print_json") as print_json:
+                    code = run(["diagnostics"])
+
+        payload = json.loads(body.decode("utf-8"))
+        raw = json.dumps(payload, ensure_ascii=False)
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["service"], "bairui")
+        self.assertEqual(payload["diagnostic_bundle"]["bundle_type"], "diagnostic")
+        self.assertEqual(code, 0)
+        self.assertEqual(print_json.call_args.args[0]["diagnostic_bundle"]["bundle_type"], "diagnostic")
+        self.assertNotIn("http-diagnostic-secret", raw)
+
     def test_apply_local_config_rejects_invalid_channel_targets(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {"HERMES_DATA_DIR": str(Path(tmp) / "data"), "HERMES_LOG_DIR": str(Path(tmp) / "logs"), "HERMES_OBSIDIAN_VAULT_DIR": str(Path(tmp) / "vault")}
@@ -1432,6 +1497,10 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("will_write_long_term_memory", app_js)
         self.assertIn('new EventSource("/events")', app_js)
         self.assertIn('api.get("/audit")', app_js)
+        self.assertIn('api.get("/diagnostics/bundle")', app_js)
+        self.assertIn('id="export-diagnostics"', app_js)
+        self.assertIn("function exportDiagnosticBundle", app_js)
+        self.assertIn("Redacted support bundle. Secrets are excluded; safety flags remain visible.", app_js)
         self.assertIn('data-audit-filter', app_js)
         self.assertIn('data-audit-open="${escapeHtml(event.id)}"', app_js)
         self.assertIn(".event-command-center", styles)

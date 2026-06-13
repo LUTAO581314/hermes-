@@ -94,6 +94,7 @@ from .config_status import build_config_status
 from .db import database_status, run_migrations
 from .demo import seed_demo_data
 from .demo_flow import run_demo_flow
+from .diagnostics import build_diagnostic_bundle
 from .document_pipeline import (
     build_document_ingest_session_summary,
     build_document_workbench_state,
@@ -174,6 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("paths", help="Print runtime paths and key configuration")
     subcommands.add_parser("config-status", help="Print operator-safe configuration diagnostics")
     subcommands.add_parser("runtime-readiness", help="Print unified vendor runtime readiness")
+    subcommands.add_parser("diagnostics", help="Print a redacted customer support diagnostic bundle")
     demo_parser = subcommands.add_parser("demo", help="Create demo data for local product walkthroughs")
     demo_subcommands = demo_parser.add_subparsers(dest="demo_command")
     demo_seed = demo_subcommands.add_parser("seed", help="Seed demo jobs, reports, memory candidates, and channel approvals")
@@ -549,6 +551,10 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "runtime-readiness":
         print_json({"service": "bairui", "runtime_readiness": collect_runtime_readiness(settings)})
+        return 0
+
+    if command == "diagnostics":
+        print_json({"service": "bairui", "diagnostic_bundle": build_diagnostic_bundle(settings)})
         return 0
 
     if command == "demo":

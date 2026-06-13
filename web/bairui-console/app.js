@@ -4124,6 +4124,7 @@ function renderEvents() {
   setScreenHead("Events", "audit timeline");
   el.actions.innerHTML = `
     <button class="primary-btn" id="refresh-events" type="button">Refresh Audit</button>
+    <button class="ghost-btn" id="export-diagnostics" type="button">Export Diagnostics</button>
     <button class="ghost-btn" id="export-events" type="button">Export Events</button>
     <button class="ghost-btn" id="events-open-settings" type="button">Open Settings</button>
     <button class="ghost-btn" id="events-open-command" type="button">Open Command</button>`;
@@ -4139,6 +4140,7 @@ function renderEvents() {
       </div>
       ${renderEventSummary()}
       ${renderEventSafetyBoundary()}
+      ${renderProductError("diagnostics-export")}
     </section>
     <div class="event-layout">
       <section class="panel pad">
@@ -4162,6 +4164,7 @@ function renderEvents() {
     render();
   });
   document.getElementById("export-events")?.addEventListener("click", exportEventsData);
+  document.getElementById("export-diagnostics")?.addEventListener("click", exportDiagnosticBundle);
   document.getElementById("events-open-settings")?.addEventListener("click", async () => {
     state.screen = "settings";
     persistUiState();
@@ -4180,6 +4183,15 @@ function renderEvents() {
     });
   });
   bindAuditCards();
+}
+
+async function exportDiagnosticBundle() {
+  const result = await runAction("diagnostics-export", () => api.get("/diagnostics/bundle"), async () => {});
+  if (!result?.diagnostic_bundle) return;
+  exportConsoleData("diagnostics", {
+    diagnostic_bundle: result.diagnostic_bundle,
+    note: "Redacted support bundle. Secrets are excluded; safety flags remain visible.",
+  });
 }
 
 function exportEventsData() {
