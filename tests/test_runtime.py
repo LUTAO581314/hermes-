@@ -1598,7 +1598,10 @@ class RuntimeFoundationTests(unittest.TestCase):
         settings_screen = next(screen for screen in contract["screens"] if screen["id"] == "runtime_settings")
         self.assertIn("/config/status", status_paths)
         self.assertIn("/config/status", settings_screen["read"])
+        self.assertIn("/backup/status", settings_screen["read"])
+        self.assertIn("/backup/plan", settings_screen["read"])
         self.assertIn({"id": "apply_local_config", "method": "POST", "path": "/config/apply", "schema": "config_apply"}, settings_screen["actions"])
+        self.assertIn({"id": "run_database_migration", "method": "POST", "path": "/admin/migrate", "schema": "database_migration"}, settings_screen["actions"])
         self.assertIn("function renderSettingsGateGrid", app_js)
         self.assertIn("function renderSettingsReadinessList", app_js)
         self.assertIn("function renderSettingsRuntimeMatrix", app_js)
@@ -1607,6 +1610,10 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("function renderSettingsConfigFields", app_js)
         self.assertIn("function renderSettingsConfigChecklist", app_js)
         self.assertIn("function renderSettingsConfigForm", app_js)
+        self.assertIn("function renderSettingsDataOperations", app_js)
+        self.assertIn("function renderSettingsBackupPlan", app_js)
+        self.assertIn("async function runSettingsDatabaseMigration", app_js)
+        self.assertIn("async function loadSettingsBackupPlan", app_js)
         self.assertIn("function settingsConfigStatusFields", app_js)
         self.assertIn("function settingsConfigFieldValue", app_js)
         self.assertIn("function settingsConfigSecretState", app_js)
@@ -1624,6 +1631,13 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("item.display_name", app_js)
         self.assertIn("Settings is the operator view for /health, /ready, /runtime/readiness", app_js)
         self.assertIn("Self-service configuration for model API, scoped data paths, channel targets, Avatar assets, CodeGraph, and database. Secret fields can be saved but never echo.", app_js)
+        self.assertIn("PostgreSQL migration, backup readiness, and restore guardrails are visible here.", app_js)
+        self.assertIn('api.post("/admin/migrate"', app_js)
+        self.assertIn('api.get("/backup/plan"', app_js)
+        self.assertIn('api.get("/backup/status"', app_js)
+        self.assertIn("plan.command", app_js)
+        self.assertIn("database URL is never printed", app_js)
+        self.assertIn("destructive restore stays a CLI maintenance-window plan", app_js)
         self.assertIn('value="${escapeHtml(settingsConfigFieldValue("model_base_url"))}"', app_js)
         self.assertIn('value="${escapeHtml(settingsConfigFieldValue("document_output_dir"))}"', app_js)
         self.assertIn('value="${escapeHtml(settingsConfigFieldValue("memory_vault_dir"))}"', app_js)
@@ -1676,6 +1690,8 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn(".settings-config-center", styles)
         self.assertIn(".settings-config-form", styles)
         self.assertIn(".settings-form-status-strip", styles)
+        self.assertIn(".settings-data-ops-grid", styles)
+        self.assertIn(".settings-backup-plan", styles)
         self.assertIn(".settings-apply-result", styles)
         self.assertIn(".settings-config-fields", styles)
         self.assertIn(".settings-secret-policy", styles)
@@ -3135,6 +3151,36 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(cli_status_code, 0)
         self.assertEqual(cli_plan_code, 0)
         self.assertNotIn("super-secret", serialized)
+
+    def test_backup_http_endpoints_are_secret_safe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_DATABASE_URL": "postgresql://bairui:http-secret@example.test:5432/bairui",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                server = ThreadingHTTPServer(("127.0.0.1", 0), HermesHandler)
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    status_code, _, status_body = _http_get(server.server_port, "/backup/status")
+                    plan_code, _, plan_body = _http_get(server.server_port, "/backup/plan")
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+
+        payload = json.loads(status_body.decode("utf-8"))
+        plan = json.loads(plan_body.decode("utf-8"))
+        serialized = json.dumps({"status": payload, "plan": plan}, ensure_ascii=False)
+        self.assertEqual(status_code, 200)
+        self.assertEqual(plan_code, 200)
+        self.assertEqual(payload["service"], "bairui")
+        self.assertEqual(plan["backup_plan"]["status"], "ready")
+        self.assertIn("pg_dump", plan["backup_plan"]["command"])
+        self.assertIn("$HERMES_DATABASE_URL", plan["backup_plan"]["command"])
+        self.assertNotIn("http-secret", serialized)
 
     def test_backup_status_without_database_url_is_missing_config(self):
         with tempfile.TemporaryDirectory() as tmp:

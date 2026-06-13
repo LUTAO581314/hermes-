@@ -136,6 +136,9 @@ const state = {
   activationAction: null,
   configApplyResult: null,
   settingsConfigDraft: {},
+  databaseMigrationResult: null,
+  backupStatus: null,
+  backupPlan: null,
   demoSeed: null,
   demoFlow: null,
   auditFilter: "all",
@@ -3847,6 +3850,18 @@ function renderSettings() {
     <section class="panel pad top-gap">
       <div class="conversation-head">
         <div>
+          <h2 class="panel-title">Data persistence operations</h2>
+          <p class="muted compact-copy">PostgreSQL migration, backup readiness, and restore guardrails are visible here. Database URLs and passwords never echo; destructive restore stays a CLI maintenance-window plan.</p>
+        </div>
+        ${pill(state.backupStatus?.backup?.status || state.ready?.database?.status || "missing_config")}
+      </div>
+      ${renderSettingsDataOperations()}
+      ${renderProductError("database-migrate")}
+      ${renderProductError("backup-plan")}
+    </section>
+    <section class="panel pad top-gap">
+      <div class="conversation-head">
+        <div>
           <h2 class="panel-title">Runtime adapter matrix</h2>
           <p class="muted compact-copy">Each row is backed by a real status endpoint or readiness item. Optional runtimes may stay partial without blocking local demo flow.</p>
         </div>
@@ -3881,6 +3896,8 @@ function renderSettings() {
   });
   document.getElementById("settings-save-config")?.addEventListener("click", saveSettingsConfig);
   document.getElementById("settings-save-owner-token-local")?.addEventListener("click", saveOwnerTokenLocal);
+  document.getElementById("settings-run-migration")?.addEventListener("click", runSettingsDatabaseMigration);
+  document.getElementById("settings-load-backup-plan")?.addEventListener("click", loadSettingsBackupPlan);
   document.getElementById("settings-open-activation")?.addEventListener("click", async () => {
     state.screen = "activation";
     persistUiState();
@@ -4180,6 +4197,76 @@ function renderSettingsConfigFields(fields) {
         .map(([key, value]) => `<div><span>${escapeHtml(key)}</span><strong>${escapeHtml(value)}</strong></div>`)
         .join("")}
     </div>`;
+}
+
+function renderSettingsDataOperations() {
+  const database = state.ready?.database || {};
+  const backup = state.backupStatus?.backup || {};
+  const plan = state.backupPlan?.backup_plan || null;
+  const migration = state.databaseMigrationResult?.database || null;
+  return `
+    <div class="settings-data-ops-grid">
+      <div>
+        <span>Database</span>
+        ${pill(database.status || "missing_config")}
+        <strong>${escapeHtml(database.detail || "HERMES_DATABASE_URL is empty")}</strong>
+        <p>Structured production state is prepared for PostgreSQL; JSONL remains the local beta fallback until migration is verified.</p>
+      </div>
+      <div>
+        <span>Backup</span>
+        ${pill(backup.status || "missing_config")}
+        <strong>${escapeHtml(backup.detail || "Backup status has not been loaded.")}</strong>
+        <p>${escapeHtml(backup.backup_dir || "Backup artifacts are stored under data/backups/postgres.")}</p>
+      </div>
+      <div>
+        <span>Restore guard</span>
+        ${pill("approval_required")}
+        <strong>typed confirmation required</strong>
+        <p>Restore is destructive and remains a guarded CLI plan for maintenance windows.</p>
+      </div>
+      <div>
+        <span>Last migration</span>
+        ${pill(migration?.status || "not_run")}
+        <strong>${escapeHtml(migration?.detail || "Migration has not been run from this console session.")}</strong>
+        <p>Run only after PostgreSQL URL is configured and owner access is available.</p>
+      </div>
+    </div>
+    <div class="action-row top-gap">
+      <button class="primary-btn" id="settings-run-migration" type="button">Run Migration</button>
+      <button class="ghost-btn" id="settings-load-backup-plan" type="button">Load Backup Plan</button>
+      <span class="muted compact-copy">Migration creates/updates schema. Backup plan prints a command that uses $HERMES_DATABASE_URL without exposing the database URL.</span>
+    </div>
+    ${plan ? renderSettingsBackupPlan(plan) : `<div class="empty-state top-gap">Backup plan is not loaded yet. Load it before accepting real customer data.</div>`}`;
+}
+
+function renderSettingsBackupPlan(plan) {
+  return `
+    <div class="settings-backup-plan">
+      <div class="agent-meta">
+        ${pill(plan.status || "missing_config")}
+        <span class="chip">secret_echo=false</span>
+        <span class="chip">format=${escapeHtml(plan.format || "custom")}</span>
+      </div>
+      <div class="settings-data-ops-grid compact">
+        <div><span>Database ref</span><strong>${escapeHtml([plan.database?.host, plan.database?.database].filter(Boolean).join("/") || "not configured")}</strong></div>
+        <div><span>Backup dir</span><strong>${escapeHtml(plan.backup_dir || "")}</strong></div>
+        <div><span>Output path</span><strong>${escapeHtml(plan.output_path || "")}</strong></div>
+      </div>
+      <pre class="mono">${escapeHtml(plan.command || "")}</pre>
+      <p class="muted compact-copy">${escapeHtml(plan.secret_policy || "database URL is never printed")} ${escapeHtml(plan.next_step || "")}</p>
+    </div>`;
+}
+
+async function runSettingsDatabaseMigration() {
+  const result = await runAction("database-migrate", () => api.post("/admin/migrate", {}), loadRuntimeStatus);
+  state.databaseMigrationResult = result || state.databaseMigrationResult;
+  await refresh();
+}
+
+async function loadSettingsBackupPlan() {
+  const result = await runAction("backup-plan", () => api.get("/backup/plan"), loadRuntimeStatus);
+  state.backupPlan = result || state.backupPlan;
+  render();
 }
 
 function renderSettingsGateGrid() {
@@ -5306,9 +5393,10 @@ async function submitAgentCommand(promptText, options = {}) {
 }
 
 async function loadRuntimeStatus() {
-  const [configStatus, adminSession, memory, voice, document, intel, simulation, search, index, codegraph] = await Promise.all([
+  const [configStatus, adminSession, backupStatus, memory, voice, document, intel, simulation, search, index, codegraph] = await Promise.all([
     safe(() => api.get("/config/status"), state.configStatus, "config-status"),
     safe(() => api.get("/admin/session"), state.adminSession, "admin-session"),
+    safe(() => api.get("/backup/status"), state.backupStatus, "backup-status"),
     safe(() => api.get("/memory/status"), state.runtimeStatus.memory, "memory-status"),
     safe(() => api.get("/voice/asr/status"), state.runtimeStatus.voice, "voice-status"),
     safe(() => api.get("/document/parse/status"), state.runtimeStatus.document, "document-status"),
@@ -5320,6 +5408,7 @@ async function loadRuntimeStatus() {
   ]);
   state.configStatus = configStatus;
   state.adminSession = adminSession;
+  state.backupStatus = backupStatus;
   state.runtimeStatus = { memory, voice, document, intel, simulation, search, index, codegraph };
 }
 

@@ -254,6 +254,8 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                 "read": (
                     "/memory/status",
                     "/config/status",
+                    "/backup/status",
+                    "/backup/plan",
                     "/voice/asr/status",
                     "/document/parse/status",
                     "/intel/status",
@@ -263,7 +265,10 @@ def build_frontend_contract(settings: Settings, version: str) -> dict[str, objec
                     "/avatar/status",
                     "/codegraph/status",
                 ),
-                "actions": ({"id": "apply_local_config", "method": "POST", "path": "/config/apply", "schema": "config_apply"},),
+                "actions": (
+                    {"id": "apply_local_config", "method": "POST", "path": "/config/apply", "schema": "config_apply"},
+                    {"id": "run_database_migration", "method": "POST", "path": "/admin/migrate", "schema": "database_migration"},
+                ),
             },
             {
                 "id": "codegraph",
