@@ -40,6 +40,7 @@ from src.hermes.adapters.sonic import SonicResult, build_docker_command as build
 from src.hermes.adapters.trendradar import build_mcp_command, status as trendradar_status
 from src.hermes.license import load_license, sign_license_payload
 from src.hermes.model_gateway import build_chat_payload, complete_chat
+from src.hermes.observability import build_metrics_summary, list_error_logs, record_error_log
 from src.hermes.platform import HEARTBEAT_PROTOCOL_VERSION, build_platform_heartbeat
 from src.hermes.runtime_readiness import collect_runtime_readiness
 from src.hermes.server import HermesHandler, PUBLIC_SERVICE
@@ -1101,6 +1102,46 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("/jobs", [audit["resource_ref"] for audit in audits])
         self.assertNotIn("owner-secret-token", raw)
 
+    def test_error_log_and_metrics_record_redacted_http_failures(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {
+                "HERMES_DATA_DIR": str(root / "data"),
+                "HERMES_LOG_DIR": str(root / "logs"),
+                "HERMES_OBSIDIAN_VAULT_DIR": str(root / "vault"),
+                "BAIRUI_OWNER_TOKEN": "metrics-owner-secret",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                server = ThreadingHTTPServer(("127.0.0.1", 0), HermesHandler)
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    denied_status, _, _ = _http_post(server.server_port, "/jobs", {"title": "blocked", "prompt": "blocked"})
+                    metrics_status, _, metrics_body = _http_get(server.server_port, "/metrics")
+                    errors_status, _, errors_body = _http_get(server.server_port, "/errors")
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+                settings = load_settings()
+                errors = list_error_logs(settings)
+                metrics = build_metrics_summary(settings)
+
+        http_metrics = json.loads(metrics_body.decode("utf-8"))["metrics"]
+        http_errors = json.loads(errors_body.decode("utf-8"))["errors"]
+        raw = json.dumps({"errors": errors, "metrics": metrics, "http_errors": http_errors, "http_metrics": http_metrics}, ensure_ascii=False)
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(metrics_status, 200)
+        self.assertEqual(errors_status, 200)
+        self.assertGreaterEqual(len(errors), 1)
+        self.assertEqual(errors[-1]["status"], 401)
+        self.assertEqual(errors[-1]["path"], "/jobs")
+        self.assertGreaterEqual(metrics["error_count"], 1)
+        self.assertGreaterEqual(metrics["blocked_or_denied_count"], 1)
+        self.assertIn("401", http_metrics["status_codes"])
+        self.assertEqual(http_errors[-1]["error"], "owner_token_required")
+        self.assertNotIn("metrics-owner-secret", raw)
+
     def test_config_status_reports_owner_gate_without_token_value(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
@@ -1139,6 +1180,7 @@ class RuntimeFoundationTests(unittest.TestCase):
             with patch.dict(os.environ, env, clear=False):
                 settings = load_settings()
                 create_job(settings.data_dir, title="Diagnostics job", prompt="collect evidence", route="ops")
+                record_error_log(settings, method="POST", path="/test/error", status=503, payload={"service": "bairui", "error": "test_error", "message": "safe diagnostic failure"})
                 bundle = build_diagnostic_bundle(settings)
 
         raw = json.dumps(bundle, ensure_ascii=False)
@@ -1147,6 +1189,9 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(bundle["external_send_performed"], False)
         self.assertEqual(bundle["long_term_memory_auto_write"], False)
         self.assertGreaterEqual(bundle["counts"]["audit"], 1)
+        self.assertGreaterEqual(bundle["counts"]["errors"], 1)
+        self.assertGreaterEqual(bundle["metrics"]["error_count"], 1)
+        self.assertEqual(bundle["error_summary"]["status_codes"]["503"], 1)
         self.assertIn("job.created", bundle["audit_summary"]["actions"])
         self.assertIn("data_dir", bundle["file_inventory"])
         self.assertIn("secret", bundle["secret_policy"])
@@ -1176,6 +1221,10 @@ class RuntimeFoundationTests(unittest.TestCase):
                     thread.join(timeout=2)
                 with patch("src.hermes.cli.print_json") as print_json:
                     code = run(["diagnostics"])
+                with patch("src.hermes.cli.print_json") as print_metrics_json:
+                    metrics_code = run(["metrics"])
+                with patch("src.hermes.cli.print_json") as print_errors_json:
+                    errors_code = run(["errors"])
 
         payload = json.loads(body.decode("utf-8"))
         raw = json.dumps(payload, ensure_ascii=False)
@@ -1184,6 +1233,10 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertEqual(payload["diagnostic_bundle"]["bundle_type"], "diagnostic")
         self.assertEqual(code, 0)
         self.assertEqual(print_json.call_args.args[0]["diagnostic_bundle"]["bundle_type"], "diagnostic")
+        self.assertEqual(metrics_code, 0)
+        self.assertIn("metrics", print_metrics_json.call_args.args[0])
+        self.assertEqual(errors_code, 0)
+        self.assertIn("errors", print_errors_json.call_args.args[0])
         self.assertNotIn("http-diagnostic-secret", raw)
 
     def test_apply_local_config_rejects_invalid_channel_targets(self):
@@ -1498,8 +1551,13 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn('new EventSource("/events")', app_js)
         self.assertIn('api.get("/audit")', app_js)
         self.assertIn('api.get("/diagnostics/bundle")', app_js)
+        self.assertIn('api.get("/metrics")', app_js)
+        self.assertIn('id="load-metrics"', app_js)
         self.assertIn('id="export-diagnostics"', app_js)
+        self.assertIn("function loadMetrics", app_js)
+        self.assertIn("function renderMetricsSummary", app_js)
         self.assertIn("function exportDiagnosticBundle", app_js)
+        self.assertIn("Metrics not loaded yet.", app_js)
         self.assertIn("Redacted support bundle. Secrets are excluded; safety flags remain visible.", app_js)
         self.assertIn('data-audit-filter', app_js)
         self.assertIn('data-audit-open="${escapeHtml(event.id)}"', app_js)

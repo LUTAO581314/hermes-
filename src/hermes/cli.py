@@ -115,6 +115,7 @@ from .events import list_frontend_events
 from .frontend_contract import build_frontend_contract
 from .license import load_license
 from .model_gateway import complete_chat
+from .observability import build_metrics_summary, list_error_logs
 from .platform import build_platform_heartbeat
 from .runtime_readiness import collect_runtime_readiness
 from .server import serve
@@ -176,6 +177,8 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("config-status", help="Print operator-safe configuration diagnostics")
     subcommands.add_parser("runtime-readiness", help="Print unified vendor runtime readiness")
     subcommands.add_parser("diagnostics", help="Print a redacted customer support diagnostic bundle")
+    subcommands.add_parser("metrics", help="Print aggregated runtime metrics")
+    subcommands.add_parser("errors", help="Print recent redacted error log records")
     demo_parser = subcommands.add_parser("demo", help="Create demo data for local product walkthroughs")
     demo_subcommands = demo_parser.add_subparsers(dest="demo_command")
     demo_seed = demo_subcommands.add_parser("seed", help="Seed demo jobs, reports, memory candidates, and channel approvals")
@@ -555,6 +558,14 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "diagnostics":
         print_json({"service": "bairui", "diagnostic_bundle": build_diagnostic_bundle(settings)})
+        return 0
+
+    if command == "metrics":
+        print_json({"service": "bairui", "metrics": build_metrics_summary(settings)})
+        return 0
+
+    if command == "errors":
+        print_json({"service": "bairui", "errors": list_error_logs(settings)})
         return 0
 
     if command == "demo":

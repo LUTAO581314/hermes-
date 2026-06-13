@@ -86,6 +86,7 @@ const state = {
   jobs: [],
   audit: [],
   events: [],
+  metrics: null,
   agents: [],
   agentSessions: [],
   selectedAgentSessionId: "",
@@ -4124,6 +4125,7 @@ function renderEvents() {
   setScreenHead("Events", "audit timeline");
   el.actions.innerHTML = `
     <button class="primary-btn" id="refresh-events" type="button">Refresh Audit</button>
+    <button class="ghost-btn" id="load-metrics" type="button">Load Metrics</button>
     <button class="ghost-btn" id="export-diagnostics" type="button">Export Diagnostics</button>
     <button class="ghost-btn" id="export-events" type="button">Export Events</button>
     <button class="ghost-btn" id="events-open-settings" type="button">Open Settings</button>
@@ -4139,7 +4141,9 @@ function renderEvents() {
         ${pill(state.events.length ? "ready" : "partial", state.events.length ? "live" : "audit fallback")}
       </div>
       ${renderEventSummary()}
+      ${renderMetricsSummary()}
       ${renderEventSafetyBoundary()}
+      ${renderProductError("metrics")}
       ${renderProductError("diagnostics-export")}
     </section>
     <div class="event-layout">
@@ -4164,6 +4168,7 @@ function renderEvents() {
     render();
   });
   document.getElementById("export-events")?.addEventListener("click", exportEventsData);
+  document.getElementById("load-metrics")?.addEventListener("click", loadMetrics);
   document.getElementById("export-diagnostics")?.addEventListener("click", exportDiagnosticBundle);
   document.getElementById("events-open-settings")?.addEventListener("click", async () => {
     state.screen = "settings";
@@ -4185,6 +4190,12 @@ function renderEvents() {
   bindAuditCards();
 }
 
+async function loadMetrics() {
+  const result = await runAction("metrics", () => api.get("/metrics"), async () => {});
+  state.metrics = result?.metrics || state.metrics;
+  render();
+}
+
 async function exportDiagnosticBundle() {
   const result = await runAction("diagnostics-export", () => api.get("/diagnostics/bundle"), async () => {});
   if (!result?.diagnostic_bundle) return;
@@ -4192,6 +4203,18 @@ async function exportDiagnosticBundle() {
     diagnostic_bundle: result.diagnostic_bundle,
     note: "Redacted support bundle. Secrets are excluded; safety flags remain visible.",
   });
+}
+
+function renderMetricsSummary() {
+  const metrics = state.metrics;
+  if (!metrics) return `<div class="empty-state top-gap">Metrics not loaded yet. Use Load Metrics for error counts, risk levels, and blocked or denied activity.</div>`;
+  return `
+    <div class="event-safety-grid top-gap">
+      <div><span>Errors</span><strong>${escapeHtml(String(metrics.error_count || 0))}</strong><p>Redacted error log records.</p></div>
+      <div><span>High risk</span><strong>${escapeHtml(String(metrics.high_risk_count || 0))}</strong><p>High-risk audit and error evidence.</p></div>
+      <div><span>Blocked/denied</span><strong>${escapeHtml(String(metrics.blocked_or_denied_count || 0))}</strong><p>Missing config, denied, blocked, or failed paths.</p></div>
+      <div><span>Latest error</span><strong>${escapeHtml(metrics.latest_error_at || "none")}</strong><p>${escapeHtml(metrics.secret_policy || "No secret values included.")}</p></div>
+    </div>`;
 }
 
 function exportEventsData() {

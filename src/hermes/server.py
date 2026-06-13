@@ -108,6 +108,7 @@ from .events import build_sse_frame, list_frontend_events
 from .frontend_contract import build_frontend_contract
 from .license import load_license
 from .model_gateway import complete_chat
+from .observability import build_metrics_summary, list_error_logs, record_error_log
 from .platform import build_platform_heartbeat
 from .runtime_readiness import collect_runtime_readiness
 from .storage import (
@@ -196,6 +197,12 @@ class HermesHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/diagnostics/bundle":
             self._send({"service": PUBLIC_SERVICE, "diagnostic_bundle": build_diagnostic_bundle(settings)})
+            return
+        if self.path == "/metrics":
+            self._send({"service": PUBLIC_SERVICE, "metrics": build_metrics_summary(settings)})
+            return
+        if self.path == "/errors":
+            self._send({"service": PUBLIC_SERVICE, "errors": list_error_logs(settings)})
             return
         if self.path == "/avatar/status":
             self._send({"service": PUBLIC_SERVICE, "avatar": avatar_payload(avatar_engine_status(settings))})
@@ -973,6 +980,11 @@ class HermesHandler(BaseHTTPRequestHandler):
         return
 
     def _send(self, payload: dict[str, Any], status: int = 200) -> None:
+        if status >= 400:
+            try:
+                record_error_log(load_settings(), method=self.command, path=self.path, status=status, payload=payload)
+            except OSError:
+                pass
         body = _json_bytes(payload)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")

@@ -10,6 +10,7 @@ from .config_status import build_config_status
 from .db import database_status
 from .events import list_frontend_events
 from .license import load_license
+from .observability import build_metrics_summary, list_error_logs
 from .platform import build_platform_heartbeat
 from .runtime_readiness import collect_runtime_readiness
 from .storage import (
@@ -38,8 +39,11 @@ def build_diagnostic_bundle(settings: Settings, *, audit_limit: int = 100) -> di
     memory_reviews = list_document_memory_reviews(settings.data_dir)
     license_state = load_license(settings.license_file, settings.license_secret)
     db_state = database_status(settings)
+    errors = list_error_logs(settings, limit=100)
+    metrics = build_metrics_summary(settings)
     counts = _counts(
         audit=audit,
+        errors=errors,
         frontend_events=frontend_events,
         jobs=jobs,
         reports=reports,
@@ -74,7 +78,10 @@ def build_diagnostic_bundle(settings: Settings, *, audit_limit: int = 100) -> di
         "config_status": config_status,
         "runtime_readiness": readiness,
         "counts": counts,
+        "metrics": metrics,
         "audit_summary": _audit_summary(audit),
+        "error_summary": _error_summary(errors),
+        "recent_errors": errors[-50:],
         "recent_audit": _safe_recent_audit(audit),
         "frontend_events": frontend_events[-25:],
         "file_inventory": _file_inventory(settings),
@@ -96,6 +103,19 @@ def _audit_summary(audit: list[dict[str, Any]]) -> dict[str, Any]:
         "risk_levels": dict(risk_levels),
         "blocked_count": len(blocked),
         "latest_created_at": str(audit[-1].get("created_at", "")) if audit else "",
+    }
+
+
+def _error_summary(errors: list[dict[str, Any]]) -> dict[str, Any]:
+    codes = Counter(str(item.get("status", "")) for item in errors)
+    paths = Counter(str(item.get("path", "")) for item in errors)
+    names = Counter(str(item.get("error", "")) for item in errors)
+    return {
+        "total": len(errors),
+        "status_codes": dict(codes),
+        "top_paths": dict(paths.most_common(10)),
+        "top_errors": dict(names.most_common(10)),
+        "latest_created_at": str(errors[-1].get("created_at", "")) if errors else "",
     }
 
 
