@@ -221,9 +221,9 @@ documents, license notices, dependency metadata, and vendor runtime folders.
 They are not allowed in public product labels, activation copy, console routes,
 customer reports, setup text, or exported customer-facing contract fields.
 
-Before a paid trial, prepare or review the third-party attribution inventory and
-confirm every included runtime license is compatible with the planned customer
-deployment model.
+Before a paid trial, review the third-party attribution inventory in
+`docs/28-third-party-attribution-inventory.md` and confirm every enabled runtime
+license is compatible with the planned customer deployment model.
 
 ## 9. Go/No-Go Checklist
 
@@ -243,7 +243,8 @@ Go only when all items are true:
 - Demo evidence shows `will_send=false` and no automatic long-term memory write.
 - Deployment writes `data/readiness.json`.
 - PostgreSQL backup/restore is validated before real customer data.
-- Third-party license and attribution review is complete before paid delivery.
+- Third-party license and attribution review is complete with
+  `docs/28-third-party-attribution-inventory.md` before paid delivery.
 
 No-go when any customer data, external sending, memory promotion, model gateway
 secret, parser runtime, backup/restore, or license boundary is unverified.

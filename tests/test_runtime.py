@@ -1681,6 +1681,7 @@ class RuntimeFoundationTests(unittest.TestCase):
         doc = Path("docs/27-commercial-trial-delivery-quickstart.md").read_text(encoding="utf-8")
 
         self.assertIn("docs/27-commercial-trial-delivery-quickstart.md", readme)
+        self.assertIn("docs/28-third-party-attribution-inventory.md", readme)
         self.assertIn("python -m src.hermes diagnostics", readme)
         self.assertIn("python -m src.hermes metrics", readme)
         self.assertIn("python -m src.hermes errors", readme)
@@ -1706,6 +1707,33 @@ class RuntimeFoundationTests(unittest.TestCase):
         self.assertIn("data/readiness.json", doc)
         self.assertIn("PostgreSQL backup/restore", doc)
         self.assertIn("third-party attribution inventory", doc)
+        self.assertIn("docs/28-third-party-attribution-inventory.md", doc)
+
+    def test_third_party_attribution_inventory_covers_trial_license_boundaries(self):
+        doc = Path("docs/28-third-party-attribution-inventory.md").read_text(encoding="utf-8")
+        required = (
+            "psycopg",
+            "EverOS",
+            "FunASR",
+            "MinerU",
+            "TrendRadar",
+            "MiroFish",
+            "SearXNG",
+            "Sonic",
+            "pixi-live2d-display-advanced",
+            "BaiLongma",
+            "Apache-2.0",
+            "MIT",
+            "GPLv3",
+            "AGPLv3",
+            "MPL-2.0",
+            "review required",
+            ".\\scripts\\check-public-brand.ps1",
+            "Customer-facing product surfaces must still expose only the `bairui` brand.",
+            "not legal advice",
+        )
+        for text in required:
+            self.assertIn(text, doc)
 
     def test_avatar_engine_status_uses_advanced_runtime_contract(self):
         state = avatar_engine_status(load_settings())
