@@ -134,6 +134,8 @@ const state = {
   codegraphActionResult: null,
   activationProbe: null,
   activationAction: null,
+  configApplyResult: null,
+  settingsConfigDraft: {},
   demoSeed: null,
   demoFlow: null,
   auditFilter: "all",
@@ -142,6 +144,7 @@ const state = {
   loading: new Set(),
   errors: {},
   errorDetails: {},
+  toast: "",
 };
 
 let activationThreeCore = null;
@@ -3904,21 +3907,29 @@ async function saveOwnerTokenLocal() {
 }
 
 function renderSettingsConfigForm() {
+  const modelKeyState = settingsConfigSecretState("model_gateway", "api_key");
+  const databaseState = settingsConfigSecretState("database", "database_url");
+  const ownerTokenState = settingsConfigSecretState("owner_gate", "owner_token");
   return `
     <section class="settings-config-form">
+      <div class="settings-form-status-strip">
+        <div><span>Loaded safely</span><strong>${escapeHtml(settingsConfigPrefillSummary())}</strong></div>
+        <div><span>Secret fields</span><strong>status only, never echoed</strong></div>
+        <div><span>Confirmation</span><strong>${escapeHtml(state.configApplyResult?.confirmation_phrase || "only for high-risk changes")}</strong></div>
+      </div>
       <div class="form-grid two-cols">
         <label>
           <span class="form-label">Model base URL</span>
-          <input class="field" id="settings-model-base-url" placeholder="https://models.example.com/v1" />
+          <input class="field" id="settings-model-base-url" value="${escapeHtml(settingsConfigFieldValue("model_base_url"))}" placeholder="https://models.example.com/v1" />
         </label>
         <label>
           <span class="form-label">Model name</span>
-          <input class="field" id="settings-model-name" placeholder="bairui-demo-model" />
+          <input class="field" id="settings-model-name" value="${escapeHtml(settingsConfigFieldValue("model_name"))}" placeholder="bairui-demo-model" />
         </label>
       </div>
       <label>
         <span class="form-label">Model API key</span>
-        <input class="field" id="settings-model-api-key" type="password" autocomplete="new-password" placeholder="Save new key; existing key is never shown" />
+        <input class="field" id="settings-model-api-key" type="password" autocomplete="new-password" placeholder="${escapeHtml(modelKeyState === "configured" ? "Configured; enter a new key only to rotate" : "Save new key; existing key is never shown")}" />
       </label>
       <div class="form-grid two-cols">
         <label>
@@ -3927,42 +3938,42 @@ function renderSettingsConfigForm() {
         </label>
         <label>
           <span class="form-label">New owner token for server</span>
-          <input class="field" id="settings-owner-token-new" type="password" autocomplete="new-password" placeholder="Optional; save new token, never echo" />
+          <input class="field" id="settings-owner-token-new" type="password" autocomplete="new-password" placeholder="${escapeHtml(ownerTokenState === "configured" ? "Configured; enter a new token only to rotate" : "Optional; save new token, never echo")}" />
         </label>
       </div>
       <div class="form-grid two-cols">
         <label>
           <span class="form-label">Document output directory</span>
-          <input class="field" id="settings-document-output-dir" placeholder="data\\documents or C:\\Users\\you\\bairui\\documents" />
+          <input class="field" id="settings-document-output-dir" value="${escapeHtml(settingsConfigFieldValue("document_output_dir"))}" placeholder="data\\documents or C:\\Users\\you\\bairui\\documents" />
         </label>
         <label>
           <span class="form-label">Memory vault directory</span>
-          <input class="field" id="settings-memory-vault-dir" placeholder="obsidian-vault or C:\\Users\\you\\bairui\\memory-vault" />
+          <input class="field" id="settings-memory-vault-dir" value="${escapeHtml(settingsConfigFieldValue("memory_vault_dir"))}" placeholder="obsidian-vault or C:\\Users\\you\\bairui\\memory-vault" />
         </label>
       </div>
       <div class="form-grid two-cols">
         <label>
           <span class="form-label">Avatar assets directory</span>
-          <input class="field" id="settings-avatar-assets-dir" placeholder="data\\avatars or C:\\Users\\you\\bairui\\avatars" />
+          <input class="field" id="settings-avatar-assets-dir" value="${escapeHtml(settingsConfigFieldValue("avatar_assets_dir"))}" placeholder="data\\avatars or C:\\Users\\you\\bairui\\avatars" />
         </label>
         <label>
           <span class="form-label">Avatar default model</span>
-          <input class="field" id="settings-avatar-default-model" placeholder="bairui.model3.json" />
+          <input class="field" id="settings-avatar-default-model" value="${escapeHtml(settingsConfigFieldValue("avatar_default_model"))}" placeholder="bairui.model3.json" />
         </label>
       </div>
       <div class="form-grid two-cols">
         <label>
           <span class="form-label">CodeGraph root</span>
-          <input class="field" id="settings-codegraph-root" placeholder="data\\codegraph or C:\\Users\\you\\bairui\\codegraph" />
+          <input class="field" id="settings-codegraph-root" value="${escapeHtml(settingsConfigFieldValue("codegraph_root"))}" placeholder="data\\codegraph or C:\\Users\\you\\bairui\\codegraph" />
         </label>
         <label>
           <span class="form-label">PostgreSQL URL</span>
-          <input class="field" id="settings-database-url" type="password" autocomplete="new-password" placeholder="Optional; save new URL, never echo" />
+          <input class="field" id="settings-database-url" type="password" autocomplete="new-password" placeholder="${escapeHtml(databaseState === "configured" ? "Configured; enter a new URL only to rotate" : "Optional; save new URL, never echo")}" />
         </label>
       </div>
       <label>
         <span class="form-label">Channel targets JSON</span>
-        <textarea class="textarea" id="settings-channel-targets-json" rows="4" placeholder='[{"id":"owner","label":"Owner","channel_type":"personal_chat"}]'></textarea>
+        <textarea class="textarea" id="settings-channel-targets-json" rows="4" placeholder='[{"id":"owner","label":"Owner","channel_type":"personal_chat"}]'>${escapeHtml(settingsConfigFieldValue("channel_targets_json"))}</textarea>
       </label>
       <label>
         <span class="form-label">Dangerous change confirmation</span>
@@ -3984,6 +3995,11 @@ function renderSettingsConfigForm() {
 function renderSettingsConfigApplyResult() {
   const result = state.configApplyResult;
   if (!result) return "";
+  const next = result.status === "confirmation_required"
+    ? "Review dangerous_fields, type APPLY BAIRUI CONFIG, then re-enter any secret values before saving."
+    : result.restart_required
+      ? "Restart the bairui server after saving, then refresh Settings to verify the new runtime state."
+      : "Refresh diagnostics, then continue Activation or run the mapped workbench action.";
   return `
     <div class="settings-apply-result">
       <div class="agent-meta">
@@ -3995,7 +4011,58 @@ function renderSettingsConfigApplyResult() {
       ${result.confirmation_phrase ? `<p class="muted compact-copy">confirmation_phrase=${escapeHtml(result.confirmation_phrase)}</p>` : ""}
       ${result.path_scope_policy ? `<p class="muted compact-copy">path_scope=${escapeHtml(result.path_scope_policy)}</p>` : ""}
       <p>${escapeHtml(result.path || result.secret_policy || "Configuration saved.")}</p>
+      <p class="muted compact-copy">next_step=${escapeHtml(next)}</p>
     </div>`;
+}
+
+function settingsConfigStatusFields(itemId) {
+  return configStatusItem(itemId)?.fields || {};
+}
+
+function settingsConfigFieldValue(field) {
+  const draft = state.settingsConfigDraft || {};
+  if (Object.prototype.hasOwnProperty.call(draft, field)) return draft[field];
+  const map = {
+    model_base_url: ["model_gateway", "base_url"],
+    model_name: ["model_gateway", "model"],
+    document_output_dir: ["document_output_dir", "path"],
+    memory_vault_dir: ["memory_vault", "path"],
+    avatar_assets_dir: ["avatar_assets", "path"],
+    avatar_default_model: ["avatar_assets", "default_model"],
+    codegraph_root: ["codegraph_root", "path"],
+  };
+  const [itemId, key] = map[field] || [];
+  if (!itemId) return "";
+  const value = settingsConfigStatusFields(itemId)?.[key] || "";
+  return value && value !== "missing_config" ? String(value) : "";
+}
+
+function settingsConfigSecretState(itemId, key) {
+  return String(settingsConfigStatusFields(itemId)?.[key] || "missing_config");
+}
+
+function settingsConfigPrefillSummary() {
+  const fields = ["model_base_url", "model_name", "document_output_dir", "memory_vault_dir", "avatar_assets_dir", "avatar_default_model", "codegraph_root"];
+  const count = fields.filter((field) => settingsConfigFieldValue(field)).length;
+  return `${count} non-secret fields from /config/status`;
+}
+
+function settingsSafeDraft(values) {
+  const safeFields = new Set([
+    "model_base_url",
+    "model_name",
+    "document_output_dir",
+    "memory_vault_dir",
+    "channel_targets_json",
+    "avatar_assets_dir",
+    "avatar_default_model",
+    "codegraph_root",
+  ]);
+  return Object.fromEntries(
+    Object.entries(values)
+      .filter(([field, value]) => safeFields.has(field) && String(value || "").trim() !== "")
+      .map(([field, value]) => [field, String(value || "").trim()]),
+  );
 }
 
 async function saveSettingsConfig() {
@@ -4012,6 +4079,7 @@ async function saveSettingsConfig() {
     codegraph_root: document.getElementById("settings-codegraph-root")?.value || "",
     database_url: document.getElementById("settings-database-url")?.value || "",
   };
+  state.settingsConfigDraft = settingsSafeDraft(values);
   const payload = {
     create_dirs: document.getElementById("settings-create-dirs")?.checked !== false,
     danger_confirmation: document.getElementById("settings-danger-confirmation")?.value || "",
@@ -4025,6 +4093,7 @@ async function saveSettingsConfig() {
     const result = await api.post("/config/apply", payload);
     state.configApplyResult = result?.config_apply || null;
     state.configStatus = result?.config_status ? { config_status: result.config_status } : state.configStatus;
+    state.settingsConfigDraft = {};
     await refreshScreenData();
   } catch (error) {
     state.configApplyResult = error?.payload?.config_apply || null;
